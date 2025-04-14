@@ -1,6 +1,4 @@
 import ast
-import typing
-from typing import Dict, List, Set, Tuple, Optional, Any, Union
 
 class TypeExtractor(ast.NodeVisitor):
     """Extract type information from Python AST."""

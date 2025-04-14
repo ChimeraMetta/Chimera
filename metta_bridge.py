@@ -1,4 +1,4 @@
-from hyperon import MeTTa, Symbol, Expression, Space, Atom
+from hyperon import MeTTa
 import os
 
 class MeTTaBridge:
