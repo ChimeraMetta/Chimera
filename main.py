@@ -19,6 +19,8 @@ def main():
     
     # Extract type information and errors
     extracted_info = decompose_python_file(python_file)
+
+    print(extracted_info)
     
     # Load the MeTTa donor system
     bridge = MeTTaBridge("donor_system.metta")
