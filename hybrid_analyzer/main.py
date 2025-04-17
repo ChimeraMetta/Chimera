@@ -11,11 +11,11 @@ from typing import List, Dict, Any, Optional
 
 # Import our components
 from console_ui import ConsoleUI
-from code_manager import CodeManager
-from commands.scan_command import ScanCommand
-from commands.analyze_command import AnalyzeCommand
-from commands.monitor_command import MonitorCommand
-from commands.recommend_command import RecommendCommand
+from manager import CodeManager
+from commands.scan import ScanCommand
+from commands.analyze import AnalyzeCommand
+from commands.monitor import MonitorCommand
+from commands.recommend import RecommendCommand
 
 # Check for required modules
 try:
