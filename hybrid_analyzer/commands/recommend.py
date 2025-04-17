@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 
 # Check for analyzer modules
 try:
-    from hybrid_analyzer.dynamic_monitor import monitor
+    from dynamic_monitor import monitor
     MONITOR_MODULE_AVAILABLE = True
 except ImportError:
     MONITOR_MODULE_AVAILABLE = False
