@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 
 # Check for analyzer modules
 try:
-    from static_analyzer import decompose_file
+    from hybrid_analyzer.static_analyzer import decompose_file
     ANALYZER_MODULES_AVAILABLE = True
 except ImportError:
     ANALYZER_MODULES_AVAILABLE = False

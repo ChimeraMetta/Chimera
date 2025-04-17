@@ -13,7 +13,7 @@ from file_processor import extract_functions, add_monitoring_to_file
 
 # Check for analyzer modules
 try:
-    from static_analyzer import decompose_file, decompose_source
+    from hybrid_analyzer.static_analyzer import decompose_file, decompose_source
     from dynamic_monitor import hybrid_transform, monitor
     ANALYZER_MODULES_AVAILABLE = True
 except ImportError:

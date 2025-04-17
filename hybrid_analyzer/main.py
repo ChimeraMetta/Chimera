@@ -19,7 +19,7 @@ from commands.recommend import RecommendCommand
 
 # Check for required modules
 try:
-    from static_analyzer import decompose_file
+    from hybrid_analyzer.static_analyzer import decompose_file
     from dynamic_monitor import hybrid_transform, monitor
     ANALYZER_MODULES_AVAILABLE = True
 except ImportError:
