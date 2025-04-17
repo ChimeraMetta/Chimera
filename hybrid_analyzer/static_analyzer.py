@@ -528,6 +528,98 @@ class CodeDecomposer(ast.NodeVisitor):
         
         return last_line
 
+def convert_python_type_to_metta(py_type: str) -> str:
+    """
+    Convert Python type annotations to MeTTa-friendly type representation.
+    
+    Examples:
+    - List[int] -> (List Number)
+    - Dict[str, List[int]] -> (Dict String (List Number))
+    - Optional[str] -> (Maybe String)
+    - Union[int, str] -> (Either Number String)
+    - Tuple[int, str] -> (Tuple Number String)
+    - Any -> Any
+    """
+    if not py_type or py_type == "Any" or py_type == "%Undefined%" or py_type == "None":
+        return py_type or "Any"
+    
+    # Check if it's a generic type with parameters
+    if "[" in py_type and "]" in py_type:
+        base_type, params_str = py_type.split("[", 1)
+        params_str = params_str.rstrip("]")
+        
+        # Handle common Python type hints
+        base_type = base_type.strip()
+        
+        # Map Python types to MeTTa types
+        type_mapping = {
+            "List": "List",
+            "Dict": "Dict",
+            "Set": "Set",
+            "Tuple": "Tuple",
+            "Optional": "Maybe",
+            "Union": "Either",
+            "Callable": "Function",
+            "Iterable": "Iterable",
+            "Iterator": "Iterator",
+            "Sequence": "Sequence",
+            "Mapping": "Mapping"
+        }
+        
+        metta_base_type = type_mapping.get(base_type, base_type)
+        
+        # Process parameters
+        # Split by commas, but respect nested brackets
+        params = []
+        current_param = ""
+        bracket_count = 0
+        
+        for char in params_str:
+            if char == "," and bracket_count == 0:
+                params.append(current_param.strip())
+                current_param = ""
+            else:
+                current_param += char
+                if char == "[":
+                    bracket_count += 1
+                elif char == "]":
+                    bracket_count -= 1
+        
+        if current_param:
+            params.append(current_param.strip())
+        
+        # Convert each parameter recursively
+        metta_params = [convert_python_type_to_metta(param) for param in params]
+        
+        # Format as MeTTa type expression
+        return f"({metta_base_type} {' '.join(metta_params)})"
+    
+    # Map basic Python types to MeTTa types
+    basic_type_mapping = {
+        "str": "String",
+        "int": "Number",
+        "float": "Number",
+        "bool": "Bool",
+        "list": "List",
+        "dict": "Dict",
+        "set": "Set",
+        "tuple": "Tuple",
+        "None": "None",
+        "string": "String",
+        "number": "Number",
+        "boolean": "Bool",
+        "array": "List",
+        "object": "Dict",
+        "String": "String",
+        "Number": "Number",
+        "Bool": "Bool",
+        "List": "List",
+        "Dict": "Dict",
+        "Set": "Set",
+        "Tuple": "Tuple"
+    }
+    
+    return basic_type_mapping.get(py_type, py_type)
 
 def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
     """Convert decomposed code structure to MeTTa atoms with proper atomic representation."""
@@ -539,13 +631,14 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
             # Function definition atoms
             params_list = []
             for _, param_type in atom["params"]:
-                params_list.append(param_type or "Any")
+                param_type_str = convert_python_type_to_metta(param_type or "Any")
+                params_list.append(param_type_str)
             
             params_str = " ".join(params_list)
-            return_str = atom["return_type"] or "Any"
+            return_type = convert_python_type_to_metta(atom["return_type"] or "Any")
             
             # Create proper type signature - names as atoms, not strings
-            metta_atoms.append(f"(: {atom['name']} (-> {params_str} {return_str}))")
+            metta_atoms.append(f"(: {atom['name']} (-> {params_str} {return_type}))")
             
             # Create function definition with scope as a proper atom, not a string
             # Replace colons with hyphens for better MeTTa compatibility
@@ -555,8 +648,8 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
             
             # Add parameters with proper atomic representation
             for i, (param_name, param_type) in enumerate(atom["params"]):
-                param_type_atom = param_type or "Any"
-                metta_atoms.append(f"(function-param {atom['name']} {i} {param_name} {param_type_atom})")
+                param_type_str = convert_python_type_to_metta(param_type or "Any")
+                metta_atoms.append(f"(function-param {atom['name']} {i} {param_name} {param_type_str})")
         
         elif atom["type"] == "class_def":
             # Class definition atoms
@@ -574,12 +667,13 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
         elif atom["type"] == "variable_assign" or atom["type"] == "variable_ann_assign":
             # Variable assignment atoms
             var_type = atom.get("declared_type") or atom.get("inferred_type") or "Any"
+            var_type_str = convert_python_type_to_metta(var_type)
             
             # Create scope path as atoms - replace colons with hyphens
             scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
             var_path = " ".join(scope_atoms + [atom['name']])
             
-            metta_atoms.append(f"(: {var_path} {var_type})")
+            metta_atoms.append(f"(: {var_path} {var_type_str})")
             
             # Variable assignment with scope as atoms
             scope_expr = " ".join(scope_atoms)
@@ -592,10 +686,14 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
             metta_atoms.append(f"(function-call {atom['name']} {atom['args']} {scope_expr} {atom['line']})")
         
         elif atom["type"] == "bin_op":
+            # Convert left and right types
+            left_type_str = convert_python_type_to_metta(atom['left_type'])
+            right_type_str = convert_python_type_to_metta(atom['right_type'])
+            
             # Binary operation atoms with scope as atoms - replace colons with hyphens
             scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
             scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(bin-op {atom['op']} {atom['left_type']} {atom['right_type']} {scope_expr} {atom['line']})")
+            metta_atoms.append(f"(bin-op {atom['op']} {left_type_str} {right_type_str} {scope_expr} {atom['line']})")
         
         elif atom["type"] == "import" or atom["type"] == "import_from":
             # Import atoms with scope as atoms - replace colons with hyphens
@@ -631,7 +729,9 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
     
     # String operations patterns
     for i, op in enumerate(decomposer.string_operations):
-        metta_atoms.append(f"(string-op-pattern {i} {op['op']} {op.get('left_type', 'Any')} {op.get('right_type', 'Any')} {op['line']})")
+        left_type = convert_python_type_to_metta(op.get('left_type', 'Any'))
+        right_type = convert_python_type_to_metta(op.get('right_type', 'Any'))
+        metta_atoms.append(f"(string-op-pattern {i} {op['op']} {left_type} {right_type} {op['line']})")
     
     # Arithmetic operations patterns
     for i, op in enumerate(decomposer.arithmetic_operations):
