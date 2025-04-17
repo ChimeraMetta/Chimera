@@ -9,7 +9,7 @@ import time
 from typing import Any, Dict, List, Callable, Optional, Union, Tuple
 
 # Import the static analyzer
-from static_analyzer import decompose_function, decompose_source
+from hybrid_analyzer.static_analyzer import decompose_function, decompose_source
 
 # MeTTa integration (needs metta package or custom implementation)
 try:

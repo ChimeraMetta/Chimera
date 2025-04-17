@@ -530,59 +530,92 @@ class CodeDecomposer(ast.NodeVisitor):
 
 
 def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
-    """Convert decomposed code structure to MeTTa atoms."""
+    """Convert decomposed code structure to MeTTa atoms with proper atomic representation."""
     metta_atoms = []
     
     # Convert basic structure atoms
     for atom in decomposer.atoms:
         if atom["type"] == "function_def":
             # Function definition atoms
-            params_str = " ".join([param_type or "Any" for _, param_type in atom["params"]])
+            params_list = []
+            for _, param_type in atom["params"]:
+                params_list.append(param_type or "Any")
+            
+            params_str = " ".join(params_list)
             return_str = atom["return_type"] or "Any"
             
+            # Create proper type signature - names as atoms, not strings
             metta_atoms.append(f"(: {atom['name']} (-> {params_str} {return_str}))")
-            metta_atoms.append(f"(function-def {atom['name']} \"{atom['scope']}\" {atom['line_start']} {atom['line_end']})")
             
-            # Add parameters
+            # Create function definition with scope as a proper atom, not a string
+            # Replace colons with hyphens for better MeTTa compatibility
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            metta_atoms.append(f"(function-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})")
+            
+            # Add parameters with proper atomic representation
             for i, (param_name, param_type) in enumerate(atom["params"]):
-                metta_atoms.append(f"(function-param {atom['name']} {i} {param_name} {param_type or 'Any'})")
+                param_type_atom = param_type or "Any"
+                metta_atoms.append(f"(function-param {atom['name']} {i} {param_name} {param_type_atom})")
         
         elif atom["type"] == "class_def":
             # Class definition atoms
             metta_atoms.append(f"(: {atom['name']} Type)")
-            metta_atoms.append(f"(class-def {atom['name']} \"{atom['scope']}\" {atom['line_start']} {atom['line_end']})")
             
-            # Add base classes
-            for i, base in enumerate(atom["bases"]):
+            # Create class definition with scope as proper atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            metta_atoms.append(f"(class-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})")
+            
+            # Add base classes as atoms
+            for base in atom["bases"]:
                 metta_atoms.append(f"(class-inherits {atom['name']} {base})")
         
         elif atom["type"] == "variable_assign" or atom["type"] == "variable_ann_assign":
             # Variable assignment atoms
             var_type = atom.get("declared_type") or atom.get("inferred_type") or "Any"
-            metta_atoms.append(f"(: {atom['scope']}.{atom['name']} {var_type})")
-            metta_atoms.append(f"(variable-assign {atom['name']} \"{atom['scope']}\" {atom['line']})")
+            
+            # Create scope path as atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            var_path = " ".join(scope_atoms + [atom['name']])
+            
+            metta_atoms.append(f"(: {var_path} {var_type})")
+            
+            # Variable assignment with scope as atoms
+            scope_expr = " ".join(scope_atoms)
+            metta_atoms.append(f"(variable-assign {atom['name']} {scope_expr} {atom['line']})")
         
         elif atom["type"] == "function_call":
-            # Function call atoms
-            metta_atoms.append(f"(function-call {atom['name']} {atom['args']} \"{atom['scope']}\" {atom['line']})")
+            # Function call atoms with scope as atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            metta_atoms.append(f"(function-call {atom['name']} {atom['args']} {scope_expr} {atom['line']})")
         
         elif atom["type"] == "bin_op":
-            # Binary operation atoms
-            metta_atoms.append(f"(bin-op {atom['op']} {atom['left_type']} {atom['right_type']} \"{atom['scope']}\" {atom['line']})")
+            # Binary operation atoms with scope as atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            metta_atoms.append(f"(bin-op {atom['op']} {atom['left_type']} {atom['right_type']} {scope_expr} {atom['line']})")
         
         elif atom["type"] == "import" or atom["type"] == "import_from":
-            # Import atoms
+            # Import atoms with scope as atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            
             if atom["type"] == "import":
-                metta_atoms.append(f"(import {atom['name']} \"{atom['scope']}\" {atom['line']})")
+                metta_atoms.append(f"(import {atom['name']} {scope_expr} {atom['line']})")
             else:
-                metta_atoms.append(f"(import-from {atom['module']} {atom['name']} \"{atom['scope']}\" {atom['line']})")
+                metta_atoms.append(f"(import-from {atom['module']} {atom['name']} {scope_expr} {atom['line']})")
     
     # Add ontological relationships
     
     # Module relationships
     for scope, modules in decomposer.module_relationships.items():
+        scope_atoms = [s.replace(':', '-') for s in scope.split('.')]
+        scope_expr = " ".join(scope_atoms)
+        
         for module in modules:
-            metta_atoms.append(f"(module-depends \"{scope}\" {module})")
+            metta_atoms.append(f"(module-depends {scope_expr} {module})")
     
     # Class hierarchies
     for base, derived in decomposer.class_hierarchies.items():
@@ -606,12 +639,21 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
     
     # Loop patterns
     for i, loop in enumerate(decomposer.loop_patterns):
-        metta_atoms.append(f"(loop-pattern {i} {loop['type']} \"{loop['scope']}\" {loop['line']})")
+        # Convert scope to atoms - replace colons with hyphens
+        scope_atoms = [s.replace(':', '-') for s in loop['scope'].split('.')]
+        scope_expr = " ".join(scope_atoms)
+        
+        metta_atoms.append(f"(loop-pattern {i} {loop['type']} {scope_expr} {loop['line']})")
     
     # Function patterns
     for i, func in enumerate(decomposer.function_patterns):
         has_return_str = "True" if func["has_return"] else "False"
-        metta_atoms.append(f"(function-pattern {i} {func['name']} {func['params']} {has_return_str} \"{func['scope']}\")")
+        
+        # Convert scope to atoms - replace colons with hyphens
+        scope_atoms = [s.replace(':', '-') for s in func['scope'].split('.')]
+        scope_expr = " ".join(scope_atoms)
+        
+        metta_atoms.append(f"(function-pattern {i} {func['name']} {func['params']} {has_return_str} {scope_expr})")
     
     return metta_atoms
 
