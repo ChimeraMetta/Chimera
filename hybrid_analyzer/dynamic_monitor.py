@@ -303,44 +303,84 @@ class DynamicMonitor:
     
     def load_metta_rules(self, rules_file: str) -> bool:
         """
-        Load MeTTa rules from a file.
+        Load MeTTa rules from a file using hyperon MeTTa's specific methods.
         
-        This allows users to add domain-specific reasoning rules to the MeTTa space.
+        Since we're seeing 'catom' related errors, we need to use hyperon-specific 
+        parsing methods rather than adding raw strings.
         """
         try:
-            with open(rules_file, 'r') as f:
-                rules = f.read()
-            
-            # Split the file into individual rules/expressions
-            rule_expressions = []
-            current_expression = ""
-            paren_count = 0
-            
-            for char in rules:
-                current_expression += char
+            # Try to use the run_file method if available
+            if hasattr(self.metta_space, 'run_file'):
+                self.metta_space.run_file(rules_file)
+                print(f"Successfully loaded rules from {rules_file}")
+                return True
                 
-                if char == '(':
-                    paren_count += 1
-                elif char == ')':
-                    paren_count -= 1
+            # If run_file is not available, try to parse and execute line by line
+            with open(rules_file, 'r') as f:
+                content = f.read()
+            
+            # Try to run the entire file as a single operation if run_ops is available
+            if hasattr(self.metta_space, 'run_ops'):
+                self.metta_space.run_ops(content)
+                print(f"Successfully loaded rules from {rules_file}")
+                return True
+                
+            # If none of the above methods work, we need to handle each expression separately
+            print(f"Warning: Falling back to individual expression parsing for {rules_file}")
+            
+            # Parse the content into individual valid MeTTa expressions
+            expressions = []
+            current_exp = ""
+            paren_level = 0
+            
+            for c in content:
+                current_exp += c
+                if c == '(':
+                    paren_level += 1
+                elif c == ')':
+                    paren_level -= 1
+                    if paren_level == 0 and current_exp.strip():
+                        # We've completed an expression
+                        expressions.append(current_exp.strip())
+                        current_exp = ""
+            
+            # Process each valid expression
+            success_count = 0
+            for i, expr in enumerate(expressions):
+                # Skip comments and empty lines
+                if expr.startswith(';') or not expr.strip():
+                    continue
                     
-                    # If we've closed all parentheses, we have a complete expression
-                    if paren_count == 0 and current_expression.strip():
-                        rule_expressions.append(current_expression.strip())
-                        current_expression = ""
+                try:
+                    # Try various methods to add the expression
+                    if hasattr(self.metta, 'parse_atom'):
+                        # If parse_atom exists, use it to create a proper atom
+                        atom = self.metta.parse_atom(expr)
+                        self.metta_space.add_atom(atom)
+                    elif hasattr(self.metta_space, 'parse'):
+                        # If parse exists, use it
+                        atom = self.metta_space.parse(expr)
+                        self.metta_space.add_atom(atom)
+                    elif hasattr(self.metta_space, 'interpret'):
+                        # Some implementations might have interpret
+                        self.metta_space.interpret(expr)
+                    else:
+                        # Last resort - try creating an atom using a constructor if available
+                        if hasattr(self.metta, 'Atom'):
+                            atom = self.metta.Atom.from_string(expr)
+                            self.metta_space.add_atom(atom)
+                        else:
+                            print(f"Warning: Couldn't find a way to parse expression {i+1}: {expr[:30]}...")
+                            continue
+                            
+                    success_count += 1
+                except Exception as e:
+                    print(f"Error adding rule {i+1}: {expr[:50]}...")
+                    print(f"  Error details: {e}")
             
-            # Add each expression as a separate atom
-            for expr in rule_expressions:
-                if expr and not expr.startswith(';'):  # Skip empty lines and comments
-                    try:
-                        # Add the expression as a string to be parsed by the MeTTa implementation
-                        self.metta_space.add_atom(expr)
-                    except Exception as e:
-                        print(f"Error adding rule: {expr}")
-                        print(f"  Error details: {e}")
-            
-            print(f"Successfully loaded {len(rule_expressions)} rules from {rules_file}")
-            return True
+            print(f"Successfully loaded {success_count}/{len(expressions)} rules from {rules_file}")
+            return success_count > 0
+                
         except Exception as e:
             print(f"Error loading MeTTa rules: {e}")
             return False
