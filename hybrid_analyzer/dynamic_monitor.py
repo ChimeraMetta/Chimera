@@ -303,87 +303,52 @@ class DynamicMonitor:
     
     def load_metta_rules(self, rules_file: str) -> bool:
         """
-        Load MeTTa rules from a file using hyperon MeTTa's specific methods.
+        Load MeTTa rules from a file by properly parsing the content first.
         
-        Since we're seeing 'catom' related errors, we need to use hyperon-specific 
-        parsing methods rather than adding raw strings.
+        This follows the Hyperon MeTTa implementation's expected usage pattern.
         """
         try:
-            # Try to use the run_file method if available
-            if hasattr(self.metta_space, 'run_file'):
-                self.metta_space.run_file(rules_file)
-                print(f"Successfully loaded rules from {rules_file}")
-                return True
-                
-            # If run_file is not available, try to parse and execute line by line
+            # Open and read the file
             with open(rules_file, 'r') as f:
-                content = f.read()
+                file_content = f.read()
             
-            # Try to run the entire file as a single operation if run_ops is available
-            if hasattr(self.metta_space, 'run_ops'):
-                self.metta_space.run_ops(content)
-                print(f"Successfully loaded rules from {rules_file}")
-                return True
-                
-            # If none of the above methods work, we need to handle each expression separately
-            print(f"Warning: Falling back to individual expression parsing for {rules_file}")
+            # Parse the content to get actual MeTTa atoms
+            parsed_atoms = self.metta.parse_all(file_content)
             
-            # Parse the content into individual valid MeTTa expressions
-            expressions = []
-            current_exp = ""
-            paren_level = 0
-            
-            for c in content:
-                current_exp += c
-                if c == '(':
-                    paren_level += 1
-                elif c == ')':
-                    paren_level -= 1
-                    if paren_level == 0 and current_exp.strip():
-                        # We've completed an expression
-                        expressions.append(current_exp.strip())
-                        current_exp = ""
-            
-            # Process each valid expression
-            success_count = 0
-            for i, expr in enumerate(expressions):
-                # Skip comments and empty lines
-                if expr.startswith(';') or not expr.strip():
-                    continue
-                    
+            # Add each parsed atom to our space
+            atom_count = 0
+            for atom in parsed_atoms:
                 try:
-                    # Try various methods to add the expression
-                    if hasattr(self.metta, 'parse_atom'):
-                        # If parse_atom exists, use it to create a proper atom
-                        atom = self.metta.parse_atom(expr)
-                        self.metta_space.add_atom(atom)
-                    elif hasattr(self.metta_space, 'parse'):
-                        # If parse exists, use it
-                        atom = self.metta_space.parse(expr)
-                        self.metta_space.add_atom(atom)
-                    elif hasattr(self.metta_space, 'interpret'):
-                        # Some implementations might have interpret
-                        self.metta_space.interpret(expr)
-                    else:
-                        # Last resort - try creating an atom using a constructor if available
-                        if hasattr(self.metta, 'Atom'):
-                            atom = self.metta.Atom.from_string(expr)
-                            self.metta_space.add_atom(atom)
-                        else:
-                            print(f"Warning: Couldn't find a way to parse expression {i+1}: {expr[:30]}...")
-                            continue
-                            
-                    success_count += 1
-                except Exception as e:
-                    print(f"Error adding rule {i+1}: {expr[:50]}...")
-                    print(f"  Error details: {e}")
+                    self.metta_space.add_atom(atom)
+                    atom_count += 1
+                except Exception as atom_err:
+                    print(f"Error adding atom: {atom}")
+                    print(f"  Error details: {atom_err}")
             
-            print(f"Successfully loaded {success_count}/{len(expressions)} rules from {rules_file}")
-            return success_count > 0
-                
+            print(f"Successfully loaded {atom_count}/{len(parsed_atoms)} rules from {rules_file}")
+            return atom_count > 0
+            
         except Exception as e:
             print(f"Error loading MeTTa rules: {e}")
-            return False
+            
+            # Fallback approach using run and load-ascii
+            try:
+                print("Trying alternate approach with load-ascii...")
+                
+                # Create a temporary binding for our space
+                space_name = f"&rules_space_{int(time.time())}"
+                
+                # Bind and load
+                self.metta.run(f'''
+                    !(bind! {space_name} {self.metta_space})
+                    !(load-ascii {space_name} "{rules_file}")
+                ''')
+                
+                print(f"Successfully loaded rules using load-ascii approach")
+                return True
+            except Exception as e2:
+                print(f"Error in alternate approach: {e2}")
+                return False
 
 # Create a global instance for easy access
 monitor = DynamicMonitor()
