@@ -19,8 +19,7 @@ from commands.recommend import RecommendCommand
 
 # Check for required modules
 try:
-    from hybrid_analyzer.static_analyzer import decompose_file
-    from dynamic_monitor import hybrid_transform, monitor
+    from static_analyzer import decompose_file
     ANALYZER_MODULES_AVAILABLE = True
 except ImportError:
     ANALYZER_MODULES_AVAILABLE = False
@@ -90,6 +89,21 @@ class HybridAnalyzerCLI:
     
     def show_welcome(self):
         """Show the welcome message."""
+        
+        self.ui.print("""
+      ___           ___                       ___           ___           ___           ___     
+     /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    
+    /::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   
+   /:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  
+  /:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ 
+ /:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\
+                      
+ \:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /
+  \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / 
+   \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  
+    \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   
+     \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    
+        """)
         self.ui.print_title("Python-MeTTa Hybrid Code Analyzer")
         self.ui.print("A tool for intelligent code analysis and monitoring")
         self.ui.print("")
@@ -139,7 +153,7 @@ class HybridAnalyzerCLI:
     
     def select_directory(self):
         """Let the user select a working directory."""
-        self.ui.print_title("Select Working Directory")
+        self.ui.print_title("Select Working Directory") 
         self.ui.print(f"Current directory: {self.current_dir}")
         self.ui.print("")
         
