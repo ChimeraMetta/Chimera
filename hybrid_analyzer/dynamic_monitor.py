@@ -311,16 +311,39 @@ class DynamicMonitor:
             with open(rules_file, 'r') as f:
                 rules = f.read()
             
-            # Add each line as a separate atom
-            for line in rules.strip().split('\n'):
-                if line.strip() and not line.strip().startswith(';'):  # Skip empty lines and comments
-                    self.metta_space.add_atom(line.strip())
+            # Split the file into individual rules/expressions
+            rule_expressions = []
+            current_expression = ""
+            paren_count = 0
             
+            for char in rules:
+                current_expression += char
+                
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                    
+                    # If we've closed all parentheses, we have a complete expression
+                    if paren_count == 0 and current_expression.strip():
+                        rule_expressions.append(current_expression.strip())
+                        current_expression = ""
+            
+            # Add each expression as a separate atom
+            for expr in rule_expressions:
+                if expr and not expr.startswith(';'):  # Skip empty lines and comments
+                    try:
+                        # Add the expression as a string to be parsed by the MeTTa implementation
+                        self.metta_space.add_atom(expr)
+                    except Exception as e:
+                        print(f"Error adding rule: {expr}")
+                        print(f"  Error details: {e}")
+            
+            print(f"Successfully loaded {len(rule_expressions)} rules from {rules_file}")
             return True
         except Exception as e:
             print(f"Error loading MeTTa rules: {e}")
             return False
-
 
 # Create a global instance for easy access
 monitor = DynamicMonitor()
