@@ -31,6 +31,9 @@ RUN echo "Downloading PyPy from ${PYPY_DOWNLOAD_URL}" \
     && tar -xjvf /tmp/${PYPY_TARBALL} -C ${PYPY_INSTALL_PATH} --strip-components=1 \
     && rm /tmp/${PYPY_TARBALL}
 
+# Ensure pip is installed and available for this PyPy version
+RUN ${PYPY_INSTALL_PATH}/bin/pypy3 -m ensurepip --upgrade
+
 # Create symbolic links to make this PyPy version the default python/pip
 RUN ln -s ${PYPY_INSTALL_PATH}/bin/pypy3 /usr/local/bin/python \
     && ln -s ${PYPY_INSTALL_PATH}/bin/pypy3 /usr/local/bin/python3 \
