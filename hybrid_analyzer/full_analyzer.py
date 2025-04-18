@@ -50,7 +50,7 @@ def find_function_relationships():
     print("\n=== Function Call Relationships ===")
     
     # Get function calls directly using MeTTa match
-    results = monitor.metta_space.run("""
+    results = monitor.metta_space.query("""
         (match &self 
                (function-def $caller $caller-scope $start $end)
                (function-call $callee $args $scope $line)
@@ -112,10 +112,10 @@ def find_type_relationships():
     print("\n=== Type Flow Relationships ===")
     
     # Get function return types
-    return_types = monitor.metta_space.run("(match &self (: $func (-> $params $return)) ($func $return))")
+    return_types = monitor.metta_space.query("(match &self (: $func (-> $params $return)) ($func $return))")
     
     # Get function parameter types
-    param_types = monitor.metta_space.run("(match &self (function-param $func $idx $name $type) ($func $name $type))")
+    param_types = monitor.metta_space.query("(match &self (function-param $func $idx $name $type) ($func $name $type))")
     
     if return_types and param_types:
         # Build maps
@@ -177,7 +177,7 @@ def find_class_relationships():
     print("\n=== Class Relationships ===")
     
     # Get class inheritance relationships
-    inheritance = monitor.metta_space.run("(match &self (class-inherits $derived $base) ($derived $base))")
+    inheritance = monitor.metta_space.query("(match &self (class-inherits $derived $base) ($derived $base))")
     
     if inheritance:
         print(f"Found {len(inheritance)} class inheritance relationships")
@@ -203,7 +203,7 @@ def find_class_relationships():
         print("No class inheritance relationships found")
     
     # Find class-function relationships
-    class_methods = monitor.metta_space.run("""
+    class_methods = monitor.metta_space.query("""
         (match &self 
                (class-def $class $class_scope $class_start $class_end)
                (function-def $method $method_scope $method_start $method_end)
@@ -237,7 +237,7 @@ def find_module_relationships():
     print("\n=== Module Relationships ===")
     
     # Get import relationships
-    imports = monitor.metta_space.run("(match &self (import $module $scope $line) ($scope $module))")
+    imports = monitor.metta_space.query("(match &self (import $module $scope $line) ($scope $module))")
     
     if imports:
         print(f"Found {len(imports)} direct module imports")
@@ -259,7 +259,7 @@ def find_module_relationships():
         print("No direct module imports found")
     
     # Get from-import relationships
-    from_imports = monitor.metta_space.run("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
+    from_imports = monitor.metta_space.query("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
     
     if from_imports:
         print(f"\nFound {len(from_imports)} from-type imports")
@@ -287,7 +287,7 @@ def find_operation_patterns():
     print("\n=== Operation Patterns ===")
     
     # Get binary operations
-    bin_ops = monitor.metta_space.run("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
+    bin_ops = monitor.metta_space.query("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
     
     if bin_ops:
         print(f"Found {len(bin_ops)} binary operations")
@@ -341,26 +341,26 @@ def analyze_structural_patterns():
     print("\n=== Structural Patterns ===")
     
     # Get counts for key elements
-    functions = monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $name)")
-    classes = monitor.metta_space.run("(match &self (class-def $name $scope $start $end) $name)")
-    loops = monitor.metta_space.run("(match &self (loop-pattern $id $type $scope $line) $type)")
-    variables = monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $name)")
+    functions = monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $name)")
+    classes = monitor.metta_space.query("(match &self (class-def $name $scope $start $end) $name)")
+    loops = monitor.metta_space.query("(match &self (loop-pattern $id $type $scope $line) $type)")
+    variables = monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $name)")
     
     # Count by scope
     scopes = {}
-    for func in monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $scope)"):
+    for func in monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $scope)"):
         scope = str(func)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
         scopes[scope]["functions"] += 1
     
-    for cls in monitor.metta_space.run("(match &self (class-def $name $scope $start $end) $scope)"):
+    for cls in monitor.metta_space.query("(match &self (class-def $name $scope $start $end) $scope)"):
         scope = str(cls)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
         scopes[scope]["classes"] += 1
     
-    for var in monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $scope)"):
+    for var in monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $scope)"):
         scope = str(var)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
@@ -394,7 +394,7 @@ def find_function_complexity():
     print("\n=== Function Complexity Analysis ===")
     
     # Get function definitions
-    functions = monitor.metta_space.run("(match &self (function-def $name $scope $start $end) ($name $start $end))")
+    functions = monitor.metta_space.query("(match &self (function-def $name $scope $start $end) ($name $start $end))")
     
     if functions:
         # For each function, count operations and structures
@@ -406,7 +406,7 @@ def find_function_complexity():
                 name, start, end = parts[0], parts[1], parts[2]
                 
                 # Count binary operations
-                bin_ops = monitor.metta_space.run(f"""
+                bin_ops = monitor.metta_space.query(f"""
                     (match &self 
                            (bin-op $op $left $right $scope $line)
                            (and (>= $line {start}) (<= $line {end}))
@@ -414,7 +414,7 @@ def find_function_complexity():
                 """)
                 
                 # Count loops
-                loops = monitor.metta_space.run(f"""
+                loops = monitor.metta_space.query(f"""
                     (match &self 
                            (loop-pattern $id $type $scope $line)
                            (and (>= $line {start}) (<= $line {end}))
@@ -422,7 +422,7 @@ def find_function_complexity():
                 """)
                 
                 # Count function calls
-                calls = monitor.metta_space.run(f"""
+                calls = monitor.metta_space.query(f"""
                     (match &self 
                            (function-call $called $args $scope $line)
                            (and (>= $line {start}) (<= $line {end}))
@@ -456,8 +456,8 @@ def analyze_domain_concepts():
     
     # Find non-standard types (potential domain types)
     standard_types = {"String", "Number", "Bool", "List", "Dict", "Tuple", "Set", "Any", "None"}
-    types = monitor.metta_space.run("(match &self (function-param $func $idx $name $type) $type)")
-    types += monitor.metta_space.run("(match &self (: $func (-> $params $return)) $return)")
+    types = monitor.metta_space.query("(match &self (function-param $func $idx $name $type) $type)")
+    types += monitor.metta_space.query("(match &self (: $func (-> $params $return)) $return)")
     
     # Filter to unique types
     unique_types = set()
@@ -476,7 +476,7 @@ def analyze_domain_concepts():
         # Try to find functions operating on these types
         print("\nFunctions working with domain types:")
         for dtype in domain_types:
-            funcs = monitor.metta_space.run(f"""
+            funcs = monitor.metta_space.query(f"""
                 (match &self 
                        (function-param $func $idx $name {dtype})
                        $func)
@@ -489,7 +489,7 @@ def analyze_domain_concepts():
     # Look for potential domain concepts in naming
     domain_concepts = set()
     # Look for domain terms in function names
-    for func in monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $name)"):
+    for func in monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $name)"):
         name = str(func)
         if "_" in name:
             parts = name.split("_")
@@ -498,7 +498,7 @@ def analyze_domain_concepts():
                     domain_concepts.add(part)
     
     # Look for domain terms in variable names
-    for var in monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $name)"):
+    for var in monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $name)"):
         name = str(var)
         if "_" in name:
             parts = name.split("_")

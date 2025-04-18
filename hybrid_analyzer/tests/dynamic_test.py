@@ -124,10 +124,10 @@ def run_tests():
         
         # Direct query of MeTTa space
         print("\nDirect query of MeTTa space:")
-        execution_count = monitor.query_metta("(match &self (execution-start $id $func $time) $id)")
+        execution_count = monitor.query("(match &self (execution-start $id $func $time) $id)")
         print(f"  Number of execution records: {len(execution_count)}")
         
-        error_count = monitor.query_metta("(match &self (execution-error $exec $error $time) $error)")
+        error_count = monitor.query("(match &self (execution-error $exec $error $time) $error)")
         print(f"  Number of error records: {len(error_count)}")
         
     except (NameError, ImportError) as e:
