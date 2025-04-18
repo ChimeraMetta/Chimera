@@ -29,17 +29,11 @@ def analyze_file(file_path):
         atoms_added = 0
         for atom_str in analysis_result["metta_atoms"]:
             try:
-                # Parse and add directly - better for atoms
-                atom = monitor.metta.parse_single(atom_str)
-                monitor.metta_space.add_atom(atom)
+                # We'll use add_atom which should work directly with atom strings
+                monitor.metta_space.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
-                # Fallback: try adding as string
-                try:
-                    monitor.metta_space.add_atom(atom_str)
-                    atoms_added += 1
-                except:
-                    pass
+                pass
                 
         print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
     else:
@@ -49,8 +43,8 @@ def find_function_relationships():
     """Find and analyze function call relationships."""
     print("\n=== Function Call Relationships ===")
     
-    # Get function calls directly using MeTTa match
-    results = monitor.metta_space.query("""
+    # Get function calls directly using monitor.query
+    results = monitor.query("""
         (match &self 
                (function-def $caller $caller-scope $start $end)
                (function-call $callee $args $scope $line)
@@ -112,10 +106,10 @@ def find_type_relationships():
     print("\n=== Type Flow Relationships ===")
     
     # Get function return types
-    return_types = monitor.metta_space.query("(match &self (: $func (-> $params $return)) ($func $return))")
+    return_types = monitor.query("(match &self (: $func (-> $params $return)) ($func $return))")
     
     # Get function parameter types
-    param_types = monitor.metta_space.query("(match &self (function-param $func $idx $name $type) ($func $name $type))")
+    param_types = monitor.query("(match &self (function-param $func $idx $name $type) ($func $name $type))")
     
     if return_types and param_types:
         # Build maps
@@ -177,7 +171,7 @@ def find_class_relationships():
     print("\n=== Class Relationships ===")
     
     # Get class inheritance relationships
-    inheritance = monitor.metta_space.query("(match &self (class-inherits $derived $base) ($derived $base))")
+    inheritance = monitor.query("(match &self (class-inherits $derived $base) ($derived $base))")
     
     if inheritance:
         print(f"Found {len(inheritance)} class inheritance relationships")
@@ -201,43 +195,13 @@ def find_class_relationships():
             print(f"- {base} is extended by: {', '.join(derived_classes)}")
     else:
         print("No class inheritance relationships found")
-    
-    # Find class-function relationships
-    class_methods = monitor.metta_space.query("""
-        (match &self 
-               (class-def $class $class_scope $class_start $class_end)
-               (function-def $method $method_scope $method_start $method_end)
-               (and (== $class_scope $method_scope)
-                    (>= $method_start $class_start)
-                    (<= $method_end $class_end))
-               ($class $method))
-    """)
-    
-    if class_methods:
-        print(f"\nFound {len(class_methods)} class-method relationships")
-        
-        # Build class -> methods map
-        class_method_map = {}
-        for rel in class_methods:
-            parts = str(rel).split()
-            if len(parts) >= 2:
-                class_name, method_name = parts[0], parts[1]
-                if class_name not in class_method_map:
-                    class_method_map[class_name] = set()
-                class_method_map[class_name].add(method_name)
-        
-        print("\nClass methods:")
-        for class_name, methods in class_method_map.items():
-            print(f"- {class_name}: {', '.join(methods)}")
-    else:
-        print("No class-method relationships found")
 
 def find_module_relationships():
     """Find and analyze module import relationships."""
     print("\n=== Module Relationships ===")
     
     # Get import relationships
-    imports = monitor.metta_space.query("(match &self (import $module $scope $line) ($scope $module))")
+    imports = monitor.query("(match &self (import $module $scope $line) ($scope $module))")
     
     if imports:
         print(f"Found {len(imports)} direct module imports")
@@ -259,7 +223,7 @@ def find_module_relationships():
         print("No direct module imports found")
     
     # Get from-import relationships
-    from_imports = monitor.metta_space.query("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
+    from_imports = monitor.query("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
     
     if from_imports:
         print(f"\nFound {len(from_imports)} from-type imports")
@@ -287,7 +251,7 @@ def find_operation_patterns():
     print("\n=== Operation Patterns ===")
     
     # Get binary operations
-    bin_ops = monitor.metta_space.query("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
+    bin_ops = monitor.query("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
     
     if bin_ops:
         print(f"Found {len(bin_ops)} binary operations")
@@ -320,19 +284,6 @@ def find_operation_patterns():
         print("\nCommon operation patterns:")
         for pattern, count in sorted(type_patterns.items(), key=lambda x: x[1], reverse=True)[:10]:  # Top 10
             print(f"- {pattern}: {count} times")
-            
-        # Look for specific patterns
-        string_ops = [(op, count) for op, count in type_patterns.items() if "String" in op]
-        if string_ops:
-            print("\nString operation patterns:")
-            for pattern, count in string_ops:
-                print(f"- {pattern}: {count} times")
-        
-        number_ops = [(op, count) for op, count in type_patterns.items() if "Number" in op and "Add" in op or "Mult" in op or "Div" in op or "Sub" in op]
-        if number_ops:
-            print("\nNumeric operation patterns:")
-            for pattern, count in number_ops:
-                print(f"- {pattern}: {count} times")
     else:
         print("No binary operations found")
 
@@ -341,26 +292,26 @@ def analyze_structural_patterns():
     print("\n=== Structural Patterns ===")
     
     # Get counts for key elements
-    functions = monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $name)")
-    classes = monitor.metta_space.query("(match &self (class-def $name $scope $start $end) $name)")
-    loops = monitor.metta_space.query("(match &self (loop-pattern $id $type $scope $line) $type)")
-    variables = monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $name)")
+    functions = monitor.query("(match &self (function-def $name $scope $start $end) $name)")
+    classes = monitor.query("(match &self (class-def $name $scope $start $end) $name)")
+    loops = monitor.query("(match &self (loop-pattern $id $type $scope $line) $type)")
+    variables = monitor.query("(match &self (variable-assign $name $scope $line) $name)")
     
     # Count by scope
     scopes = {}
-    for func in monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $scope)"):
+    for func in monitor.query("(match &self (function-def $name $scope $start $end) $scope)"):
         scope = str(func)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
         scopes[scope]["functions"] += 1
     
-    for cls in monitor.metta_space.query("(match &self (class-def $name $scope $start $end) $scope)"):
+    for cls in monitor.query("(match &self (class-def $name $scope $start $end) $scope)"):
         scope = str(cls)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
         scopes[scope]["classes"] += 1
     
-    for var in monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $scope)"):
+    for var in monitor.query("(match &self (variable-assign $name $scope $line) $scope)"):
         scope = str(var)
         if scope not in scopes:
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
@@ -394,7 +345,7 @@ def find_function_complexity():
     print("\n=== Function Complexity Analysis ===")
     
     # Get function definitions
-    functions = monitor.metta_space.query("(match &self (function-def $name $scope $start $end) ($name $start $end))")
+    functions = monitor.query("(match &self (function-def $name $scope $start $end) ($name $start $end))")
     
     if functions:
         # For each function, count operations and structures
@@ -405,34 +356,40 @@ def find_function_complexity():
             if len(parts) >= 3:
                 name, start, end = parts[0], parts[1], parts[2]
                 
-                # Count binary operations
-                bin_ops = monitor.metta_space.query(f"""
-                    (match &self 
-                           (bin-op $op $left $right $scope $line)
-                           (and (>= $line {start}) (<= $line {end}))
-                           $op)
-                """)
-                
-                # Count loops
-                loops = monitor.metta_space.query(f"""
-                    (match &self 
-                           (loop-pattern $id $type $scope $line)
-                           (and (>= $line {start}) (<= $line {end}))
-                           $type)
-                """)
-                
-                # Count function calls
-                calls = monitor.metta_space.query(f"""
-                    (match &self 
-                           (function-call $called $args $scope $line)
-                           (and (>= $line {start}) (<= $line {end}))
-                           $called)
-                """)
-                
-                # Calculate complexity score (very simple metric)
-                score = len(bin_ops) + len(loops) * 3 + len(calls)
-                
-                complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
+                try:
+                    # Query for binary operations
+                    bin_op_query = f"""
+                        (match &self 
+                               (bin-op $op $left $right $scope $line)
+                               (and (>= $line {start}) (<= $line {end}))
+                               $op)
+                    """
+                    bin_ops = monitor.query(bin_op_query)
+                    
+                    # Query for loops
+                    loop_query = f"""
+                        (match &self 
+                               (loop-pattern $id $type $scope $line)
+                               (and (>= $line {start}) (<= $line {end}))
+                               $type)
+                    """
+                    loops = monitor.query(loop_query)
+                    
+                    # Query for function calls
+                    call_query = f"""
+                        (match &self 
+                               (function-call $called $args $scope $line)
+                               (and (>= $line {start}) (<= $line {end}))
+                               $called)
+                    """
+                    calls = monitor.query(call_query)
+                    
+                    # Calculate complexity score (very simple metric)
+                    score = len(bin_ops) + len(loops) * 3 + len(calls)
+                    
+                    complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
+                except Exception as e:
+                    print(f"Error analyzing complexity for {name}: {e}")
         
         # Sort by complexity score
         complexity_data.sort(key=lambda x: x[1], reverse=True)
@@ -456,8 +413,8 @@ def analyze_domain_concepts():
     
     # Find non-standard types (potential domain types)
     standard_types = {"String", "Number", "Bool", "List", "Dict", "Tuple", "Set", "Any", "None"}
-    types = monitor.metta_space.query("(match &self (function-param $func $idx $name $type) $type)")
-    types += monitor.metta_space.query("(match &self (: $func (-> $params $return)) $return)")
+    types = monitor.query("(match &self (function-param $func $idx $name $type) $type)")
+    types += monitor.query("(match &self (: $func (-> $params $return)) $return)")
     
     # Filter to unique types
     unique_types = set()
@@ -476,20 +433,20 @@ def analyze_domain_concepts():
         # Try to find functions operating on these types
         print("\nFunctions working with domain types:")
         for dtype in domain_types:
-            funcs = monitor.metta_space.query(f"""
-                (match &self 
-                       (function-param $func $idx $name {dtype})
-                       $func)
-            """)
-            if funcs:
-                print(f"- {dtype} is used by: {', '.join(str(f) for f in funcs)}")
+            try:
+                query = f"(match &self (function-param $func $idx $name {dtype}) $func)"
+                funcs = monitor.query(query)
+                if funcs:
+                    print(f"- {dtype} is used by: {', '.join(str(f) for f in funcs)}")
+            except Exception as e:
+                print(f"Error querying functions for type {dtype}: {e}")
     else:
         print("No domain-specific types found")
     
     # Look for potential domain concepts in naming
     domain_concepts = set()
     # Look for domain terms in function names
-    for func in monitor.metta_space.query("(match &self (function-def $name $scope $start $end) $name)"):
+    for func in monitor.query("(match &self (function-def $name $scope $start $end) $name)"):
         name = str(func)
         if "_" in name:
             parts = name.split("_")
@@ -498,7 +455,7 @@ def analyze_domain_concepts():
                     domain_concepts.add(part)
     
     # Look for domain terms in variable names
-    for var in monitor.metta_space.query("(match &self (variable-assign $name $scope $line) $name)"):
+    for var in monitor.query("(match &self (variable-assign $name $scope $line) $name)"):
         name = str(var)
         if "_" in name:
             parts = name.split("_")
