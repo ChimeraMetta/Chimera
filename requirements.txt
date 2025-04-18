@@ -1,0 +1,5 @@
+cffi==1.14.6
+greenlet==0.4.13
+hpy==0.0.3
+hyperon==0.2.4
+readline==6.2.4.1
