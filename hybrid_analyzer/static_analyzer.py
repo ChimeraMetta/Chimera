@@ -2,7 +2,11 @@ import ast
 import os
 import sys
 import inspect
+import logging
 from typing import Dict, List, Any, Set, Tuple, Optional
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class CodeDecomposer(ast.NodeVisitor):
     """
@@ -623,138 +627,218 @@ def convert_python_type_to_metta(py_type: str) -> str:
 
 def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
     """Convert decomposed code structure to MeTTa atoms with proper atomic representation."""
+    logging.debug(f"Starting conversion to MeTTa atoms. Found {len(decomposer.atoms)} structural atoms initially.")
     metta_atoms = []
     
     # Convert basic structure atoms
-    for atom in decomposer.atoms:
-        if atom["type"] == "function_def":
-            # Function definition atoms
-            params_list = []
-            for _, param_type in atom["params"]:
-                param_type_str = convert_python_type_to_metta(param_type or "Any")
-                params_list.append(param_type_str)
+    logging.debug("Processing basic structural atoms...")
+    for i, atom in enumerate(decomposer.atoms):
+        logging.debug(f"Processing atom {i+1}/{len(decomposer.atoms)}: Type={atom['type']}, Name={atom.get('name', 'N/A')}")
+        try:
+            if atom["type"] == "function_def":
+                # Function definition atoms
+                params_list = []
+                for _, param_type in atom["params"]:
+                    param_type_str = convert_python_type_to_metta(param_type or "Any")
+                    params_list.append(param_type_str)
+                
+                params_str = " ".join(params_list)
+                return_type = convert_python_type_to_metta(atom["return_type"] or "Any")
+                
+                # Create proper type signature - names as atoms, not strings
+                type_sig_atom = f"(: {atom['name']} (-> {params_str} {return_type}))"
+                metta_atoms.append(type_sig_atom)
+                logging.debug(f"  Generated type signature atom: {type_sig_atom}")
+                
+                # Create function definition with scope as a proper atom, not a string
+                # Replace colons with hyphens for better MeTTa compatibility
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                func_def_atom = f"(function-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})"
+                metta_atoms.append(func_def_atom)
+                logging.debug(f"  Generated function definition atom: {func_def_atom}")
+                
+                # Add parameters with proper atomic representation
+                for j, (param_name, param_type) in enumerate(atom["params"]):
+                    param_type_str = convert_python_type_to_metta(param_type or "Any")
+                    param_atom = f"(function-param {atom['name']} {j} {param_name} {param_type_str})"
+                    metta_atoms.append(param_atom)
+                    logging.debug(f"    Generated param atom: {param_atom}")
             
-            params_str = " ".join(params_list)
-            return_type = convert_python_type_to_metta(atom["return_type"] or "Any")
+            elif atom["type"] == "class_def":
+                # Class definition atoms
+                class_type_atom = f"(: {atom['name']} Type)"
+                metta_atoms.append(class_type_atom)
+                logging.debug(f"  Generated class type atom: {class_type_atom}")
+                
+                # Create class definition with scope as proper atoms - replace colons with hyphens
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                class_def_atom = f"(class-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})"
+                metta_atoms.append(class_def_atom)
+                logging.debug(f"  Generated class definition atom: {class_def_atom}")
+                
+                # Add base classes as atoms
+                for base in atom["bases"]:
+                    inherit_atom = f"(class-inherits {atom['name']} {base})"
+                    metta_atoms.append(inherit_atom)
+                    logging.debug(f"    Generated inheritance atom: {inherit_atom}")
             
-            # Create proper type signature - names as atoms, not strings
-            metta_atoms.append(f"(: {atom['name']} (-> {params_str} {return_type}))")
+            elif atom["type"] == "variable_assign" or atom["type"] == "variable_ann_assign":
+                # Variable assignment atoms
+                var_type = atom.get("declared_type") or atom.get("inferred_type") or "Any"
+                var_type_str = convert_python_type_to_metta(var_type)
+                
+                # Create scope path as atoms - replace colons with hyphens
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                var_path = " ".join(scope_atoms + [atom['name']])
+                
+                var_type_atom = f"(: {var_path} {var_type_str})"
+                metta_atoms.append(var_type_atom)
+                logging.debug(f"  Generated variable type atom: {var_type_atom}")
+                
+                # Variable assignment with scope as atoms
+                scope_expr = " ".join(scope_atoms)
+                var_assign_atom = f"(variable-assign {atom['name']} {scope_expr} {atom['line']})"
+                metta_atoms.append(var_assign_atom)
+                logging.debug(f"  Generated variable assignment atom: {var_assign_atom}")
             
-            # Create function definition with scope as a proper atom, not a string
-            # Replace colons with hyphens for better MeTTa compatibility
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(function-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})")
+            elif atom["type"] == "function_call":
+                # Function call atoms with scope as atoms - replace colons with hyphens
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                func_call_atom = f"(function-call {atom['name']} {atom['args']} {scope_expr} {atom['line']})"
+                metta_atoms.append(func_call_atom)
+                logging.debug(f"  Generated function call atom: {func_call_atom}")
             
-            # Add parameters with proper atomic representation
-            for i, (param_name, param_type) in enumerate(atom["params"]):
-                param_type_str = convert_python_type_to_metta(param_type or "Any")
-                metta_atoms.append(f"(function-param {atom['name']} {i} {param_name} {param_type_str})")
-        
-        elif atom["type"] == "class_def":
-            # Class definition atoms
-            metta_atoms.append(f"(: {atom['name']} Type)")
+            elif atom["type"] == "bin_op":
+                # Convert left and right types
+                left_type_str = convert_python_type_to_metta(atom['left_type'])
+                right_type_str = convert_python_type_to_metta(atom['right_type'])
+                
+                # Binary operation atoms with scope as atoms - replace colons with hyphens
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                bin_op_atom = f"(bin-op {atom['op']} {left_type_str} {right_type_str} {scope_expr} {atom['line']})"
+                metta_atoms.append(bin_op_atom)
+                logging.debug(f"  Generated binary operation atom: {bin_op_atom}")
             
-            # Create class definition with scope as proper atoms - replace colons with hyphens
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(class-def {atom['name']} {scope_expr} {atom['line_start']} {atom['line_end']})")
-            
-            # Add base classes as atoms
-            for base in atom["bases"]:
-                metta_atoms.append(f"(class-inherits {atom['name']} {base})")
-        
-        elif atom["type"] == "variable_assign" or atom["type"] == "variable_ann_assign":
-            # Variable assignment atoms
-            var_type = atom.get("declared_type") or atom.get("inferred_type") or "Any"
-            var_type_str = convert_python_type_to_metta(var_type)
-            
-            # Create scope path as atoms - replace colons with hyphens
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            var_path = " ".join(scope_atoms + [atom['name']])
-            
-            metta_atoms.append(f"(: {var_path} {var_type_str})")
-            
-            # Variable assignment with scope as atoms
-            scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(variable-assign {atom['name']} {scope_expr} {atom['line']})")
-        
-        elif atom["type"] == "function_call":
-            # Function call atoms with scope as atoms - replace colons with hyphens
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(function-call {atom['name']} {atom['args']} {scope_expr} {atom['line']})")
-        
-        elif atom["type"] == "bin_op":
-            # Convert left and right types
-            left_type_str = convert_python_type_to_metta(atom['left_type'])
-            right_type_str = convert_python_type_to_metta(atom['right_type'])
-            
-            # Binary operation atoms with scope as atoms - replace colons with hyphens
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            scope_expr = " ".join(scope_atoms)
-            metta_atoms.append(f"(bin-op {atom['op']} {left_type_str} {right_type_str} {scope_expr} {atom['line']})")
-        
-        elif atom["type"] == "import" or atom["type"] == "import_from":
-            # Import atoms with scope as atoms - replace colons with hyphens
-            scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
-            scope_expr = " ".join(scope_atoms)
-            
-            if atom["type"] == "import":
-                metta_atoms.append(f"(import {atom['name']} {scope_expr} {atom['line']})")
+            elif atom["type"] == "import" or atom["type"] == "import_from":
+                # Import atoms with scope as atoms - replace colons with hyphens
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                
+                if atom["type"] == "import":
+                    import_atom = f"(import {atom['name']} {scope_expr} {atom['line']})"
+                    metta_atoms.append(import_atom)
+                    logging.debug(f"  Generated import atom: {import_atom}")
+                else:
+                    import_from_atom = f"(import-from {atom['module']} {atom['name']} {scope_expr} {atom['line']})"
+                    metta_atoms.append(import_from_atom)
+                    logging.debug(f"  Generated import-from atom: {import_from_atom}")
             else:
-                metta_atoms.append(f"(import-from {atom['module']} {atom['name']} {scope_expr} {atom['line']})")
-    
+                logging.warning(f"  Skipping unknown atom type: {atom['type']}")
+        except Exception as e:
+            logging.error(f"Error processing atom {i+1}: {atom}. Error: {e}", exc_info=True)
+
+
     # Add ontological relationships
+    logging.debug("Processing ontological relationships...")
     
     # Module relationships
+    logging.debug(f"Processing {len(decomposer.module_relationships)} module relationship scopes...")
     for scope, modules in decomposer.module_relationships.items():
         scope_atoms = [s.replace(':', '-') for s in scope.split('.')]
         scope_expr = " ".join(scope_atoms)
-        
+        logging.debug(f"  Processing scope '{scope_expr}' with {len(modules)} modules.")
         for module in modules:
-            metta_atoms.append(f"(module-depends {scope_expr} {module})")
-    
+            try:
+                module_dep_atom = f"(module-depends {scope_expr} {module})"
+                metta_atoms.append(module_dep_atom)
+                logging.debug(f"    Generated module dependency atom: {module_dep_atom}")
+            except Exception as e:
+                 logging.error(f"Error processing module dependency for scope '{scope_expr}', module '{module}': {e}", exc_info=True)
+
     # Class hierarchies
+    logging.debug(f"Processing {len(decomposer.class_hierarchies)} base classes for hierarchies...")
     for base, derived in decomposer.class_hierarchies.items():
+        logging.debug(f"  Processing base class '{base}' with {len(derived)} derived classes.")
         for cls in derived:
-            metta_atoms.append(f"(class-hierarchy {base} {cls})")
-    
+             try:
+                class_hier_atom = f"(class-hierarchy {base} {cls})"
+                metta_atoms.append(class_hier_atom)
+                logging.debug(f"    Generated class hierarchy atom: {class_hier_atom}")
+             except Exception as e:
+                logging.error(f"Error processing class hierarchy for base '{base}', derived '{cls}': {e}", exc_info=True)
+
     # Function dependencies
+    logging.debug(f"Processing {len(decomposer.function_dependencies)} functions for dependencies...")
     for func, calls in decomposer.function_dependencies.items():
+        logging.debug(f"  Processing function '{func}' with {len(calls)} called functions.")
         for called_func in calls:
-            metta_atoms.append(f"(function-depends {func} {called_func})")
+             try:
+                func_dep_atom = f"(function-depends {func} {called_func})"
+                metta_atoms.append(func_dep_atom)
+                logging.debug(f"    Generated function dependency atom: {func_dep_atom}")
+             except Exception as e:
+                logging.error(f"Error processing function dependency for func '{func}', called '{called_func}': {e}", exc_info=True)
     
     # Add pattern information for donor system
-    
+    logging.debug("Processing pattern information for donor system...")
+
     # String operations patterns
+    logging.debug(f"Processing {len(decomposer.string_operations)} string operation patterns...")
     for i, op in enumerate(decomposer.string_operations):
-        left_type = convert_python_type_to_metta(op.get('left_type', 'Any'))
-        right_type = convert_python_type_to_metta(op.get('right_type', 'Any'))
-        metta_atoms.append(f"(string-op-pattern {i} {op['op']} {left_type} {right_type} {op['line']})")
-    
+         try:
+            left_type = convert_python_type_to_metta(op.get('left_type', 'Any'))
+            right_type = convert_python_type_to_metta(op.get('right_type', 'Any'))
+            string_op_atom = f"(string-op-pattern {i} {op['op']} {left_type} {right_type} {op['line']})"
+            metta_atoms.append(string_op_atom)
+            logging.debug(f"  Generated string op pattern atom {i}: {string_op_atom}")
+         except Exception as e:
+            logging.error(f"Error processing string op pattern {i}: {op}. Error: {e}", exc_info=True)
+
     # Arithmetic operations patterns
+    logging.debug(f"Processing {len(decomposer.arithmetic_operations)} arithmetic operation patterns...")
     for i, op in enumerate(decomposer.arithmetic_operations):
-        metta_atoms.append(f"(arithmetic-op-pattern {i} {op['op']} {op['line']})")
-    
+         try:
+            arith_op_atom = f"(arithmetic-op-pattern {i} {op['op']} {op['line']})"
+            metta_atoms.append(arith_op_atom)
+            logging.debug(f"  Generated arithmetic op pattern atom {i}: {arith_op_atom}")
+         except Exception as e:
+            logging.error(f"Error processing arithmetic op pattern {i}: {op}. Error: {e}", exc_info=True)
+
     # Loop patterns
+    logging.debug(f"Processing {len(decomposer.loop_patterns)} loop patterns...")
     for i, loop in enumerate(decomposer.loop_patterns):
-        # Convert scope to atoms - replace colons with hyphens
-        scope_atoms = [s.replace(':', '-') for s in loop['scope'].split('.')]
-        scope_expr = " ".join(scope_atoms)
-        
-        metta_atoms.append(f"(loop-pattern {i} {loop['type']} {scope_expr} {loop['line']})")
-    
+         try:
+            # Convert scope to atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in loop['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            
+            loop_pattern_atom = f"(loop-pattern {i} {loop['type']} {scope_expr} {loop['line']})"
+            metta_atoms.append(loop_pattern_atom)
+            logging.debug(f"  Generated loop pattern atom {i}: {loop_pattern_atom}")
+         except Exception as e:
+            logging.error(f"Error processing loop pattern {i}: {loop}. Error: {e}", exc_info=True)
+
     # Function patterns
+    logging.debug(f"Processing {len(decomposer.function_patterns)} function patterns...")
     for i, func in enumerate(decomposer.function_patterns):
-        has_return_str = "True" if func["has_return"] else "False"
-        
-        # Convert scope to atoms - replace colons with hyphens
-        scope_atoms = [s.replace(':', '-') for s in func['scope'].split('.')]
-        scope_expr = " ".join(scope_atoms)
-        
-        metta_atoms.append(f"(function-pattern {i} {func['name']} {func['params']} {has_return_str} {scope_expr})")
+         try:
+            has_return_str = "True" if func["has_return"] else "False"
+            
+            # Convert scope to atoms - replace colons with hyphens
+            scope_atoms = [s.replace(':', '-') for s in func['scope'].split('.')]
+            scope_expr = " ".join(scope_atoms)
+            
+            func_pattern_atom = f"(function-pattern {i} {func['name']} {func['params']} {has_return_str} {scope_expr})"
+            metta_atoms.append(func_pattern_atom)
+            logging.debug(f"  Generated function pattern atom {i}: {func_pattern_atom}")
+         except Exception as e:
+            logging.error(f"Error processing function pattern {i}: {func}. Error: {e}", exc_info=True)
     
+    logging.debug(f"Finished conversion. Generated {len(metta_atoms)} MeTTa atoms in total.")
     return metta_atoms
 
 
