@@ -11,30 +11,8 @@ from typing import Any, Dict, List, Callable, Optional, Union, Tuple
 from static_analyzer import decompose_function, decompose_source, convert_python_type_to_metta
 
 # MeTTa integration through hyperon
-try:
-    from hyperon import MeTTa
-except ImportError:
-    print("Hyperon MeTTa not found, will mock MeTTa functionality for demo purposes")
-    class MockMeTTa:
-        class Space:
-            def __init__(self):
-                self.atoms = []
-                
-            def add_atom(self, atom_str):
-                """Add an atom to the space"""
-                self.atoms.append(atom_str)
-                
-            def query(self, pattern_str):
-                """Query atoms matching the pattern"""
-                # Mock implementation for demonstration
-                return [a for a in self.atoms if pattern_str in a]
-                
-            def run_ops(self, code_str):
-                """Run MeTTa operations"""
-                # Mock implementation
-                return None
-    
-    MeTTa = MockMeTTa
+from hyperon import *
+
 
 class DynamicMonitor:
     """
@@ -46,6 +24,13 @@ class DynamicMonitor:
         """Initialize the monitor with an optional MeTTa space."""
         self.metta = MeTTa()
         self.metta_space = metta_space or self.metta.space()
+
+        self.E = E
+        self.S = S
+        self.Atoms = Atoms
+        self.AtomType = AtomType
+        self.G = G
+        self.interpret = interpret
     
     def hybrid_transform(self, context: Optional[str] = None, 
                         auto_fix: bool = False):
@@ -236,13 +221,32 @@ class DynamicMonitor:
         except:
             return None
     
-    def query_metta(self, query_pattern: str) -> List[str]:
+    def query_metta(self, query_pattern: str) -> List:
         """
-        Query MeTTa for information.
-        
-        This allows users to directly query the MeTTa space for insights and recommendations.
+        Query MeTTa for information using the interpret function.
         """
-        return self.metta_space.run(query_pattern)
+        try:
+            # Parse the query string into a proper MeTTa expression
+            parsed_query = self.metta.parse_single(query_pattern)
+            
+            # Use interpret function from hyperon
+            results = self.interpret(self.metta_space, 
+                                    self.E(self.Atoms.METTA, parsed_query,
+                                           self.AtomType.UNDEFINED, 
+                                           self.G(self.metta_space)))
+            return results
+        except Exception as e:
+            print(f"Error executing query: {query_pattern}")
+            print(f"  Error details: {e}")
+            
+            # Fallback to direct query if interpret fails
+            try:
+                print("Trying fallback query approach...")
+                results = self.metta_space.query(parsed_query)
+                return results
+            except Exception as e2:
+                print(f"  Fallback query failed: {e2}")
+                return []
     
     def get_function_recommendations(self, func_name: str) -> List[Dict]:
         """
