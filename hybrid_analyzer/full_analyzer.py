@@ -1,5 +1,5 @@
 from static_analyzer import decompose_file, decompose_source
-from dynamic_monitor import DynamicMonitor, hybrid_transform
+from dynamic_monitor import DynamicMonitor
 import os
 import sys
 
@@ -18,7 +18,7 @@ def analyze_codebase(path):
         print(f"Invalid path or not a Python file: {path}")
 
 def analyze_file(file_path):
-    """Analyze a single Python file."""
+    """Analyze a single Python file and add to the ontology."""
     print(f"Analyzing {file_path}...")
     
     # Run static analysis
@@ -26,210 +26,537 @@ def analyze_file(file_path):
     
     # Add analysis results to MeTTa
     if "metta_atoms" in analysis_result and analysis_result["metta_atoms"]:
-        # Construct a MeTTa program
-        program = "\n".join(analysis_result["metta_atoms"])
-        
-        try:
-            # Run the program to add all atoms
-            monitor.metta.run(program)
-            print(f"Added {len(analysis_result['metta_atoms'])} atoms from {file_path}")
-        except Exception as e:
-            print(f"Error adding atoms: {e}")
-            
-            # Fallback: Try adding atoms one by one
-            atoms_added = 0
-            for atom_str in analysis_result["metta_atoms"]:
+        atoms_added = 0
+        for atom_str in analysis_result["metta_atoms"]:
+            try:
+                # Parse and add directly - better for atoms
+                atom = monitor.metta.parse_single(atom_str)
+                monitor.metta_space.add_atom(atom)
+                atoms_added += 1
+            except Exception as e:
+                # Fallback: try adding as string
                 try:
-                    cmd = f"{atom_str}"
-                    monitor.metta.run(cmd)
+                    monitor.metta_space.add_atom(atom_str)
                     atoms_added += 1
-                except Exception as e2:
-                    print(f"Error adding atom: {atom_str[:50]}...")
-            
-            print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms via fallback method")
+                except:
+                    pass
+                
+        print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
     else:
-        print(f"Warning: No MeTTa atoms generated for {file_path}")
+        print(f"No MeTTa atoms generated for {file_path}")
 
-def get_codebase_insights():
-    """Query MeTTa for insights about the analyzed codebase."""
+def find_function_relationships():
+    """Find and analyze function call relationships."""
+    print("\n=== Function Call Relationships ===")
     
-    # Get architectural insights
-    print("\nArchitectural Insights:")
-    insights = monitor.query_metta("(match &self (architectural-insight $description $confidence) ($description $confidence))")
-    for insight in insights:
-        # Parse the result (format depends on your MeTTa implementation)
-        parts = insight.strip("()").split(" ", 1)
-        if len(parts) >= 2:
-            description, confidence = parts[0], parts[1]
-            print(f"- {description} (confidence: {confidence})")
+    # Get function calls directly using MeTTa match
+    results = monitor.metta_space.run("""
+        (match &self 
+               (function-def $caller $caller-scope $start $end)
+               (function-call $callee $args $scope $line)
+               (and (== $scope $caller-scope)
+                    (>= $line $start)
+                    (<= $line $end))
+               ($caller $callee))
+    """)
     
-    # Find error-prone functions
-    print("\nError-Prone Functions:")
-    error_prone = monitor.query_metta("(find-error-prone-functions 0.2)")
-    if error_prone:
-        for func in error_prone:
-            print(f"- {func}")
-    else:
-        print("No error-prone functions detected.")
-    
-    # Find functions with high complexity
-    print("\nComplex Functions:")
-    complex_funcs = monitor.query_metta("(match &self (code-quality-issue $func complexity $description $confidence) ($func $description $confidence))")
-    for func_info in complex_funcs:
-        # Parse the result
-        parts = func_info.strip("()").split(" ", 2)
-        if len(parts) >= 3:
-            func, description, confidence = parts[0], parts[1], parts[2]
-            print(f"- {func}: {description} (confidence: {confidence})")
-    
-    # Get type safety issues
-    print("\nType Safety Issues:")
-    type_issues = monitor.query_metta("(match &self (type-safety-issue $func $description $confidence) ($func $description $confidence))")
-    for issue in type_issues:
-        # Parse the result
-        parts = issue.strip("()").split(" ", 2)
-        if len(parts) >= 3:
-            func, description, confidence = parts[0], parts[1], parts[2]
-            print(f"- {func}: {description} (confidence: {confidence})")
-
-def get_function_recommendations(function_name):
-    """Get recommendations for a specific function."""
-    print(f"\nRecommendations for {function_name}:")
-    
-    # Get recommendations from MeTTa
-    recs = monitor.get_function_recommendations(function_name)
-    
-    if recs:
-        for rec in recs:
-            print(f"- {rec['type']}: {rec['description']} (confidence: {rec['confidence']})")
-    else:
-        print("No recommendations available.")
+    if results:
+        print(f"Found {len(results)} function call relationships")
         
-    # Get related functions
-    related = monitor.query_metta(f"(find-related-functions {function_name} (list))")
-    if related:
-        print("\nRelated functions:")
-        for func in related:
-            print(f"- {func}")
+        # Build caller -> callee map
+        call_graph = {}
+        reverse_graph = {}
+        
+        for result in results:
+            parts = str(result).split()
+            if len(parts) >= 2:
+                caller, callee = parts[0], parts[1]
+                
+                # Add to call graph
+                if caller not in call_graph:
+                    call_graph[caller] = set()
+                call_graph[caller].add(callee)
+                
+                # Add to reverse graph
+                if callee not in reverse_graph:
+                    reverse_graph[callee] = set()
+                reverse_graph[callee].add(caller)
+        
+        # Display function call graph
+        print("\nFunction call relationships:")
+        for caller, callees in call_graph.items():
+            print(f"- {caller} calls: {', '.join(callees)}")
+        
+        # Find high fan-in functions (called by many)
+        high_fan_in = [(func, len(callers)) for func, callers in reverse_graph.items() if len(callers) > 1]
+        high_fan_in.sort(key=lambda x: x[1], reverse=True)
+        
+        if high_fan_in:
+            print("\nMost called functions (high fan-in):")
+            for func, count in high_fan_in:
+                print(f"- {func}: called by {count} functions")
+        
+        # Find high fan-out functions (call many others)
+        high_fan_out = [(caller, len(callees)) for caller, callees in call_graph.items() if len(callees) > 1]
+        high_fan_out.sort(key=lambda x: x[1], reverse=True)
+        
+        if high_fan_out:
+            print("\nFunctions calling many others (high fan-out):")
+            for func, count in high_fan_out:
+                print(f"- {func}: calls {count} functions")
+    else:
+        print("No function call relationships found")
 
-def visualize_module_dependencies():
-    """Create a visualization of module dependencies."""
-    # Query MeTTa for module dependencies
-    modules = monitor.query_metta("(match &self (module-depends $module $dependency) ($module $dependency))")
+def find_type_relationships():
+    """Find and analyze type relationships between functions."""
+    print("\n=== Type Flow Relationships ===")
     
-    # This would typically use a visualization library like networkx and matplotlib
-    # For example:
-    # import networkx as nx
-    # import matplotlib.pyplot as plt
-    # G = nx.DiGraph()
-    # for edge in modules:
-    #     parts = edge.strip("()").split()
-    #     if len(parts) >= 2:
-    #         source, target = parts[0], parts[1]
-    #         G.add_edge(source, target)
-    # nx.draw(G, with_labels=True)
-    # plt.savefig("module_dependencies.png")
+    # Get function return types
+    return_types = monitor.metta_space.run("(match &self (: $func (-> $params $return)) ($func $return))")
     
-    print(f"Found {len(modules)} module dependencies")
+    # Get function parameter types
+    param_types = monitor.metta_space.run("(match &self (function-param $func $idx $name $type) ($func $name $type))")
+    
+    if return_types and param_types:
+        # Build maps
+        returns = {}
+        params = {}
+        
+        for result in return_types:
+            parts = str(result).split()
+            if len(parts) >= 2:
+                func, ret_type = parts[0], parts[1]
+                returns[func] = ret_type
+        
+        for result in param_types:
+            parts = str(result).split()
+            if len(parts) >= 3:
+                func, name, param_type = parts[0], parts[1], parts[2]
+                if func not in params:
+                    params[func] = []
+                params[func].append((name, param_type))
+        
+        # Find type flows
+        type_flows = []
+        for source_func, ret_type in returns.items():
+            for target_func, target_params in params.items():
+                if source_func != target_func:  # Skip self-references
+                    for param_name, param_type in target_params:
+                        if ret_type == param_type:
+                            type_flows.append((source_func, target_func, ret_type))
+        
+        if type_flows:
+            print(f"Found {len(type_flows)} potential type flows between functions")
+            print("\nPotential data flow paths:")
+            for source, target, type_name in type_flows:
+                print(f"- {source} -> {target} (type: {type_name})")
+        else:
+            print("No type flow relationships found")
+        
+        # Analyze type usage
+        type_usage = {}
+        for func, params_list in params.items():
+            for name, type_name in params_list:
+                if type_name not in type_usage:
+                    type_usage[type_name] = 0
+                type_usage[type_name] += 1
+        
+        for func, ret_type in returns.items():
+            if ret_type not in type_usage:
+                type_usage[ret_type] = 0
+            type_usage[ret_type] += 1
+        
+        print("\nType usage frequency:")
+        for type_name, count in sorted(type_usage.items(), key=lambda x: x[1], reverse=True):
+            print(f"- {type_name}: used {count} times")
+    else:
+        print("Insufficient type information found")
 
-def visualize_class_hierarchy():
-    """Create a visualization of class hierarchies."""
-    # Query MeTTa for class hierarchies
-    hierarchies = monitor.query_metta("(match &self (class-hierarchy $base $derived) ($base $derived))")
+def find_class_relationships():
+    """Find and analyze class inheritance relationships."""
+    print("\n=== Class Relationships ===")
     
-    # Similar to module dependencies, you would use a visualization library here
+    # Get class inheritance relationships
+    inheritance = monitor.metta_space.run("(match &self (class-inherits $derived $base) ($derived $base))")
     
-    print(f"Found {len(hierarchies)} class inheritance relationships")
+    if inheritance:
+        print(f"Found {len(inheritance)} class inheritance relationships")
+        print("\nClass inheritance:")
+        for rel in inheritance:
+            print(f"- {rel}")
+        
+        # Build inheritance graph
+        inheritance_graph = {}
+        for rel in inheritance:
+            parts = str(rel).split()
+            if len(parts) >= 2:
+                derived, base = parts[0], parts[1]
+                if base not in inheritance_graph:
+                    inheritance_graph[base] = set()
+                inheritance_graph[base].add(derived)
+        
+        # Show hierarchy
+        print("\nClass hierarchy:")
+        for base, derived_classes in inheritance_graph.items():
+            print(f"- {base} is extended by: {', '.join(derived_classes)}")
+    else:
+        print("No class inheritance relationships found")
+    
+    # Find class-function relationships
+    class_methods = monitor.metta_space.run("""
+        (match &self 
+               (class-def $class $class_scope $class_start $class_end)
+               (function-def $method $method_scope $method_start $method_end)
+               (and (== $class_scope $method_scope)
+                    (>= $method_start $class_start)
+                    (<= $method_end $class_end))
+               ($class $method))
+    """)
+    
+    if class_methods:
+        print(f"\nFound {len(class_methods)} class-method relationships")
+        
+        # Build class -> methods map
+        class_method_map = {}
+        for rel in class_methods:
+            parts = str(rel).split()
+            if len(parts) >= 2:
+                class_name, method_name = parts[0], parts[1]
+                if class_name not in class_method_map:
+                    class_method_map[class_name] = set()
+                class_method_map[class_name].add(method_name)
+        
+        print("\nClass methods:")
+        for class_name, methods in class_method_map.items():
+            print(f"- {class_name}: {', '.join(methods)}")
+    else:
+        print("No class-method relationships found")
 
-def analyze_function_dependencies():
-    """Analyze function dependencies to find potential bottlenecks."""
-    # Find functions with high fan-in (many callers)
-    high_fan_in = monitor.query_metta("(match &self (high-fan-in-functions 5 $funcs) $funcs)")
+def find_module_relationships():
+    """Find and analyze module import relationships."""
+    print("\n=== Module Relationships ===")
     
-    if high_fan_in:
-        print("\nFunctions with high fan-in (potential bottlenecks):")
-        for func in high_fan_in:
-            print(f"- {func}")
+    # Get import relationships
+    imports = monitor.metta_space.run("(match &self (import $module $scope $line) ($scope $module))")
+    
+    if imports:
+        print(f"Found {len(imports)} direct module imports")
+        
+        # Build scope -> imports map
+        scope_imports = {}
+        for imp in imports:
+            parts = str(imp).split()
+            if len(parts) >= 2:
+                scope, module = parts[0], parts[1]
+                if scope not in scope_imports:
+                    scope_imports[scope] = set()
+                scope_imports[scope].add(module)
+        
+        print("\nModule dependencies by scope:")
+        for scope, modules in scope_imports.items():
+            print(f"- {scope} imports: {', '.join(modules)}")
+    else:
+        print("No direct module imports found")
+    
+    # Get from-import relationships
+    from_imports = monitor.metta_space.run("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
+    
+    if from_imports:
+        print(f"\nFound {len(from_imports)} from-type imports")
+        
+        # Build scope -> (module, name) map
+        scope_from_imports = {}
+        for imp in from_imports:
+            parts = str(imp).split()
+            if len(parts) >= 3:
+                scope, module, name = parts[0], parts[1], parts[2]
+                if scope not in scope_from_imports:
+                    scope_from_imports[scope] = []
+                scope_from_imports[scope].append((module, name))
+        
+        print("\nModule component imports by scope:")
+        for scope, imports in scope_from_imports.items():
+            print(f"- {scope} imports:")
+            for module, name in imports:
+                print(f"  - {name} from {module}")
+    else:
+        print("No from-type imports found")
+
+def find_operation_patterns():
+    """Find and analyze operation patterns in the code."""
+    print("\n=== Operation Patterns ===")
+    
+    # Get binary operations
+    bin_ops = monitor.metta_space.run("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
+    
+    if bin_ops:
+        print(f"Found {len(bin_ops)} binary operations")
+        
+        # Count operations by type
+        op_counts = {}
+        for op in bin_ops:
+            parts = str(op).split()
+            if len(parts) >= 1:
+                op_type = parts[0]
+                if op_type not in op_counts:
+                    op_counts[op_type] = 0
+                op_counts[op_type] += 1
+        
+        print("\nOperation frequency:")
+        for op_type, count in sorted(op_counts.items(), key=lambda x: x[1], reverse=True):
+            print(f"- {op_type}: {count} times")
+        
+        # Find common type patterns in operations
+        type_patterns = {}
+        for op in bin_ops:
+            parts = str(op).split()
+            if len(parts) >= 3:
+                op_type, left_type, right_type = parts[0], parts[1], parts[2]
+                key = f"{op_type}({left_type}, {right_type})"
+                if key not in type_patterns:
+                    type_patterns[key] = 0
+                type_patterns[key] += 1
+        
+        print("\nCommon operation patterns:")
+        for pattern, count in sorted(type_patterns.items(), key=lambda x: x[1], reverse=True)[:10]:  # Top 10
+            print(f"- {pattern}: {count} times")
             
-            # Get callers for each high fan-in function
-            callers = monitor.query_metta(f"(find-calling-functions {func} (list))")
-            if callers:
-                print(f"  Called by: {', '.join(callers)}")
+        # Look for specific patterns
+        string_ops = [(op, count) for op, count in type_patterns.items() if "String" in op]
+        if string_ops:
+            print("\nString operation patterns:")
+            for pattern, count in string_ops:
+                print(f"- {pattern}: {count} times")
+        
+        number_ops = [(op, count) for op, count in type_patterns.items() if "Number" in op and "Add" in op or "Mult" in op or "Div" in op or "Sub" in op]
+        if number_ops:
+            print("\nNumeric operation patterns:")
+            for pattern, count in number_ops:
+                print(f"- {pattern}: {count} times")
     else:
-        print("\nNo high fan-in functions detected.")
+        print("No binary operations found")
 
-def find_error_patterns():
-    """Find common error patterns across the codebase."""
-    error_patterns = monitor.query_metta("(match &self (function-error-pattern $func $error $freq $desc) ($func $error $freq $desc))")
+def analyze_structural_patterns():
+    """Analyze structural patterns in the codebase."""
+    print("\n=== Structural Patterns ===")
     
-    if error_patterns:
-        print("\nCommon Error Patterns:")
-        for pattern in error_patterns:
-            # Parse the result
-            parts = pattern.strip("()").split(" ", 3)
-            if len(parts) >= 4:
-                func, error, freq, desc = parts[0], parts[1], parts[2], parts[3]
-                print(f"- {func}: {error} (frequency: {freq}) - {desc}")
+    # Get counts for key elements
+    functions = monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $name)")
+    classes = monitor.metta_space.run("(match &self (class-def $name $scope $start $end) $name)")
+    loops = monitor.metta_space.run("(match &self (loop-pattern $id $type $scope $line) $type)")
+    variables = monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $name)")
+    
+    # Count by scope
+    scopes = {}
+    for func in monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $scope)"):
+        scope = str(func)
+        if scope not in scopes:
+            scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
+        scopes[scope]["functions"] += 1
+    
+    for cls in monitor.metta_space.run("(match &self (class-def $name $scope $start $end) $scope)"):
+        scope = str(cls)
+        if scope not in scopes:
+            scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
+        scopes[scope]["classes"] += 1
+    
+    for var in monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $scope)"):
+        scope = str(var)
+        if scope not in scopes:
+            scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
+        scopes[scope]["variables"] += 1
+    
+    print(f"\nCodebase structure summary:")
+    print(f"- Functions: {len(functions)}")
+    print(f"- Classes: {len(classes)}")
+    print(f"- Variables: {len(variables)}")
+    print(f"- Loops: {len(loops)}")
+    print(f"- Scopes: {len(scopes)}")
+    
+    # Determine overall architecture
+    if len(classes) == 0 and len(functions) > 0:
+        print("\nArchitectural pattern: Primarily Functional")
+    elif len(classes) > 0 and len(functions) / max(1, len(classes)) < 2:
+        print("\nArchitectural pattern: Primarily Object-Oriented")
     else:
-        print("\nNo common error patterns detected.")
-
-def suggest_refactorings():
-    """Suggest potential refactorings based on code analysis."""
-    # Find functions with high complexity
-    complex_funcs = monitor.query_metta("(match &self (code-quality-issue $func complexity $desc $conf) ($func $desc $conf))")
+        print("\nArchitectural pattern: Mixed (OO and Functional)")
     
-    if complex_funcs:
-        print("\nRefactoring Suggestions:")
-        for func_info in complex_funcs:
-            # Parse the result
-            parts = func_info.strip("()").split(" ", 2)
+    # Analyze module structure
+    if len(scopes) > 1:
+        print("\nModule structure:")
+        for scope, counts in scopes.items():
+            total = counts["functions"] + counts["classes"] + counts["variables"]
+            if total > 0:
+                print(f"- {scope}: {counts['functions']} functions, {counts['classes']} classes, {counts['variables']} variables")
+
+def find_function_complexity():
+    """Analyze function complexity based on operations and structures."""
+    print("\n=== Function Complexity Analysis ===")
+    
+    # Get function definitions
+    functions = monitor.metta_space.run("(match &self (function-def $name $scope $start $end) ($name $start $end))")
+    
+    if functions:
+        # For each function, count operations and structures
+        complexity_data = []
+        
+        for func in functions:
+            parts = str(func).split()
             if len(parts) >= 3:
-                func = parts[0]
+                name, start, end = parts[0], parts[1], parts[2]
                 
-                # Check if function has many loops
-                loop_query = monitor.query_metta(f"(match &self (loop-pattern $id $type $scope $line) (contains-scope $scope {func}))")
-                if len(loop_query) > 2:
-                    print(f"- {func}: Consider extracting loop logic into separate functions")
+                # Count binary operations
+                bin_ops = monitor.metta_space.run(f"""
+                    (match &self 
+                           (bin-op $op $left $right $scope $line)
+                           (and (>= $line {start}) (<= $line {end}))
+                           $op)
+                """)
                 
-                # Check if function has many parameters
-                param_query = monitor.query_metta(f"(match &self (function-param {func} $idx $name $type) $name)")
-                if len(param_query) > 4:
-                    print(f"- {func}: Has many parameters ({len(param_query)}). Consider grouping related parameters into a class")
+                # Count loops
+                loops = monitor.metta_space.run(f"""
+                    (match &self 
+                           (loop-pattern $id $type $scope $line)
+                           (and (>= $line {start}) (<= $line {end}))
+                           $type)
+                """)
+                
+                # Count function calls
+                calls = monitor.metta_space.run(f"""
+                    (match &self 
+                           (function-call $called $args $scope $line)
+                           (and (>= $line {start}) (<= $line {end}))
+                           $called)
+                """)
+                
+                # Calculate complexity score (very simple metric)
+                score = len(bin_ops) + len(loops) * 3 + len(calls)
+                
+                complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
+        
+        # Sort by complexity score
+        complexity_data.sort(key=lambda x: x[1], reverse=True)
+        
+        print(f"\nFunction complexity ranking (top 10):")
+        for i, (name, score, ops, loops, calls) in enumerate(complexity_data[:10], 1):
+            print(f"{i}. {name}: score {score} ({ops} operations, {loops} loops, {calls} calls)")
+        
+        # Identify potentially complex functions
+        complex_funcs = [name for name, score, _, _, _ in complexity_data if score > 15]
+        if complex_funcs:
+            print(f"\nPotentially complex functions that might benefit from refactoring:")
+            for name in complex_funcs:
+                print(f"- {name}")
     else:
-        print("\nNo refactoring suggestions available.")
+        print("No function definitions found")
 
-def analyze_type_usage():
-    """Analyze type usage across the codebase."""
-    # Find functions with type issues
-    type_issues = monitor.query_metta("(match &self (type-safety-issue $func $desc $conf) ($func $desc $conf))")
+def analyze_domain_concepts():
+    """Analyze potential domain concepts in the codebase."""
+    print("\n=== Domain Concept Analysis ===")
     
-    if type_issues:
-        print("\nType Usage Analysis:")
-        for issue in type_issues:
-            # Parse the result
-            parts = issue.strip("()").split(" ", 2)
-            if len(parts) >= 3:
-                func = parts[0]
-                
-                # Check for type conversion patterns
-                conversions = monitor.query_metta(f"(match &self (execution-error $exec $error-id $time) (execution-start $exec {func} $start) (error-type $error-id TypeError))")
-                if conversions:
-                    # Find parameters with potential type issues
-                    params = monitor.query_metta(f"(match &self (input-param $exec $idx $name $type) (execution-error $exec $error-id $time) $name)")
-                    for param in params:
-                        print(f"- {func}: Parameter '{param}' may need explicit type conversion")
+    # Find non-standard types (potential domain types)
+    standard_types = {"String", "Number", "Bool", "List", "Dict", "Tuple", "Set", "Any", "None"}
+    types = monitor.metta_space.run("(match &self (function-param $func $idx $name $type) $type)")
+    types += monitor.metta_space.run("(match &self (: $func (-> $params $return)) $return)")
+    
+    # Filter to unique types
+    unique_types = set()
+    for t in types:
+        type_str = str(t)
+        unique_types.add(type_str)
+    
+    # Filter to domain types
+    domain_types = [t for t in unique_types if t not in standard_types and t and t[0] not in "$" and "(" not in t]
+    
+    if domain_types:
+        print(f"Found {len(domain_types)} potential domain types:")
+        for dtype in sorted(domain_types):
+            print(f"- {dtype}")
+        
+        # Try to find functions operating on these types
+        print("\nFunctions working with domain types:")
+        for dtype in domain_types:
+            funcs = monitor.metta_space.run(f"""
+                (match &self 
+                       (function-param $func $idx $name {dtype})
+                       $func)
+            """)
+            if funcs:
+                print(f"- {dtype} is used by: {', '.join(str(f) for f in funcs)}")
     else:
-        print("\nNo type usage issues detected.")
+        print("No domain-specific types found")
+    
+    # Look for potential domain concepts in naming
+    domain_concepts = set()
+    # Look for domain terms in function names
+    for func in monitor.metta_space.run("(match &self (function-def $name $scope $start $end) $name)"):
+        name = str(func)
+        if "_" in name:
+            parts = name.split("_")
+            for part in parts:
+                if len(part) > 3 and part not in standard_types:
+                    domain_concepts.add(part)
+    
+    # Look for domain terms in variable names
+    for var in monitor.metta_space.run("(match &self (variable-assign $name $scope $line) $name)"):
+        name = str(var)
+        if "_" in name:
+            parts = name.split("_")
+            for part in parts:
+                if len(part) > 3 and part not in standard_types:
+                    domain_concepts.add(part)
+    
+    if domain_concepts:
+        print(f"\nPotential domain concepts from naming patterns:")
+        for concept in sorted(domain_concepts):
+            print(f"- {concept}")
+    else:
+        print("\nNo clear domain concepts found in naming patterns")
 
 if __name__ == "__main__":
     # Initialize MeTTa monitor
     monitor = DynamicMonitor()
-
-    # Load the MeTTa reasoning rules
-    monitor.load_metta_rules("ontology.metta")
+    
+    # Create basic relationship rules
+    rules = """
+    ;; Basic relationship definitions for MeTTa reasoning
+    
+    ;; Function calls function
+    (= (calls $caller $callee)
+       (match &self (function-def $caller $scope $start $end)
+              (function-call $callee $args $scope $line)
+              (and (>= $line $start) (<= $line $end))))
+    
+    ;; Function returns type
+    (= (returns $func $type)
+       (match &self (: $func (-> $params $type))))
+    
+    ;; Function accepts type
+    (= (accepts $func $type)
+       (match &self (function-param $func $idx $name $type)))
+    
+    ;; Data flows between functions
+    (= (data-flows $source $target $type)
+       (and (returns $source $type)
+            (accepts $target $type)))
+    
+    ;; Class extends class
+    (= (extends $derived $base)
+       (match &self (class-inherits $derived $base)))
+    """
+    
+    # Write rules to file and load them
+    with open("basic_rules.metta", "w") as f:
+        f.write(rules)
+    
+    try:
+        monitor.load_metta_rules("basic_rules.metta")
+        print("Loaded basic relationship rules")
+    except Exception as e:
+        print(f"Error loading rules: {e}")
     
     if len(sys.argv) < 2:
-        print("Usage: python code_analyzer.py <path_to_file_or_directory> [function_name]")
+        print("Usage: python ontology_analyzer.py <path_to_file_or_directory>")
         sys.exit(1)
     
     # Path to analyze
@@ -238,26 +565,12 @@ if __name__ == "__main__":
     # Run analysis
     analyze_codebase(path)
     
-    # Get codebase insights
-    get_codebase_insights()
-    
-    # Analyze function dependencies
-    analyze_function_dependencies()
-    
-    # # Find error patterns
-    # find_error_patterns()
-    
-    # # Suggest refactorings
-    # suggest_refactorings()
-    
-    # # Analyze type usage
-    # analyze_type_usage()
-    
-    # # Visualize dependencies
-    # visualize_module_dependencies()
-    # visualize_class_hierarchy()
-    
-    # Optionally get recommendations for specific function
-    if len(sys.argv) > 2:
-        function_name = sys.argv[2]
-        get_function_recommendations(function_name)
+    # Perform relationship analysis
+    find_function_relationships()
+    find_type_relationships()
+    find_class_relationships()
+    find_module_relationships()
+    find_operation_patterns()
+    analyze_structural_patterns()
+    find_function_complexity()
+    analyze_domain_concepts()
