@@ -1,359 +1,352 @@
-;; Codebase Ontology and Reasoning Rules
-;; For use with the static analyzer and dynamic monitor
+;; Core Codebase Ontology Rules
+;; These rules focus on relationships and architecture rather than errors
 
 ;; =====================
-;; Fragment Donors
+;; Module Structure
 ;; =====================
-(= (fragment-donor python-string-concat)
-   "str1 + str2")
 
-(= (fragment-donor python-f-string)
-   "f\"{variable}\"")
+;; Define module dependency relationship
+(= (module-depends-on $module $dependency)
+   (match &self (import $dependency $module-scope $line)
+          (contains-scope $module-scope $module)))
 
-(= (fragment-donor python-format-string)
-   "\"{}\".format(variable)")
+;; Define module import relationship
+(= (module-imports $module $imported-module $imported-name)
+   (match &self (import-from $imported-module $imported-name $module-scope $line)
+          (contains-scope $module-scope $module)))
 
-(= (fragment-donor python-string-join)
-   "\", \".join(items)")
+;; Check if a scope contains a module name
+(= (contains-scope $scope $module)
+   (= $scope $module))
 
-(= (fragment-donor python-list-comprehension)
-   "[x for x in items]")
-
-(= (fragment-donor python-zero-division-check)
-   "if divisor != 0:
-    result = dividend / divisor
-else:
-    result = float('inf')")
-
-(= (fragment-donor python-index-check)
-   "if 0 <= index < len(sequence):
-    item = sequence[index]
-else:
-    item = default")
-
-(= (fragment-donor python-dict-lookup)
-   "try:
-    value = dictionary[key]
-except KeyError:
-    value = default")
+;; Get all dependencies for a module
+(= (all-module-dependencies $module $dependencies)
+   (case (match &self (module-depends-on $module $dependency))
+     (Empty $dependencies)
+     ($dependency (all-module-dependencies $module (cons $dependency $dependencies)))))
 
 ;; =====================
-;; Operation Donors
+;; Function Relationships
 ;; =====================
-(= (operation-donor Add String String)
-   (fragment-donor python-string-concat))
 
-(= (operation-donor Add String Number)
-   (fragment-donor python-f-string))
+;; Define function call relationship
+(= (function-calls $caller $callee)
+   (match &self (function-def $caller $caller-scope $start $end)
+          (function-call $callee $args $scope $line)
+          (and (= $scope $caller-scope)
+               (>= $line $start)
+               (<= $line $end))))
 
-(= (operation-donor Add Number String)
-   (fragment-donor python-f-string))
+;; Define function data dependency relationship
+(= (function-uses-type $func $type)
+   (match &self (function-param $func $idx $name $type)))
 
-(= (operation-donor Div Number Number)
-   (fragment-donor python-zero-division-check))
+;; Function with a high number of calls to other functions (high fan-out)
+(= (high-fan-out-function $func $threshold)
+   (> (count-calls-from $func) $threshold))
 
-(= (operation-donor Subscript List Number)
-   (fragment-donor python-index-check))
+;; Function called by many other functions (high fan-in)
+(= (high-fan-in-function $func $threshold)
+   (> (count-calls-to $func) $threshold))
 
-(= (operation-donor Subscript Dict Any)
-   (fragment-donor python-dict-lookup))
+;; Count calls from a function
+(= (count-calls-from $func)
+   (case (match &self (function-calls $func $callee))
+     (Empty 0)
+     ($callee (+ 1 (count-calls-from $func)))))
 
-;; =====================
-;; Type Conversion Donors
-;; =====================
-(= (type-donor String Number)
-   "float(string_value)")
-
-(= (type-donor Number String)
-   "str(number_value)")
-
-(= (type-donor List String)
-   "\", \".join(list_value)")
-
-(= (type-donor String List)
-   "string_value.split(separator)")
-
-;; =====================
-;; Function Donors
-;; =====================
-(= (function-donor safe-division)
-   "def safe_divide(a: float, b: float, default: float = float('inf')) -> float:
-    try:
-        return a / b
-    except ZeroDivisionError:
-        return default")
-
-(= (function-donor safe-index)
-   "def safe_get(sequence, index, default=None):
-    try:
-        return sequence[index]
-    except (IndexError, KeyError):
-        return default")
-
-(= (function-donor string-formatter)
-   "def format_string(template: str, *args, **kwargs) -> str:
-    try:
-        return template.format(*args, **kwargs)
-    except (ValueError, KeyError, IndexError) as e:
-        return f\"Error formatting string: {e}\"")
+;; Count calls to a function
+(= (count-calls-to $func)
+   (case (match &self (function-calls $caller $func))
+     (Empty 0)
+     ($caller (+ 1 (count-calls-to $func)))))
 
 ;; =====================
-;; Error Fix Rules
+;; Class Relationships
 ;; =====================
-(= (error-fix ZeroDivisionError safe-division)
-   "Replace division operation with safe_divide function")
 
-(= (error-fix IndexError safe-index)
-   "Replace direct indexing with safe_get function")
+;; Define class inheritance relationship
+(= (class-extends $derived $base)
+   (match &self (class-inherits $derived $base)))
 
-(= (error-fix TypeError string-conversion)
-   "Add explicit type conversion")
+;; Define class method relationship
+(= (class-has-method $class $method)
+   (match &self (function-def $method $scope $start $end)
+          (= $scope (concat "class:" $class))))
 
-(= (error-fix KeyError safe-dict-lookup)
-   "Add try-except block for dictionary lookups")
-
-;; =====================
-;; Fix Code Templates
-;; =====================
-(= (fix-code safe-division)
-   "def safe_divide(a, b, default=float('inf')):
-    try:
-        return a / b
-    except ZeroDivisionError:
-        return default")
-
-(= (fix-code safe-index)
-   "def safe_get(sequence, index, default=None):
-    try:
-        return sequence[index]
-    except (IndexError, KeyError):
-        return default")
-
-(= (fix-code string-conversion)
-   "# Convert values to strings before concatenation
-str(value1) + str(value2)")
-
-(= (fix-code safe-dict-lookup)
-   "try:
-    value = dictionary[key]
-except KeyError:
-    value = default_value")
+;; Define class uses relationship (when a class is used as a parameter type)
+(= (function-uses-class $func $class)
+   (match &self (function-param $func $idx $name $class)))
 
 ;; =====================
-;; Pattern Recognition Rules
+;; Data Flow Patterns
 ;; =====================
-(= (recognize-pattern (bin-op Add String String $scope $line))
-   (string-concat String String))
 
-(= (recognize-pattern (bin-op Add String Number $scope $line))
-   (string-format String Number))
+;; Define data flow between functions (output of one is input to another)
+(= (data-flows $source-func $target-func $type)
+   (and (function-returns $source-func $type)
+        (function-accepts $target-func $type)))
 
-(= (recognize-pattern (bin-op Add Number String $scope $line))
-   (string-format Number String))
+;; Determine if a function returns a specific type
+(= (function-returns $func $type)
+   (match &self (: $func (-> $params $type))))
 
-(= (recognize-pattern (bin-op Div Number Number $scope $line))
-   (division Number Number))
-
-;; =====================
-;; Error Pattern Recognition
-;; =====================
-(= (recognize-error-pattern ZeroDivisionError (division $a $b))
-   (safe-division-needed $a $b))
-
-(= (recognize-error-pattern IndexError (Subscript List Number))
-   (safe-index-needed List Number))
-
-(= (recognize-error-pattern TypeError (bin-op Add String Number $scope $line))
-   (type-conversion-needed String Number Add))
-
-(= (recognize-error-pattern TypeError (bin-op Add Number String $scope $line))
-   (type-conversion-needed Number String Add))
+;; Determine if a function accepts a specific type as parameter
+(= (function-accepts $func $type)
+   (match &self (function-param $func $idx $name $type)))
 
 ;; =====================
-;; Dynamic Error Analysis
+;; Architectural Patterns
 ;; =====================
-(= (analyze-error $exec-id $error-id)
-   (case (match &self (error-type $error-id $type))
-     (Empty (no-fix-available $error-id))
-     ($type (find-error-fix $error-id $type))))
 
-(= (find-error-fix $error-id $error-type)
-   (case (match &self (error-fix $error-type $fix) $fix)
-     (Empty (no-fix-available $error-id))
-     ($fix (suggest-fix $error-id $fix))))
+;; Identify layers in the architecture
+(= (architectural-layer $name $funcs)
+   (case (match &self (function-def $func $scope $start $end)
+                (contains-layer-scope $scope $name))
+     (Empty $funcs)
+     ($func (architectural-layer $name (cons $func $funcs)))))
 
-;; =====================
-;; Fix Selection Rules
-;; =====================
-(= (select-fix-for $error-id $func-name $fix)
-   (case (match &self (function-context $func-name $context))
-     (Empty $fix)  ; No context, use general fix
-     ($context (context-aware-fix $error-id $fix $context))))
+;; Helper to check if scope matches a layer
+(= (contains-layer-scope $scope $layer)
+   (starts-with $scope $layer))
 
-(= (context-aware-fix $error-id $fix finance)
-   (case (match &self (error-type $error-id ZeroDivisionError))
-     (Empty $fix)
-     ($_ safe-financial-division)))
+;; Identify core utilities (functions called by many others)
+(= (core-utility $func $threshold)
+   (high-fan-in-function $func $threshold))
+
+;; Identify boundary functions (those that accept external types)
+(= (boundary-function $func)
+   (function-accepts $func "Dict"))
 
 ;; =====================
-;; Function Recommendation Rules
+;; Usage Patterns
 ;; =====================
-(= (function-recommendation $func-name error-pattern $description 0.8)
-   (case (match &self (execution-error $exec-id $error-id $time)
-               (match &self (execution-start $exec-id $func-name $start-time))
-               (match &self (error-type $error-id $error-type)))
+
+;; Identify common type usage patterns
+(= (common-type-usage $type)
+   (> (count-type-usages $type) 3))
+
+;; Count type usages
+(= (count-type-usages $type)
+   (case (match &self (function-param $func $idx $name $type))
+     (Empty 0)
+     ($func (+ 1 (count-type-usages $type)))))
+
+;; Identify common operation patterns
+(= (common-operation $op $left-type $right-type)
+   (> (count-operations $op $left-type $right-type) 2))
+
+;; Count operations of specific types
+(= (count-operations $op $left-type $right-type)
+   (case (match &self (bin-op $op $left-type $right-type $scope $line))
+     (Empty 0)
+     ($scope (+ 1 (count-operations $op $left-type $right-type)))))
+
+;; =====================
+;; Holistic Insights
+;; =====================
+
+;; Determine programming paradigm
+(= (programming-paradigm $paradigm $confidence)
+   (case (count-classes) 
+     (0 (and (= $paradigm "Functional") (= $confidence 0.9)))
+     ($classes (case (count-functions)
+                 (0 (and (= $paradigm "Data-driven") (= $confidence 0.8)))
+                 ($funcs (if (> (/ $funcs $classes) 5)
+                             (and (= $paradigm "Mostly functional") (= $confidence 0.7))
+                             (if (< (/ $funcs $classes) 2)
+                                 (and (= $paradigm "Mostly object-oriented") (= $confidence 0.7))
+                                 (and (= $paradigm "Mixed paradigm") (= $confidence 0.6)))))))))
+
+;; Count classes
+(= (count-classes)
+   (case (match &self (class-def $name $scope $start $end))
+     (Empty 0)
+     ($name (+ 1 (count-classes)))))
+
+;; Count functions
+(= (count-functions)
+   (case (match &self (function-def $name $scope $start $end))
+     (Empty 0)
+     ($name (+ 1 (count-functions)))))
+
+;; Identify architectural patterns
+(= (architectural-insight "Layered architecture detected" 0.8)
+   (> (count-layers) 2))
+
+(= (architectural-insight "Core utilities identified" 0.7)
+   (core-utilities-exist 3))
+
+(= (architectural-insight "Data processing pipeline pattern detected" 0.7)
+   (data-pipeline-exists))
+
+;; Helper for architectural insights
+(= (count-layers)
+   (case (match &self (architectural-layer $name $funcs))
+     (Empty 0)
+     ($name (+ 1 (count-layers)))))
+
+(= (core-utilities-exist $threshold)
+   (case (match &self (core-utility $func $threshold))
      (Empty False)
-     ($_ (add-recommendation $func-name $error-type $description))))
+     ($func True)))
 
-(= (add-recommendation $func-name ZeroDivisionError "Consider using a safe division utility to handle zero divisors")
-   True)
-
-(= (add-recommendation $func-name IndexError "Add bounds checking before accessing list elements")
-   True)
-
-(= (add-recommendation $func-name TypeError "Ensure consistent types by adding explicit conversions")
-   True)
-
-;; Performance and complexity recommendations based on execution metrics
-(= (function-recommendation $func-name performance $description 0.7)
-   (case (match &self (function-metrics $func-name $calls $successes $failures $avg-time))
+(= (data-pipeline-exists)
+   (case (match &self (data-flows $src $tgt $type))
      (Empty False)
-     (($calls $successes $failures $avg-time) 
-      (if (> $avg-time 1.0)  ; Threshold for slow functions
-          (add-performance-recommendation $func-name $avg-time)
-          False))))
-
-(= (add-performance-recommendation $func-name $avg-time)
-   "Function has high average execution time. Consider optimizing algorithm or caching results")
+     ($flow True)))
 
 ;; =====================
-;; Code Quality Rules
+;; Function Complexity Analysis
 ;; =====================
-(= (code-quality-issue $func-name complexity "Function has too many loops" 0.6)
-   (case (match &self (loop-pattern $id for $func-scope $line1)
-               (match &self (loop-pattern $id2 for $func-scope $line2))
-               (match &self (loop-pattern $id3 for $func-scope $line3)))
-     (Empty False)
-     ($_ (if (!= $line1 $line2) 
-            (if (!= $line1 $line3)
-                (if (!= $line2 $line3)
-                    (contains-scope $func-scope $func-name)
-                    False)
-                False)
-            False))))
 
-(= (contains-scope $scope $func-name)
-   (case (match &self (function-def $func-name $scope $start $end))
-     (Empty False)
-     ($_ True)))
-
-;; =====================
-;; Utility Functions
-;; =====================
-(= (current-time)
-   (time))
-
-;; =====================
-;; Function Error Patterns
-;; =====================
-(= (function-error-pattern $func-name $error-type $frequency $description)
-   (case (count-errors $func-name $error-type $count)
-     (Empty False)
-     ($count (if (> $count 2)
-                 (error-pattern-description $error-type $description)
-                 False))))
-
-(= (count-errors $func-name $error-type $count)
-   (case (match &self (execution-start $exec-id $func-name $start)
-               (match &self (execution-error $exec-id $error-id $time))
-               (match &self (error-type $error-id $error-type))
-               (aggregate-count $func-name $error-type))
+;; Function complexity based on operation count
+(= (function-operation-complexity $func $count)
+   (case (match &self (function-def $func $scope $start $end)
+                (match &self (bin-op $op $left $right $scope $line)
+                       (and (>= $line $start) (<= $line $end)))
+                (aggregate-count))
      (Empty 0)
      ($count $count)))
 
-(= (error-pattern-description ZeroDivisionError "Function frequently encounters division by zero")
-   True)
+;; Function complexity based on loop count
+(= (function-loop-complexity $func $count)
+   (case (match &self (function-def $func $scope $start $end)
+                (match &self (loop-pattern $id $type $loop-scope $line)
+                       (and (= $scope $loop-scope) (>= $line $start) (<= $line $end)))
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
 
-(= (error-pattern-description IndexError "Function frequently tries to access out-of-bounds indices")
-   True)
-
-(= (error-pattern-description TypeError "Function frequently has type mismatches")
-   True)
-
-;; =====================
-;; Codebase Structure Analysis
-;; =====================
-(= (module-dependency-graph $module $dependencies)
-   (case (match &self (module-depends $module $dependency))
-     (Empty (list))
-     ($dependency (cons $dependency (module-dependency-graph $module (remove $dependency $dependencies))))))
-
-(= (class-hierarchy-graph $base-class $derived-classes)
-   (case (match &self (class-hierarchy $base-class $derived))
-     (Empty (list))
-     ($derived (cons $derived (class-hierarchy-graph $base-class (remove $derived $derived-classes))))))
+;; Function is complex
+(= (complex-function $func)
+   (or (> (function-operation-complexity $func 0) 10)
+       (> (function-loop-complexity $func 0) 2)))
 
 ;; =====================
-;; Query Support Functions
+;; Type System Analysis
 ;; =====================
-(= (find-all-functions $func-list)
-   (case (match &self (function-def $name $scope $start $end))
-     (Empty $func-list)
-     ($name (find-all-functions (add-unique $func-list $name)))))
 
+;; Count parameter types used in the codebase
+(= (type-frequency $type $count)
+   (case (match &self (function-param $func $idx $name $type)
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
+
+;; Common types (used in multiple functions)
+(= (common-type $type)
+   (> (type-frequency $type 0) 3))
+
+;; Function pairs that can compose (output of one matches input of another)
+(= (composable-functions $func1 $func2)
+   (case (match &self (: $func1 (-> $params1 $return))
+                (match &self (function-param $func2 $idx $name $param-type)
+                       (= $return $param-type)))
+     (Empty False)
+     ($return True)))
+
+;; =====================
+;; Code Patterns & Idioms
+;; =====================
+
+;; Identify iterate-and-accumulate pattern
+(= (iterate-accumulate-pattern $func)
+   (match &self (function-def $func $scope $start $end)
+          (loop-pattern $id for $scope $loop-line)
+          (bin-op Add $target $source $scope $op-line)
+          (and (>= $loop-line $start) (<= $loop-line $end)
+               (>= $op-line $start) (<= $op-line $end)
+               (> $op-line $loop-line))))
+
+;; Identify string formatting pattern  
+(= (string-formatting-pattern $func)
+   (match &self (function-def $func $scope $start $end)
+          (bin-op Add String $right $scope $line)
+          (and (>= $line $start) (<= $line $end))))
+
+;; Identify dict lookup pattern
+(= (dict-lookup-pattern $func)
+   (match &self (function-def $func $scope $start $end)
+          (function-call "get" 3 $scope $line)
+          (and (>= $line $start) (<= $line $end))))
+
+;; =====================
+;; Module Structure Analysis
+;; =====================
+
+;; Count functions per module/scope
+(= (module-function-count $scope $count)
+   (case (match &self (function-def $name $scope $start $end)
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
+
+;; Module with high function count (potential monolith)
+(= (high-function-module $scope $threshold)
+   (> (module-function-count $scope 0) $threshold))
+
+;; Module dependencies count
+(= (module-dependency-count $scope $count)
+   (case (match &self (import $module $scope $line)
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
+
+;; Highly dependent module
+(= (highly-dependent-module $scope $threshold)
+   (> (module-dependency-count $scope 0) $threshold))
+
+;; =====================
+;; Domain Analysis 
+;; =====================
+
+;; Domain-specific type identification
+(= (domain-specific-type $type)
+   (and (not (= $type "String"))
+        (not (= $type "Number"))
+        (not (= $type "Bool"))
+        (not (= $type "List"))
+        (not (= $type "Dict"))
+        (not (= $type "Tuple"))
+        (not (= $type "Set"))
+        (not (= $type "Any"))
+        (not (= $type "None"))))
+
+;; Module might represent a domain concept
+(= (domain-module $scope)
+   (> (module-function-count $scope 0) 5))
+
+;; =====================
+;; Additional Utility Rules
+;; =====================
+
+;; Start with utility for string comparison
+(= (starts-with $str $prefix)
+   (= $str $prefix))  ;; Simplified for demonstration
+
+;; Check if a list contains an element
+(= (contains $list $item)
+   (case $list
+     (Empty False)
+     ((cons $head $tail) (if (= $head $item)
+                             True
+                             (contains $tail $item)))))
+
+;; String concatenation (simplified)
+(= (concat $a $b)
+   (concat-strings $a $b))
+
+;; Add an item to a list if not already present
 (= (add-unique $list $item)
    (if (contains $list $item)
        $list
-       (append $list $item)))
+       (cons $item $list)))
 
-(= (find-error-prone-functions $threshold)
-   (case (match &self (function-metrics $name $calls $successes $failures $avg-time))
-     (Empty (list))
-     (($name $calls $successes $failures $avg-time)
-      (if (> (/ $failures $calls) $threshold)
-          (cons $name (find-error-prone-functions $threshold))
-          (find-error-prone-functions $threshold)))))
-
-;; =====================
-;; Type Safety Analysis
-;; =====================
-(= (type-safety-issue $func-name $description 0.75)
-   (case (match &self (execution-error $exec-id $error-id $time)
-               (match &self (execution-start $exec-id $func-name $start))
-               (match &self (error-type $error-id TypeError)))
-     (Empty False)
-     ($_ "Function may have type conversion issues. Consider adding explicit type checking")))
-
-;; =====================
-;; Code Relationship Analysis
-;; =====================
-(= (find-related-functions $func-name $related-list)
-   (case (match &self (function-depends $func-name $called-func))
-     (Empty $related-list)
-     ($called-func (find-related-functions $func-name (add-unique $related-list $called-func)))))
-
-(= (find-calling-functions $func-name $calling-list)
-   (case (match &self (function-depends $caller $func-name))
-     (Empty $calling-list)
-     ($caller (find-calling-functions $func-name (add-unique $calling-list $caller)))))
-
-;; =====================
-;; Architectural Insights
-;; =====================
-(= (architectural-insight $description 0.7)
-   (case (high-fan-in-functions 5 $functions)
-     (Empty False)
-     ($functions "Several functions have high fan-in, suggesting they might be bottlenecks or key utilities")))
-
-(= (high-fan-in-functions $threshold $result)
-   (case (match &self (function-def $name $scope $start $end))
-     (Empty $result)
-     ($name (case (count-callers $name $count)
-              (if (> $count $threshold)
-                  (high-fan-in-functions $threshold (add-unique $result $name))
-                  (high-fan-in-functions $threshold $result))))))
-
-(= (count-callers $func-name $count)
-   (case (match &self (function-depends $caller $func-name))
-     (Empty 0)
-     ($_ (+ 1 (count-callers $func-name (- $count 1))))))
+;; Remove an item from a list
+(= (remove $item $list)
+   (case $list
+     (Empty Empty)
+     ((cons $head $tail) (if (= $head $item)
+                             (remove $item $tail)
+                             (cons $head (remove $item $tail))))))
