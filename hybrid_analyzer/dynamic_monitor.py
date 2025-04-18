@@ -138,19 +138,19 @@ class DynamicMonitor:
                     if auto_fix:
                         # Ask MeTTa if it has any fixes for this error type
                         fix_query = f"(match &self (error-fix {error_type} $fix) $fix)"
-                        potential_fixes = self.metta_space.query(fix_query)
+                        potential_fixes = self.metta_space.run(fix_query)
                         
                         if potential_fixes:
                             # Let MeTTa select the best fix based on context
                             apply_fix_query = f"(match &self (select-fix-for {error_id} {func.__name__} $fix) $fix)"
-                            selected_fix = self.metta_space.query(apply_fix_query)
+                            selected_fix = self.metta_space.run(apply_fix_query)
                             
                             if selected_fix:
                                 fix_to_apply = selected_fix[0]
                                 
                                 # Request the fix code from MeTTa
                                 fix_code_query = f"(match &self (fix-code {fix_to_apply} $code) $code)"
-                                fix_code_result = self.metta_space.query(fix_code_query)
+                                fix_code_result = self.metta_space.run(fix_code_query)
                                 
                                 if fix_code_result:
                                     # Apply the fix (this would need to be implemented)
@@ -242,7 +242,7 @@ class DynamicMonitor:
         
         This allows users to directly query the MeTTa space for insights and recommendations.
         """
-        return self.metta_space.query(query_pattern)
+        return self.metta_space.run(query_pattern)
     
     def get_function_recommendations(self, func_name: str) -> List[Dict]:
         """
@@ -250,7 +250,7 @@ class DynamicMonitor:
         """
         # Query MeTTa for recommendations instead of calculating in Python
         recommendation_query = f"(match &self (function-recommendation {func_name} $type $description $confidence) ($type $description $confidence))"
-        raw_recommendations = self.metta_space.query(recommendation_query)
+        raw_recommendations = self.metta_space.run(recommendation_query)
         
         # Parse the results
         recommendations = []
@@ -280,7 +280,7 @@ class DynamicMonitor:
         """
         # Query MeTTa for error patterns
         pattern_query = f"(match &self (function-error-pattern {func_name} $error_type $frequency $description) ($error_type $frequency $description))"
-        raw_patterns = self.metta_space.query(pattern_query)
+        raw_patterns = self.metta_space.run(pattern_query)
         
         # Parse the results
         patterns = []
