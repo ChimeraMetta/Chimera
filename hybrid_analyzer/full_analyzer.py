@@ -475,42 +475,8 @@ if __name__ == "__main__":
     monitor = DynamicMonitor()
     
     # Create basic relationship rules
-    rules = """
-    ;; Basic relationship definitions for MeTTa reasoning
-    
-    ;; Function calls function
-    (= (calls $caller $callee)
-       (match &self (function-def $caller $scope $start $end)
-              (function-call $callee $args $scope $line)
-              (and (>= $line $start) (<= $line $end))))
-    
-    ;; Function returns type
-    (= (returns $func $type)
-       (match &self (: $func (-> $params $type))))
-    
-    ;; Function accepts type
-    (= (accepts $func $type)
-       (match &self (function-param $func $idx $name $type)))
-    
-    ;; Data flows between functions
-    (= (data-flows $source $target $type)
-       (and (returns $source $type)
-            (accepts $target $type)))
-    
-    ;; Class extends class
-    (= (extends $derived $base)
-       (match &self (class-inherits $derived $base)))
-    """
-    
-    # Write rules to file and load them
-    with open("basic_rules.metta", "w") as f:
-        f.write(rules)
-    
-    try:
-        monitor.load_metta_rules("basic_rules.metta")
-        print("Loaded basic relationship rules")
-    except Exception as e:
-        print(f"Error loading rules: {e}")
+    # Load the MeTTa reasoning rules
+    monitor.load_metta_rules("ontology.metta")
     
     if len(sys.argv) < 2:
         print("Usage: python ontology_analyzer.py <path_to_file_or_directory>")
