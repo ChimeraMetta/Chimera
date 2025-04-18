@@ -26,16 +26,27 @@ def analyze_file(file_path):
     
     # Add analysis results to MeTTa
     if "metta_atoms" in analysis_result and analysis_result["metta_atoms"]:
-        for atom_str in analysis_result["metta_atoms"]:
-            try:
-                # Parse the string into a proper MeTTa atom
-                atom = monitor.metta.parse(atom_str)
-                monitor.metta_space.add_atom(atom)
-            except Exception as e:
-                print(f"Error adding atom: {atom_str[:50]}...")
-                print(f"  Error details: {e}")
+        # Construct a MeTTa program
+        program = "\n".join(analysis_result["metta_atoms"])
         
-        print(f"Added atoms from {file_path} to MeTTa")
+        try:
+            # Run the program to add all atoms
+            monitor.metta.run(program)
+            print(f"Added {len(analysis_result['metta_atoms'])} atoms from {file_path}")
+        except Exception as e:
+            print(f"Error adding atoms: {e}")
+            
+            # Fallback: Try adding atoms one by one
+            atoms_added = 0
+            for atom_str in analysis_result["metta_atoms"]:
+                try:
+                    cmd = f"{atom_str}"
+                    monitor.metta.run(cmd)
+                    atoms_added += 1
+                except Exception as e2:
+                    print(f"Error adding atom: {atom_str[:50]}...")
+            
+            print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms via fallback method")
     else:
         print(f"Warning: No MeTTa atoms generated for {file_path}")
 
