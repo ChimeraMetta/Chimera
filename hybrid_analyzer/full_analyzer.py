@@ -33,6 +33,7 @@ def analyze_file(file_path):
                 monitor.metta_space.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
+                print(f"Error adding atom {atom_str}: {e}")
                 pass
                 
         print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
@@ -479,7 +480,7 @@ if __name__ == "__main__":
     monitor.load_metta_rules("ontology.metta")
     
     if len(sys.argv) < 2:
-        print("Usage: python ontology_analyzer.py <path_to_file_or_directory>")
+        print("Usage: python full_analyzer.py <path_to_file_or_directory>")
         sys.exit(1)
     
     # Path to analyze
