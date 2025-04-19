@@ -43,16 +43,39 @@ def find_function_relationships():
     """Find and analyze function call relationships."""
     print("\n=== Function Call Relationships ===")
     
-    # Get function calls directly using monitor.query
+    # Get function calls with a more robust query pattern
+    # The old query may have had scope matching issues
     results = monitor.query("""
         (match &self 
-               (function-def $caller $caller-scope $start $end)
                (function-call $callee $args $scope $line)
-               (and (== $scope $caller-scope)
+               (function-def $caller $caller-scope $start $end)
+               (and (= $scope $caller-scope)
                     (>= $line $start)
                     (<= $line $end))
                ($caller $callee))
     """)
+    
+    # If the first approach doesn't work, try an alternative query
+    if not results:
+        results = monitor.query("""
+            (match &self 
+                   (function-def $caller $caller-scope $start $end)
+                   $caller_atom)
+            (match &self 
+                   (function-call $callee $args $scope $line)
+                   $callee_atom)
+            (and (>= $line $start)
+                 (<= $line $end)
+                 (= $scope $caller-scope))
+            ($caller $callee)
+        """)
+    
+    # If still no results, try with function-depends which might have been populated
+    if not results:
+        results = monitor.query("""
+            (match &self (function-depends $caller $callee)
+                  ($caller $callee))
+        """)
     
     if results:
         print(f"Found {len(results)} function call relationships")
@@ -62,19 +85,24 @@ def find_function_relationships():
         reverse_graph = {}
         
         for result in results:
-            parts = str(result).split()
-            if len(parts) >= 2:
-                caller, callee = parts[0], parts[1]
-                
-                # Add to call graph
-                if caller not in call_graph:
-                    call_graph[caller] = set()
-                call_graph[caller].add(callee)
-                
-                # Add to reverse graph
-                if callee not in reverse_graph:
-                    reverse_graph[callee] = set()
-                reverse_graph[callee].add(caller)
+            try:
+                # Handle different result formats by converting to string and parsing
+                result_str = str(result)
+                parts = result_str.strip('()').split()
+                if len(parts) >= 2:
+                    caller, callee = parts[0], parts[1]
+                    
+                    # Add to call graph
+                    if caller not in call_graph:
+                        call_graph[caller] = set()
+                    call_graph[caller].add(callee)
+                    
+                    # Add to reverse graph
+                    if callee not in reverse_graph:
+                        reverse_graph[callee] = set()
+                    reverse_graph[callee].add(caller)
+            except Exception as e:
+                print(f"Error processing result {result}: {e}")
         
         # Display function call graph
         print("\nFunction call relationships:")
@@ -87,7 +115,7 @@ def find_function_relationships():
         
         if high_fan_in:
             print("\nMost called functions (high fan-in):")
-            for func, count in high_fan_in:
+            for func, count in high_fan_in[:10]:  # Show top 10
                 print(f"- {func}: called by {count} functions")
         
         # Find high fan-out functions (call many others)
@@ -96,10 +124,45 @@ def find_function_relationships():
         
         if high_fan_out:
             print("\nFunctions calling many others (high fan-out):")
-            for func, count in high_fan_out:
+            for func, count in high_fan_out[:10]:  # Show top 10
                 print(f"- {func}: calls {count} functions")
+        
+        # Additional debugging to show all function definitions and calls
+        print("\nDebugging information:")
+        
+        func_defs = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
+        print(f"Total function definitions: {len(func_defs)}")
+        if len(func_defs) > 0 and len(func_defs) < 10:
+            for f in func_defs:
+                print(f"  {f}")
+        
+        func_calls = monitor.query("(match &self (function-call $name $args $scope $line) ($name $scope $line))")
+        print(f"Total function calls: {len(func_calls)}")
+        if len(func_calls) > 0 and len(func_calls) < 10:
+            for c in func_calls:
+                print(f"  {c}")
     else:
-        print("No function call relationships found")
+        print("No function call relationships found. Adding diagnostic information:")
+        
+        # Diagnostic information
+        func_defs = monitor.query("(match &self (function-def $name $scope $start $end) $name)")
+        func_calls = monitor.query("(match &self (function-call $name $args $scope $line) $name)")
+        deps = monitor.query("(match &self (function-depends $caller $callee) ($caller $callee))")
+        
+        print(f"Function definitions found: {len(func_defs)}")
+        print(f"Function calls found: {len(func_calls)}")
+        print(f"Function dependencies found: {len(deps)}")
+        
+        # Show sample function definitions and calls for debugging
+        if func_defs:
+            print("\nSample function definitions:")
+            for i, func in enumerate(func_defs[:5]):
+                print(f"  {func}")
+        
+        if func_calls:
+            print("\nSample function calls:")
+            for i, call in enumerate(func_calls[:5]):
+                print(f"  {call}")
 
 def find_type_relationships():
     """Find and analyze type relationships between functions."""

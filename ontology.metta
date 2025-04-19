@@ -29,13 +29,76 @@
 ;; Function Relationships
 ;; =====================
 
-;; Define function call relationship
-(= (function-calls $caller $callee)
+;; Direct function call relationship based on scope and line numbers
+(= (direct-function-call $caller $callee)
    (match &self (function-def $caller $caller-scope $start $end)
           (function-call $callee $args $scope $line)
           (and (= $scope $caller-scope)
                (>= $line $start)
                (<= $line $end))))
+
+;; Alternative approach using function-depends relationship which might be 
+;; populated by the static analyzer
+(= (function-calls $caller $callee)
+   (or (direct-function-call $caller $callee)
+       (match &self (function-depends $caller $callee))))
+
+;; Transitive function call relationship (call chain)
+(= (calls-transitively $caller $callee)
+   (or (function-calls $caller $callee)
+       (match &self (function-calls $caller $intermediate)
+              (calls-transitively $intermediate $callee))))
+
+;; Find all functions called by a specific function (direct and indirect)
+(= (all-called-by $caller $result)
+   (match &self (calls-transitively $caller $callee)
+          (cons $callee $result)))
+
+;; Find all functions that call a specific function (direct and indirect)
+(= (all-callers-of $callee $result)
+   (match &self (calls-transitively $caller $callee)
+          (cons $caller $result)))
+
+;; Count the depth of a call chain
+(= (call-chain-depth $caller $callee $depth)
+   (case (function-calls $caller $callee)
+     (True (= $depth 1))
+     (False (case (match &self (function-calls $caller $intermediate)
+                          (call-chain-depth $intermediate $callee $intermediate-depth))
+              (Empty (= $depth 9999))  ; No path found
+              ($intermediate-depth (= $depth (+ 1 $intermediate-depth)))))))
+
+;; Identify critical functions - those that are part of many call chains
+(= (critical-function $func $threshold)
+   (> (+ (count-callers $func) (count-callees $func)) $threshold))
+
+;; Count number of functions that call this function
+(= (count-callers $func)
+   (case (match &self (function-calls $caller $func))
+     (Empty 0)
+     ($caller (+ 1 (count-callers $func)))))
+
+;; Count number of functions called by this function
+(= (count-callees $func)
+   (case (match &self (function-calls $func $callee))
+     (Empty 0)
+     ($callee (+ 1 (count-callees $func)))))
+
+;; Recursive call detection
+(= (recursive-function $func)
+   (function-calls $func $func))
+
+;; Mutually recursive functions
+(= (mutually-recursive-functions $func1 $func2)
+   (and (function-calls $func1 $func2)
+        (function-calls $func2 $func1)))
+
+;; Identify potential callback patterns
+(= (callback-pattern $func $callback-param)
+   (and (match &self (function-param $func $idx $callback-param Any))
+        (match &self (function-call $callback-param $args $func-scope $line)
+               (function-def $func $func-scope $start $end)
+               (and (>= $line $start) (<= $line $end)))))
 
 ;; Define function data dependency relationship
 (= (function-uses-type $func $type)
