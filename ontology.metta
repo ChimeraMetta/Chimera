@@ -380,6 +380,70 @@
 (= (domain-module $scope)
    (> (module-function-count $scope 0) 5))
 
+;; ===================== 
+;; Type safety validation rules
+;; =====================
+
+;; Detect binary operation type mismatch
+(= (binary-op-type-mismatch $op $left-type $right-type $scope $line)
+   (match &self (bin-op $op $left-type $right-type $scope $line)
+          (not (compatible-types-for-op $op $left-type $right-type))))
+
+;; Define type compatibility for different operations
+(= (compatible-types-for-op Add String String) True)
+(= (compatible-types-for-op Add String Number) False)
+(= (compatible-types-for-op Add Number String) False)
+(= (compatible-types-for-op Add Number Number) True)
+(= (compatible-types-for-op Sub Number Number) True)
+(= (compatible-types-for-op Sub Any Any) False)
+(= (compatible-types-for-op Mult Number Number) True)
+(= (compatible-types-for-op Mult String Number) True)
+(= (compatible-types-for-op Mult Number String) True)
+(= (compatible-types-for-op Div Number Number) True)
+(= (compatible-types-for-op Div Any Any) False)
+
+;; Detect function call parameter type mismatch
+(= (function-param-type-mismatch $func $arg-idx $expected-type $actual-type $call-scope $call-line)
+   (match &self (function-call $func $args $call-scope $call-line)
+          (function-param $func $arg-idx $param-name $expected-type)
+          (parameter-type-at-call $func $arg-idx $call-scope $call-line $actual-type)
+          (not (compatible-types $expected-type $actual-type))))
+
+;; Helper to determine parameter type at call site (simplified)
+(= (parameter-type-at-call $func $idx $scope $line $type)
+   (match &self (function-call-param-type $func $idx $scope $line $type)))
+
+;; Type compatibility rules
+(= (compatible-types $type1 $type2) 
+   (= $type1 $type2))
+(= (compatible-types Any $type) True)
+(= (compatible-types $type Any) True)
+(= (compatible-types Number String) False)
+(= (compatible-types String Number) False)
+(= (compatible-types Bool Number) False)
+(= (compatible-types Number Bool) False)
+
+;; Detect potential division by zero
+(= (potential-division-by-zero $scope $line)
+   (match &self (bin-op Div $left-type $right-type $scope $line)
+          (match &self (zero-value-in-expression $right-type $scope $line))))
+
+;; Simplified zero value detection
+(= (zero-value-in-expression $type $scope $line)
+   (match &self (literal-zero-value $scope $line)))
+
+;; Detect null/None dereference
+(= (potential-null-dereference $scope $line)
+   (match &self (function-call $func $args $scope $line)
+          (match &self (null-value-in-args $func $args $scope $line))))
+
+;; Return type mismatch
+(= (return-type-mismatch $func $expected $actual $line)
+   (match &self (function-def $func $scope $start $end)
+          (: $func (-> $params $expected))
+          (function-return $func $actual $line)
+          (not (compatible-types $expected $actual))))
+
 ;; =====================
 ;; Additional Utility Rules
 ;; =====================
