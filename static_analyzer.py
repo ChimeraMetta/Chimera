@@ -213,7 +213,7 @@ class CodeDecomposer(ast.NodeVisitor):
         self.generic_visit(node)
     
     def visit_Call(self, node):
-        """Process function calls."""
+        """Process function calls with enhanced context tracking."""
         func_name = self._get_name(node.func)
         
         # Track dependencies
@@ -231,6 +231,16 @@ class CodeDecomposer(ast.NodeVisitor):
             "scope": current_scope,
             "line": node.lineno
         })
+        
+        # Also create a special nested call atom that connects caller and callee directly
+        # This will make MeTTa querying more robust
+        if self.current_function:
+            self.atoms.append({
+                "type": "direct_call",
+                "caller": self.current_function,
+                "callee": func_name,
+                "line": node.lineno
+            })
         
         # Track arg types for donor system
         arg_types = []
