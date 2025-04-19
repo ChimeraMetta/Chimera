@@ -29,10 +29,7 @@ def analyze_file(file_path):
         atoms_added = 0
         for atom_str in analysis_result["metta_atoms"]:
             try:
-                # Parse the string representation into a MeTTa atom
-                parsed_atom = monitor.metta_space.parse_single(atom_str)
-                # Add the parsed atom to the space
-                monitor.metta_space.add_atom(parsed_atom)
+                monitor.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
                 print(f"Error adding atom {atom_str}: {e}")

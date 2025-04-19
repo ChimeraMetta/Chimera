@@ -304,6 +304,19 @@ class DynamicMonitor:
                 print(f"Error parsing error pattern: {e}")
         
         return patterns
+
+    def add_atom(self, atom_str: str) -> bool:
+        """
+        Add a MeTTa atom to the space.
+        """
+        try:
+            parsed_atom = self.metta.parse_single(atom_str)
+            self.metta_space.add_atom(parsed_atom)
+            return True
+        except Exception as e:
+            print(f"Error adding atom: {atom_str}")
+            print(f"  Error details: {e}")
+            return False
     
     def load_metta_rules(self, rules_file: str) -> bool:
         """
