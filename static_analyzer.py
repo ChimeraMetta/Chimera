@@ -213,16 +213,10 @@ class CodeDecomposer(ast.NodeVisitor):
         self.generic_visit(node)
     
     def visit_Call(self, node):
-        """Process function calls with enhanced context tracking."""
+        """Process function calls with enhanced type tracking."""
         func_name = self._get_name(node.func)
         
-        # Track dependencies
-        if self.current_function:
-            if self.current_function not in self.function_dependencies:
-                self.function_dependencies[self.current_function] = set()
-            self.function_dependencies[self.current_function].add(func_name)
-        
-        # Create function call atom
+        # Create function call atom (existing code)
         current_scope = ".".join(self.scope_stack)
         self.atoms.append({
             "type": "function_call",
@@ -231,6 +225,28 @@ class CodeDecomposer(ast.NodeVisitor):
             "scope": current_scope,
             "line": node.lineno
         })
+        
+        # Add type information for each argument
+        for i, arg in enumerate(node.args):
+            arg_type = self._infer_type_from_value(arg)
+            self.atoms.append({
+                "type": "function_call_param_type",
+                "func": func_name,
+                "idx": i,
+                "type": arg_type or "Any",
+                "scope": current_scope,
+                "line": node.lineno
+            })
+            
+            # Check for null values in arguments
+            if self._is_potential_null(arg):
+                self.atoms.append({
+                    "type": "null_value_in_args",
+                    "func": func_name,
+                    "args": len(node.args),
+                    "scope": current_scope,
+                    "line": node.lineno
+                })
         
         # Also create a special nested call atom that connects caller and callee directly
         # This will make MeTTa querying more robust
@@ -261,8 +277,16 @@ class CodeDecomposer(ast.NodeVisitor):
         # Continue visiting children
         self.generic_visit(node)
     
+    def _is_potential_zero(self, node):
+        """Check if an expression is potentially zero."""
+        if isinstance(node, ast.Constant) and node.value == 0:
+            return True
+        if isinstance(node, ast.Num) and node.n == 0:  # For older Python versions
+            return True
+        return False
+    
     def visit_BinOp(self, node):
-        """Process binary operations."""
+        """Process binary operations with enhanced type checking."""
         left_type = self._infer_type_from_value(node.left)
         right_type = self._infer_type_from_value(node.right)
         op_type = type(node.op).__name__
@@ -277,6 +301,14 @@ class CodeDecomposer(ast.NodeVisitor):
             "scope": current_scope,
             "line": node.lineno
         })
+        
+        # Add potential zero value detection for division
+        if isinstance(node.op, ast.Div) and self._is_potential_zero(node.right):
+            self.atoms.append({
+                "type": "literal_zero_value",
+                "scope": current_scope,
+                "line": node.lineno
+            })
         
         # Track patterns for donor system
         if left_type == "String" or right_type == "String":
@@ -381,6 +413,29 @@ class CodeDecomposer(ast.NodeVisitor):
             }
         
         # Continue visiting children
+        self.generic_visit(node)
+    
+    def _is_potential_null(self, node):
+        """Check if an expression is potentially null/None."""
+        if isinstance(node, ast.Constant) and node.value is None:
+            return True
+        if isinstance(node, ast.Name) and node.id == 'None':
+            return True
+        return False
+
+    def visit_Return(self, node):
+        """Process return statements for type checking."""
+        ret_type = self._infer_type_from_value(node.value) if node.value else "None"
+        
+        current_scope = ".".join(self.scope_stack)
+        self.atoms.append({
+            "type": "function_return",
+            "func": self.current_function,
+            "type": ret_type or "Any",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
         self.generic_visit(node)
     
     def visit_ImportFrom(self, node):
@@ -817,6 +872,28 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
             logging.debug(f"  Generated arithmetic op pattern atom {i}: {arith_op_atom}")
          except Exception as e:
             logging.error(f"Error processing arithmetic op pattern {i}: {op}. Error: {e}", exc_info=True)
+    
+     # Add type safety atoms
+    for atom in decomposer.atoms:
+        if atom["type"] == "literal_zero_value":
+            zero_atom = f"(literal-zero-value {atom['scope']} {atom['line']})"
+            metta_atoms.append(zero_atom)
+            logging.debug(f"  Generated zero value atom: {zero_atom}")
+        
+        elif atom["type"] == "function_call_param_type":
+            param_type_atom = f"(function-call-param-type {atom['func']} {atom['idx']} {atom['scope']} {atom['line']} {atom['type']})"
+            metta_atoms.append(param_type_atom)
+            logging.debug(f"  Generated function call param type atom: {param_type_atom}")
+        
+        elif atom["type"] == "null_value_in_args":
+            null_atom = f"(null-value-in-args {atom['func']} {atom['args']} {atom['scope']} {atom['line']})"
+            metta_atoms.append(null_atom)
+            logging.debug(f"  Generated null value in args atom: {null_atom}")
+        
+        elif atom["type"] == "function_return":
+            return_atom = f"(function-return {atom['func']} {atom['type']} {atom['line']})"
+            metta_atoms.append(return_atom)
+            logging.debug(f"  Generated function return atom: {return_atom}")
 
     # Loop patterns
     logging.debug(f"Processing {len(decomposer.loop_patterns)} loop patterns...")

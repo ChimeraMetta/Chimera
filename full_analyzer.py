@@ -350,6 +350,88 @@ def find_operation_patterns():
     else:
         print("No binary operations found")
 
+def analyze_type_safety():
+    """Analyze code for potential type safety issues."""
+    print("\n=== Type Safety Analysis ===")
+    
+    # Check for binary operation type mismatches
+    bin_op_mismatches = monitor.query("""
+        (match &self 
+               (binary-op-type-mismatch $op $left-type $right-type $scope $line)
+               ($op $left-type $right-type $scope $line))
+    """)
+    
+    if bin_op_mismatches:
+        print(f"Found {len(bin_op_mismatches)} potential binary operation type mismatches:")
+        for mismatch in bin_op_mismatches:
+            parts = str(mismatch).strip('()').split()
+            if len(parts) >= 5:
+                op, left, right, scope, line = parts[:5]
+                print(f"- Line {line}: {op} operation between {left} and {right} in {scope}")
+    
+    # Check for function parameter type mismatches
+    param_mismatches = monitor.query("""
+        (match &self 
+               (function-param-type-mismatch $func $idx $expected $actual $scope $line)
+               ($func $idx $expected $actual $scope $line))
+    """)
+    
+    if param_mismatches:
+        print(f"\nFound {len(param_mismatches)} potential function parameter type mismatches:")
+        for mismatch in param_mismatches:
+            parts = str(mismatch).strip('()').split()
+            if len(parts) >= 6:
+                func, idx, expected, actual, scope, line = parts[:6]
+                print(f"- Line {line}: Function {func} parameter {idx} expects {expected} but got {actual}")
+    
+    # Check for potential division by zero
+    div_zero = monitor.query("""
+        (match &self 
+               (potential-division-by-zero $scope $line)
+               ($scope $line))
+    """)
+    
+    if div_zero:
+        print(f"\nFound {len(div_zero)} potential division by zero operations:")
+        for div in div_zero:
+            parts = str(div).strip('()').split()
+            if len(parts) >= 2:
+                scope, line = parts[:2]
+                print(f"- Line {line}: Division operation with potential zero divisor in {scope}")
+    
+    # Check for return type mismatches
+    return_mismatches = monitor.query("""
+        (match &self 
+               (return-type-mismatch $func $expected $actual $line)
+               ($func $expected $actual $line))
+    """)
+    
+    if return_mismatches:
+        print(f"\nFound {len(return_mismatches)} potential return type mismatches:")
+        for mismatch in return_mismatches:
+            parts = str(mismatch).strip('()').split()
+            if len(parts) >= 4:
+                func, expected, actual, line = parts[:4]
+                print(f"- Line {line}: Function {func} declares return type {expected} but returns {actual}")
+    
+    # Check for potential null dereferences
+    null_derefs = monitor.query("""
+        (match &self 
+               (potential-null-dereference $scope $line)
+               ($scope $line))
+    """)
+    
+    if null_derefs:
+        print(f"\nFound {len(null_derefs)} potential null/None dereferences:")
+        for deref in null_derefs:
+            parts = str(deref).strip('()').split()
+            if len(parts) >= 2:
+                scope, line = parts[:2]
+                print(f"- Line {line}: Potential None/null value used in function call in {scope}")
+    
+    if not (bin_op_mismatches or param_mismatches or div_zero or return_mismatches or null_derefs):
+        print("No type safety issues detected.")
+
 def analyze_structural_patterns():
     """Analyze structural patterns in the codebase."""
     print("\n=== Structural Patterns ===")
@@ -550,6 +632,7 @@ if __name__ == "__main__":
     
     # Run analysis
     analyze_codebase(path)
+    analyze_type_safety()
     
     # Perform relationship analysis
     find_function_relationships()
