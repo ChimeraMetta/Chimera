@@ -1,7 +1,10 @@
-from static_analyzer import decompose_file, decompose_source
+from static_analyzer import decompose_file
 from dynamic_monitor import DynamicMonitor
+from temporal_analyzer import TemporalAnalyzer
 import os
 import sys
+
+ONTOLOGY_PATH = "metta/ontology.metta"
 
 def analyze_codebase(path):
     """Analyze a Python file or directory of Python files."""
@@ -485,6 +488,89 @@ def analyze_structural_patterns():
             if total > 0:
                 print(f"- {scope}: {counts['functions']} functions, {counts['classes']} classes, {counts['variables']} variables")
 
+# Function to analyze temporal code evolution
+def analyze_temporal_evolution(repo_path, monitor=None):
+    """Analyze temporal code evolution using Git history."""
+    print("\n=== Temporal Code Evolution Analysis ===")
+    
+    if not monitor:
+        # Create monitor if not provided
+        monitor = DynamicMonitor()
+        monitor.load_metta_rules("ontology.metta")
+    
+    # Create temporal analyzer
+    temporal_analyzer = TemporalAnalyzer(repo_path, monitor)
+    
+    # Analyze Git history
+    if not temporal_analyzer.analyze_history(max_commits=20):  # Limit to 20 commits for faster processing
+        print("Could not analyze Git history. Skipping temporal analysis.")
+        return
+    
+    # Find functions with frequent changes
+    frequent_changes = monitor.query("""
+        (match &self 
+               (function-change-frequency $func $freq)
+               (> $freq 3)
+               ($func $freq))
+    """)
+    
+    if frequent_changes:
+        print(f"\nFound {len(frequent_changes)} functions with frequent changes:")
+        for fc in frequent_changes:
+            parts = str(fc).strip('()').split(' ')
+            if len(parts) >= 2:
+                func, freq = parts[0], parts[1]
+                print(f"- {func.strip('\"')}: changed {freq} times")
+    
+    # Find functions that grew in complexity
+    complexity_growth = monitor.query("""
+        (match &self 
+               (function-complexity-growth $func $start $end $change)
+               (> $change 0)
+               ($func $change))
+    """)
+    
+    if complexity_growth:
+        print(f"\nFound {len(complexity_growth)} functions that grew in complexity:")
+        for cg in complexity_growth:
+            parts = str(cg).strip('()').split(' ')
+            if len(parts) >= 2:
+                func, change = parts[0], parts[1]
+                print(f"- {func.strip('\"')}: complexity increased by {change}")
+    
+    # Find co-evolving functions
+    co_evolving = monitor.query("""
+        (match &self 
+               (functions-co-evolve $func1 $func2 0.7)
+               ($func1 $func2))
+    """)
+    
+    if co_evolving:
+        print(f"\nFound {len(co_evolving)} co-evolving function pairs:")
+        for ce in co_evolving:
+            parts = str(ce).strip('()').split(' ')
+            if len(parts) >= 2:
+                func1, func2 = parts[0], parts[1]
+                print(f"- {func1.strip('\"')} and {func2.strip('\"')} frequently change together")
+    
+    # Find potential hotspots
+    hotspots = monitor.query("""
+        (match &self 
+               (function-hotspot $func $confidence)
+               ($func $confidence))
+    """)
+    
+    if hotspots:
+        print(f"\nFound {len(hotspots)} potential code hotspots:")
+        for hs in hotspots:
+            parts = str(hs).strip('()').split(' ')
+            if len(parts) >= 2:
+                func, confidence = parts[0], parts[1]
+                print(f"- {func.strip('\"')}: {confidence} confidence")
+    
+    if not (frequent_changes or complexity_growth or co_evolving or hotspots):
+        print("No significant temporal patterns detected in the analyzed commits.")
+
 def find_function_complexity():
     """Analyze function complexity based on operations and structures."""
     print("\n=== Function Complexity Analysis ===")
@@ -621,7 +707,7 @@ if __name__ == "__main__":
     
     # Create basic relationship rules
     # Load the MeTTa reasoning rules
-    monitor.load_metta_rules("ontology.metta")
+    monitor.load_metta_rules(ONTOLOGY_PATH)
     
     if len(sys.argv) < 2:
         print("Usage: python full_analyzer.py <path_to_file_or_directory>")
@@ -633,6 +719,8 @@ if __name__ == "__main__":
     # Run analysis
     analyze_codebase(path)
     analyze_type_safety()
+
+    analyze_temporal_evolution(path, monitor)
     
     # Perform relationship analysis
     find_function_relationships()
