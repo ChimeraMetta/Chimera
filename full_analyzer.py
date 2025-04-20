@@ -579,150 +579,187 @@ def analyze_temporal_evolution(repo_path, monitor=None):
 
 def find_function_complexity():
     """
-    Analyze function complexity based on operations and structures using MeTTa queries.
-    Handles cases where line numbers might not be available.
+    Debug version of the function complexity analyzer with detailed logging
+    to identify why all functions are getting the same complexity score.
     """
-    print("\n=== Function Complexity Analysis ===")
+    print("\n=== Function Complexity Analysis (Debug Mode) ===")
     
-    # Get all function definitions
+    # First, get a sample of all available atoms to understand what's in the knowledge base
+    print("\nSampling MeTTa knowledge base to understand available data:")
+    
+    # Sample some binary operations
+    bin_op_sample = monitor.query("(match &self (bin-op $op $left $right $scope $line) ($op $left $right $scope $line))")
+    print(f"Binary operations available: {len(bin_op_sample)}")
+    if bin_op_sample and len(bin_op_sample) > 0:
+        print(f"Sample: {bin_op_sample[0]}")
+    
+    # Sample some loop patterns
+    loop_sample = monitor.query("(match &self (loop-pattern $id $type $scope $line) ($id $type $scope $line))")
+    print(f"Loop patterns available: {len(loop_sample)}")
+    if loop_sample and len(loop_sample) > 0:
+        print(f"Sample: {loop_sample[0]}")
+    
+    # Sample some function calls
+    call_sample = monitor.query("(match &self (function-call $name $args $scope $line) ($name $args $scope $line))")
+    print(f"Function calls available: {len(call_sample)}")
+    if call_sample and len(call_sample) > 0:
+        print(f"Sample: {call_sample[0]}")
+    
+    # Get function definitions
     functions = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
+    print(f"Function definitions available: {len(functions)}")
+    if functions and len(functions) > 0:
+        print(f"Sample function: {functions[0]}")
     
-    if functions:
-        # For each function, count operations and structures
-        complexity_data = []
-        
-        for func in functions:
-            parts = str(func).strip('()').split()
-            if len(parts) >= 2:  # At minimum we need name and scope
-                # Extract parts, handling cases with missing line numbers
-                name = parts[0]
-                scope = parts[1]
-                has_line_numbers = len(parts) >= 4 and parts[2].isdigit() and parts[3].isdigit()
-                
-                try:
-                    # If we have valid line numbers, use them for more precise querying
-                    if has_line_numbers:
-                        start_line = int(parts[2])
-                        end_line = int(parts[3])
-                        
-                        # Query for binary operations with line constraints
-                        bin_op_query = f"""
-                            (match &self 
-                                   (bin-op $op $left $right $op_scope $line)
-                                   (and (= $op_scope "{scope}")
-                                        (>= $line {start_line}) 
-                                        (<= $line {end_line}))
-                                   $op)
-                        """
-                        
-                        # Query for loops with line constraints
-                        loop_query = f"""
-                            (match &self 
-                                   (loop-pattern $id $type $loop_scope $line)
-                                   (and (= $loop_scope "{scope}")
-                                        (>= $line {start_line}) 
-                                        (<= $line {end_line}))
-                                   $type)
-                        """
-                        
-                        # Query for function calls with line constraints
-                        call_query = f"""
-                            (match &self 
-                                   (function-call $called $args $call_scope $line)
-                                   (and (= $call_scope "{scope}")
-                                        (>= $line {start_line}) 
-                                        (<= $line {end_line}))
-                                   $called)
-                        """
-                    else:
-                        # If we don't have line numbers, use scope matching only
-                        bin_op_query = f"""
-                            (match &self 
-                                   (bin-op $op $left $right $op_scope $line)
-                                   (= $op_scope "{scope}")
-                                   $op)
-                        """
-                        
-                        loop_query = f"""
-                            (match &self 
-                                   (loop-pattern $id $type $loop_scope $line)
-                                   (= $loop_scope "{scope}")
-                                   $type)
-                        """
-                        
-                        call_query = f"""
-                            (match &self 
-                                   (function-call $called $args $call_scope $line)
-                                   (= $call_scope "{scope}")
-                                   $called)
-                        """
-                    
-                    # Execute the queries
-                    bin_ops = monitor.query(bin_op_query)
-                    loops = monitor.query(loop_query)
-                    calls = monitor.query(call_query)
-                    
-                    # Additional direct call query for functions within classes
-                    # This is a fallback if no calls are found by scope matching
-                    if "class-" in scope and (not calls or len(calls) == 0):
-                        # Try using class method pattern
-                        class_name = scope.replace("class-", "")
-                        method_name = f"{class_name}.{name}"
-                        
-                        alt_call_query = f"""
-                            (match &self 
-                                   (function-call {method_name} $args $call_scope $line)
-                                   $call_scope)
-                        """
-                        alt_calls = monitor.query(alt_call_query)
-                        if alt_calls and len(alt_calls) > 0:
-                            calls = alt_calls
-                    
-                    # Calculate complexity score (weighted metric)
-                    # Operations: 1 point
-                    # Loops: 3 points
-                    # Function calls: 1 point
-                    score = len(bin_ops) + len(loops) * 3 + len(calls)
-                    
-                    # Add reasonableness check
-                    if len(bin_ops) > 20:
-                        print(f"Note: High number of operations ({len(bin_ops)}) detected for {name}. Limiting to 20.")
-                        bin_ops = bin_ops[:20]
-                    
-                    if len(calls) > 15:
-                        print(f"Note: High number of calls ({len(calls)}) detected for {name}. Limiting to 15.")
-                        calls = calls[:15]
-                    
-                    # Recalculate score after limiting
-                    score = len(bin_ops) + len(loops) * 3 + len(calls)
-                    
-                    # Add to complexity data
-                    complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
-                    
-                except Exception as e:
-                    print(f"Error analyzing complexity for {name}: {e}")
-        
-        if not complexity_data:
-            print("No valid function complexity data found.")
-            return
+    if not functions:
+        print("No function definitions found")
+        return
+    
+    # For each function, count operations and structures with detailed logging
+    complexity_data = []
+    
+    for i, func in enumerate(functions[:5]):  # Limit to first 5 for debugging
+        parts = str(func).strip('()').split()
+        if len(parts) >= 2:  # At minimum we need name and scope
+            # Extract parts, handling cases with missing line numbers
+            name = parts[0]
+            scope = parts[1]
+            has_line_numbers = len(parts) >= 4 and parts[2].isdigit() and parts[3].isdigit()
             
+            print(f"\n-------- Analyzing function: {name} (Scope: {scope}) --------")
+            if has_line_numbers:
+                print(f"Line range: {parts[2]} - {parts[3]}")
+            else:
+                print("No line numbers available")
+            
+            try:
+                # Query for binary operations
+                if has_line_numbers:
+                    start_line = int(parts[2])
+                    end_line = int(parts[3])
+                    bin_op_query = f"""
+                        (match &self 
+                               (bin-op $op $left $right $op_scope $line)
+                               (and (= $op_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
+                               $op)
+                    """
+                else:
+                    bin_op_query = f"""
+                        (match &self 
+                               (bin-op $op $left $right $op_scope $line)
+                               (= $op_scope "{scope}")
+                               $op)
+                    """
+                
+                bin_ops = monitor.query(bin_op_query)
+                print(f"Binary operations: {len(bin_ops)}")
+                print(f"Binary operation query: {bin_op_query}")
+                if bin_ops and len(bin_ops) > 0:
+                    print(f"First operation: {bin_ops[0]}")
+                
+                # Try an alternative query to see if we get different results
+                alt_bin_op_query = f"""
+                    (match &self (bin-op $op $left $right $any_scope $any_line) $op)
+                """
+                alt_bin_ops = monitor.query(alt_bin_op_query)
+                print(f"Alternative binary operations query returns: {len(alt_bin_ops)} results")
+                
+                # Query for loops
+                if has_line_numbers:
+                    loop_query = f"""
+                        (match &self 
+                               (loop-pattern $id $type $loop_scope $line)
+                               (and (= $loop_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
+                               $id)
+                    """
+                else:
+                    loop_query = f"""
+                        (match &self 
+                               (loop-pattern $id $type $loop_scope $line)
+                               (= $loop_scope "{scope}")
+                               $id)
+                    """
+                
+                loops = monitor.query(loop_query)
+                print(f"Loops: {len(loops)}")
+                print(f"Loop query: {loop_query}")
+                if loops and len(loops) > 0:
+                    print(f"First loop: {loops[0]}")
+                
+                # Try an alternative query to see if we get different results
+                alt_loop_query = f"""
+                    (match &self (loop-pattern $id $type $any_scope $any_line) $id)
+                """
+                alt_loops = monitor.query(alt_loop_query)
+                print(f"Alternative loops query returns: {len(alt_loops)} results")
+                
+                # Query for function calls
+                if has_line_numbers:
+                    call_query = f"""
+                        (match &self 
+                               (function-call $called $args $call_scope $line)
+                               (and (= $call_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
+                               $called)
+                    """
+                else:
+                    call_query = f"""
+                        (match &self 
+                               (function-call $called $args $call_scope $line)
+                               (= $call_scope "{scope}")
+                               $called)
+                    """
+                
+                calls = monitor.query(call_query)
+                print(f"Function calls: {len(calls)}")
+                print(f"Call query: {call_query}")
+                if calls and len(calls) > 0:
+                    print(f"First call: {calls[0]}")
+                
+                # Try an alternative query to see if we get different results
+                alt_call_query = f"""
+                    (match &self (function-call $called $args $any_scope $any_line) $called)
+                """
+                alt_calls = monitor.query(alt_call_query)
+                print(f"Alternative calls query returns: {len(alt_calls)} results")
+                
+                # Calculate complexity score
+                score = len(bin_ops) + len(loops) * 3 + len(calls)
+                print(f"Calculated complexity score: {score}")
+                
+                complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
+                
+            except Exception as e:
+                print(f"Error analyzing complexity for {name}: {e}")
+    
+    # Print a sample of what's actually in the knowledge base for one function
+    if functions and len(functions) > 0:
+        sample_func = str(functions[0]).strip('()').split()[0]
+        print(f"\n-------- Raw knowledge base data for function: {sample_func} --------")
+        
+        # Get all atoms related to this function
+        related_atoms = monitor.query(f"""
+            (match &self ($predicate {sample_func} $rest) ($predicate $rest))
+        """)
+        print(f"Found {len(related_atoms)} atoms related to {sample_func}")
+        for i, atom in enumerate(related_atoms[:10]):  # Show first 10
+            print(f"Related atom {i+1}: {atom}")
+    
+    # Now proceed with normal output
+    if complexity_data:
         # Sort by complexity score
         complexity_data.sort(key=lambda x: x[1], reverse=True)
         
         print(f"\nFunction complexity ranking (top 10):")
         for i, (name, score, ops, loops, calls) in enumerate(complexity_data[:10], 1):
             print(f"{i}. {name}: score {score} ({ops} operations, {loops} loops, {calls} calls)")
-        
-        # Identify potentially complex functions using a more meaningful threshold
-        complex_funcs = [(name, score) for name, score, _, _, _ in complexity_data if score > 15]
-        if complex_funcs:
-            print(f"\nPotentially complex functions that might benefit from refactoring:")
-            for name, score in complex_funcs:
-                print(f"- {name} (complexity score: {score})")
-        else:
-            print("\nNo excessively complex functions detected.")
     else:
-        print("No function definitions found")
+        print("\nNo valid complexity data generated.")
 
 def analyze_domain_concepts():
     """Analyze potential domain concepts in the codebase."""
