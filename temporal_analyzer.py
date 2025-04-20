@@ -6,6 +6,7 @@ import hashlib
 import time
 from hyperon import *
 from dynamic_monitor import DynamicMonitor
+from typing import Dict, Any, Optional
 
 TEMPORAL_RULE_PATH = "metta/temporal.metta"
 
