@@ -1,6 +1,6 @@
 from static_analyzer import decompose_file
 from dynamic_monitor import DynamicMonitor
-from temporal_analyzer import TemporalAnalyzer
+from temporal_analyzer import TemporalCodeAnalyzer
 import os
 import sys
 
@@ -499,7 +499,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         monitor.load_metta_rules("ontology.metta")
     
     # Create temporal analyzer
-    temporal_analyzer = TemporalAnalyzer(repo_path, monitor)
+    temporal_analyzer = TemporalCodeAnalyzer(repo_path, monitor)
     
     # Analyze Git history
     if not temporal_analyzer.analyze_history(max_commits=20):  # Limit to 20 commits for faster processing
