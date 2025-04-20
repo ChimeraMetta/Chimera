@@ -435,6 +435,7 @@ def analyze_type_safety():
     if not (bin_op_mismatches or param_mismatches or div_zero or return_mismatches or null_derefs):
         print("No type safety issues detected.")
 
+
 def analyze_structural_patterns():
     """Analyze structural patterns in the codebase."""
     print("\n=== Structural Patterns ===")
@@ -577,53 +578,93 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         print("No significant temporal patterns detected in the analyzed commits.")
 
 def find_function_complexity():
-    """Analyze function complexity based on operations and structures."""
+    """Analyze function complexity based on operations and structures using MeTTa queries."""
     print("\n=== Function Complexity Analysis ===")
     
-    # Get function definitions
-    functions = monitor.query("(match &self (function-def $name $scope $start $end) ($name $start $end))")
+    # Get function definitions with their scopes and line ranges
+    functions = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
     
     if functions:
         # For each function, count operations and structures
         complexity_data = []
         
         for func in functions:
-            parts = str(func).split()
-            if len(parts) >= 3:
-                name, start, end = parts[0], parts[1], parts[2]
+            parts = str(func).strip('()').split()
+            if len(parts) >= 4:
+                name, scope, start, end = parts[0], parts[1], parts[2], parts[3]
                 
                 try:
-                    # Query for binary operations
+                    # Convert line numbers to integers
+                    start_line = int(start)
+                    end_line = int(end)
+                    
+                    # Query for binary operations with EXACT scope checking
                     bin_op_query = f"""
                         (match &self 
-                               (bin-op $op $left $right $scope $line)
-                               (and (>= $line {start}) (<= $line {end}))
+                               (bin-op $op $left $right $op_scope $line)
+                               (and (= $op_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
                                $op)
                     """
                     bin_ops = monitor.query(bin_op_query)
                     
-                    # Query for loops
+                    # Query for loops with EXACT scope checking
                     loop_query = f"""
                         (match &self 
-                               (loop-pattern $id $type $scope $line)
-                               (and (>= $line {start}) (<= $line {end}))
+                               (loop-pattern $id $type $loop_scope $line)
+                               (and (= $loop_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
                                $type)
                     """
                     loops = monitor.query(loop_query)
                     
-                    # Query for function calls
+                    # Query for function calls with EXACT scope checking
                     call_query = f"""
                         (match &self 
-                               (function-call $called $args $scope $line)
-                               (and (>= $line {start}) (<= $line {end}))
+                               (function-call $called $args $call_scope $line)
+                               (and (= $call_scope "{scope}")
+                                    (>= $line {start_line}) 
+                                    (<= $line {end_line}))
                                $called)
                     """
                     calls = monitor.query(call_query)
                     
-                    # Calculate complexity score (very simple metric)
+                    # Alternative query for direct calls (more reliable)
+                    direct_call_query = f"""
+                        (match &self
+                               (direct_call $caller $callee $line)
+                               (and (= $caller "{name}")
+                                    (>= $line {start_line})
+                                    (<= $line {end_line}))
+                               $callee)
+                    """
+                    direct_calls = monitor.query(direct_call_query)
+                    
+                    # Use the more specific direct_calls if available
+                    if direct_calls and len(direct_calls) > 0:
+                        calls = direct_calls
+                    
+                    # Calculate complexity score (weighted metric)
+                    # Operations: 1 point
+                    # Loops: 3 points
+                    # Function calls: 1 point
                     score = len(bin_ops) + len(loops) * 3 + len(calls)
                     
+                    # Add reasonableness check
+                    if len(bin_ops) > 20:
+                        print(f"Warning: Unusually high number of operations ({len(bin_ops)}) detected for {name}. Limiting to 20.")
+                        bin_ops = bin_ops[:20]
+                        score = len(bin_ops) + len(loops) * 3 + len(calls)
+                    
+                    if len(calls) > 15:
+                        print(f"Warning: Unusually high number of calls ({len(calls)}) detected for {name}. Limiting to 15.")
+                        calls = calls[:15]
+                        score = len(bin_ops) + len(loops) * 3 + len(calls)
+                    
                     complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
+                    
                 except Exception as e:
                     print(f"Error analyzing complexity for {name}: {e}")
         
@@ -634,12 +675,39 @@ def find_function_complexity():
         for i, (name, score, ops, loops, calls) in enumerate(complexity_data[:10], 1):
             print(f"{i}. {name}: score {score} ({ops} operations, {loops} loops, {calls} calls)")
         
-        # Identify potentially complex functions
-        complex_funcs = [name for name, score, _, _, _ in complexity_data if score > 15]
+        # Identify potentially complex functions using a more meaningful threshold
+        # Adjust threshold based on your codebase norms
+        complex_funcs = [(name, score) for name, score, _, _, _ in complexity_data if score > 15]
         if complex_funcs:
             print(f"\nPotentially complex functions that might benefit from refactoring:")
-            for name in complex_funcs:
-                print(f"- {name}")
+            for name, score in complex_funcs:
+                print(f"- {name} (complexity score: {score})")
+        else:
+            print("\nNo excessively complex functions detected.")
+            
+        # In addition to the query-based analysis, add a verification step
+        # for the top complex functions by examining their metrics more closely
+        if complexity_data:
+            most_complex = complexity_data[0]
+            name, score, ops, loops, calls = most_complex
+            
+            # Query for conditionals (if statements) to get a more complete picture
+            if_query = f"""
+                (match &self 
+                       (if-statement $id $scope $line)
+                       (and (= $scope "{scope}")
+                            (>= $line {start_line})
+                            (<= $line {end_line}))
+                       $id)
+            """
+            conditionals = monitor.query(if_query)
+            
+            print(f"\nDetailed analysis of most complex function: {name}")
+            print(f"- Operations: {ops}")
+            print(f"- Loops: {loops}")
+            print(f"- Function calls: {calls}")
+            print(f"- Conditionals: {len(conditionals)}")
+            print(f"- Total complexity score: {score}")
     else:
         print("No function definitions found")
 
