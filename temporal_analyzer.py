@@ -4,6 +4,7 @@ from tqdm import tqdm
 import glob
 import hashlib
 import time
+import os
 from hyperon import *
 from dynamic_monitor import DynamicMonitor
 from typing import Dict, Any, Optional
@@ -91,6 +92,8 @@ class TemporalCodeAnalyzer:
         self.repo_path = repo_path
         self.monitor = monitor
         self.repo = None
+        self.metta = MeTTa()
+        self.metta_space = self.metta.space()
         
         if os.path.exists(os.path.join(repo_path, '.git')):
             self.repo = git.Repo(repo_path)
