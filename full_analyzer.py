@@ -520,7 +520,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
             parts = str(fc).strip('()').split(' ')
             if len(parts) >= 2:
                 func, freq = parts[0], parts[1]
-                print(f"- {func.strip('"')}: changed {freq} times")
+                print(f'- {func.strip('"')}: changed {freq} times')
     
     # Find functions that grew in complexity
     complexity_growth = monitor.query("""
@@ -536,7 +536,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
             parts = str(cg).strip('()').split(' ')
             if len(parts) >= 2:
                 func, change = parts[0], parts[1]
-                print(f"- {func.strip('"')}: complexity increased by {change}")
+                print(f'- {func.strip('"')}: complexity increased by {change}')
     
     # Find co-evolving functions
     co_evolving = monitor.query("""
@@ -551,7 +551,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
             parts = str(ce).strip('()').split(' ')
             if len(parts) >= 2:
                 func1, func2 = parts[0], parts[1]
-                print(f"- {func1.strip('"')} and {func2.strip('"')} frequently change together")
+                print(f'- {func1.strip('"')} and {func2.strip('"')} frequently change together')
     
     # Find potential hotspots
     hotspots = monitor.query("""
@@ -566,7 +566,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
             parts = str(hs).strip('()').split(' ')
             if len(parts) >= 2:
                 func, confidence = parts[0], parts[1]
-                print(f"- {func.strip('"')}: {confidence} confidence")
+                print(f'- {func.strip('"')}: {confidence} confidence')
     
     if not (frequent_changes or complexity_growth or co_evolving or hotspots):
         print("No significant temporal patterns detected in the analyzed commits.")
