@@ -578,10 +578,13 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         print("No significant temporal patterns detected in the analyzed commits.")
 
 def find_function_complexity():
-    """Analyze function complexity based on operations and structures using MeTTa queries."""
+    """
+    Analyze function complexity based on operations and structures using MeTTa queries.
+    Handles cases where line numbers might not be available.
+    """
     print("\n=== Function Complexity Analysis ===")
     
-    # Get function definitions with their scopes and line ranges
+    # Get all function definitions
     functions = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
     
     if functions:
@@ -590,61 +593,90 @@ def find_function_complexity():
         
         for func in functions:
             parts = str(func).strip('()').split()
-            if len(parts) >= 4:
-                name, scope, start, end = parts[0], parts[1], parts[2], parts[3]
+            if len(parts) >= 2:  # At minimum we need name and scope
+                # Extract parts, handling cases with missing line numbers
+                name = parts[0]
+                scope = parts[1]
+                has_line_numbers = len(parts) >= 4 and parts[2].isdigit() and parts[3].isdigit()
                 
                 try:
-                    # Convert line numbers to integers
-                    start_line = int(start)
-                    end_line = int(end)
+                    # If we have valid line numbers, use them for more precise querying
+                    if has_line_numbers:
+                        start_line = int(parts[2])
+                        end_line = int(parts[3])
+                        
+                        # Query for binary operations with line constraints
+                        bin_op_query = f"""
+                            (match &self 
+                                   (bin-op $op $left $right $op_scope $line)
+                                   (and (= $op_scope "{scope}")
+                                        (>= $line {start_line}) 
+                                        (<= $line {end_line}))
+                                   $op)
+                        """
+                        
+                        # Query for loops with line constraints
+                        loop_query = f"""
+                            (match &self 
+                                   (loop-pattern $id $type $loop_scope $line)
+                                   (and (= $loop_scope "{scope}")
+                                        (>= $line {start_line}) 
+                                        (<= $line {end_line}))
+                                   $type)
+                        """
+                        
+                        # Query for function calls with line constraints
+                        call_query = f"""
+                            (match &self 
+                                   (function-call $called $args $call_scope $line)
+                                   (and (= $call_scope "{scope}")
+                                        (>= $line {start_line}) 
+                                        (<= $line {end_line}))
+                                   $called)
+                        """
+                    else:
+                        # If we don't have line numbers, use scope matching only
+                        bin_op_query = f"""
+                            (match &self 
+                                   (bin-op $op $left $right $op_scope $line)
+                                   (= $op_scope "{scope}")
+                                   $op)
+                        """
+                        
+                        loop_query = f"""
+                            (match &self 
+                                   (loop-pattern $id $type $loop_scope $line)
+                                   (= $loop_scope "{scope}")
+                                   $type)
+                        """
+                        
+                        call_query = f"""
+                            (match &self 
+                                   (function-call $called $args $call_scope $line)
+                                   (= $call_scope "{scope}")
+                                   $called)
+                        """
                     
-                    # Query for binary operations with EXACT scope checking
-                    bin_op_query = f"""
-                        (match &self 
-                               (bin-op $op $left $right $op_scope $line)
-                               (and (= $op_scope "{scope}")
-                                    (>= $line {start_line}) 
-                                    (<= $line {end_line}))
-                               $op)
-                    """
+                    # Execute the queries
                     bin_ops = monitor.query(bin_op_query)
-                    
-                    # Query for loops with EXACT scope checking
-                    loop_query = f"""
-                        (match &self 
-                               (loop-pattern $id $type $loop_scope $line)
-                               (and (= $loop_scope "{scope}")
-                                    (>= $line {start_line}) 
-                                    (<= $line {end_line}))
-                               $type)
-                    """
                     loops = monitor.query(loop_query)
-                    
-                    # Query for function calls with EXACT scope checking
-                    call_query = f"""
-                        (match &self 
-                               (function-call $called $args $call_scope $line)
-                               (and (= $call_scope "{scope}")
-                                    (>= $line {start_line}) 
-                                    (<= $line {end_line}))
-                               $called)
-                    """
                     calls = monitor.query(call_query)
                     
-                    # Alternative query for direct calls (more reliable)
-                    direct_call_query = f"""
-                        (match &self
-                               (direct_call $caller $callee $line)
-                               (and (= $caller "{name}")
-                                    (>= $line {start_line})
-                                    (<= $line {end_line}))
-                               $callee)
-                    """
-                    direct_calls = monitor.query(direct_call_query)
-                    
-                    # Use the more specific direct_calls if available
-                    if direct_calls and len(direct_calls) > 0:
-                        calls = direct_calls
+                    # Additional direct call query for functions within classes
+                    # This is a fallback if no calls are found by scope matching
+                    if "class-" in scope and (not calls or len(calls) == 0):
+                        # Try using class method pattern
+                        class_name = scope.replace("class-", "")
+                        method_name = f"{class_name}.{name}"
+                        
+                        alt_call_query = f"""
+                            (match &self 
+                                   (function-call {method_name} $args $call_scope $line)
+                                   $call_scope)
+                        """
+                        alt_calls = monitor.query(alt_call_query)
+                        if alt_calls and len(alt_calls) > 0:
+                            calls = alt_calls
                     
                     # Calculate complexity score (weighted metric)
                     # Operations: 1 point
@@ -654,20 +686,26 @@ def find_function_complexity():
                     
                     # Add reasonableness check
                     if len(bin_ops) > 20:
-                        print(f"Warning: Unusually high number of operations ({len(bin_ops)}) detected for {name}. Limiting to 20.")
+                        print(f"Note: High number of operations ({len(bin_ops)}) detected for {name}. Limiting to 20.")
                         bin_ops = bin_ops[:20]
-                        score = len(bin_ops) + len(loops) * 3 + len(calls)
                     
                     if len(calls) > 15:
-                        print(f"Warning: Unusually high number of calls ({len(calls)}) detected for {name}. Limiting to 15.")
+                        print(f"Note: High number of calls ({len(calls)}) detected for {name}. Limiting to 15.")
                         calls = calls[:15]
-                        score = len(bin_ops) + len(loops) * 3 + len(calls)
                     
+                    # Recalculate score after limiting
+                    score = len(bin_ops) + len(loops) * 3 + len(calls)
+                    
+                    # Add to complexity data
                     complexity_data.append((name, score, len(bin_ops), len(loops), len(calls)))
                     
                 except Exception as e:
                     print(f"Error analyzing complexity for {name}: {e}")
         
+        if not complexity_data:
+            print("No valid function complexity data found.")
+            return
+            
         # Sort by complexity score
         complexity_data.sort(key=lambda x: x[1], reverse=True)
         
@@ -676,7 +714,6 @@ def find_function_complexity():
             print(f"{i}. {name}: score {score} ({ops} operations, {loops} loops, {calls} calls)")
         
         # Identify potentially complex functions using a more meaningful threshold
-        # Adjust threshold based on your codebase norms
         complex_funcs = [(name, score) for name, score, _, _, _ in complexity_data if score > 15]
         if complex_funcs:
             print(f"\nPotentially complex functions that might benefit from refactoring:")
@@ -684,30 +721,6 @@ def find_function_complexity():
                 print(f"- {name} (complexity score: {score})")
         else:
             print("\nNo excessively complex functions detected.")
-            
-        # In addition to the query-based analysis, add a verification step
-        # for the top complex functions by examining their metrics more closely
-        if complexity_data:
-            most_complex = complexity_data[0]
-            name, score, ops, loops, calls = most_complex
-            
-            # Query for conditionals (if statements) to get a more complete picture
-            if_query = f"""
-                (match &self 
-                       (if-statement $id $scope $line)
-                       (and (= $scope "{scope}")
-                            (>= $line {start_line})
-                            (<= $line {end_line}))
-                       $id)
-            """
-            conditionals = monitor.query(if_query)
-            
-            print(f"\nDetailed analysis of most complex function: {name}")
-            print(f"- Operations: {ops}")
-            print(f"- Loops: {loops}")
-            print(f"- Function calls: {calls}")
-            print(f"- Conditionals: {len(conditionals)}")
-            print(f"- Total complexity score: {score}")
     else:
         print("No function definitions found")
 
