@@ -801,12 +801,81 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
                     import_from_atom = f"(import-from {atom['module']} {atom['name']} {scope_expr} {atom['line']})"
                     metta_atoms.append(import_from_atom)
                     logging.debug(f"  Generated import-from atom: {import_from_atom}")
+                    
+            # Add handling for types that were previously skipped
+            elif atom["type"] == "direct_call":
+                direct_call_atom = f"(direct-call {atom['caller']} {atom['callee']} {atom['line']})"
+                metta_atoms.append(direct_call_atom)
+                logging.debug(f"  Generated direct call atom: {direct_call_atom}")
+                
+            elif atom["type"] == "function_call_param_type":
+                param_type_str = convert_python_type_to_metta(atom['type'])
+                param_type_atom = f"(function-call-param-type {atom['func']} {atom['idx']} {atom['scope']} {atom['line']} {param_type_str})"
+                metta_atoms.append(param_type_atom)
+                logging.debug(f"  Generated function call param type atom: {param_type_atom}")
+                
+            elif atom["type"] == "null_value_in_args":
+                null_atom = f"(null-value-in-args {atom['func']} {atom['args']} {atom['scope']} {atom['line']})"
+                metta_atoms.append(null_atom)
+                logging.debug(f"  Generated null value in args atom: {null_atom}")
+                
+            elif atom["type"] == "literal_zero_value":
+                zero_atom = f"(literal-zero-value {atom['scope']} {atom['line']})"
+                metta_atoms.append(zero_atom)
+                logging.debug(f"  Generated zero value atom: {zero_atom}")
+                
+            elif atom["type"] == "function_return":
+                return_type_str = convert_python_type_to_metta(atom['type'])
+                return_atom = f"(function-return {atom['func']} {return_type_str} {atom['line']})"
+                metta_atoms.append(return_atom)
+                logging.debug(f"  Generated function return atom: {return_atom}")
+                
+            elif atom["type"] == "for_loop" or atom["type"] == "while_loop":
+                # Handle loop patterns
+                scope_atoms = [s.replace(':', '-') for s in atom['scope'].split('.')]
+                scope_expr = " ".join(scope_atoms)
+                loop_type = "for" if atom["type"] == "for_loop" else "while"
+                
+                # Generate a unique ID for this loop
+                loop_id = f"{atom['line_start']}-{atom['line_end']}"
+                
+                loop_atom = f"(loop-pattern {loop_id} {loop_type} {scope_expr} {atom['line_start']})"
+                metta_atoms.append(loop_atom)
+                logging.debug(f"  Generated loop pattern atom: {loop_atom}")
+                
+            # Handle simple type atoms - convert these to type declarations
+            elif atom["type"] in ["String", "Number", "Bool", "Dict", "List", "Set", "Tuple", "Any", "None"]:
+                # These types are built-in, so just declare them if not already declared
+                type_decl_atom = f"(: {atom['type']} Type)"
+                if type_decl_atom not in metta_atoms:  # Avoid duplicates
+                    metta_atoms.append(type_decl_atom)
+                    logging.debug(f"  Generated type declaration atom: {type_decl_atom}")
+            
+            # Handle custom/domain types (like Product, DiscountedProduct)
+            elif atom["type"] not in ["sorted", "module"]:  # Skip some internal types
+                # Consider any unknown type as a domain-specific type
+                # Extract the name properly if it's available
+                type_name = atom.get("name", atom["type"])
+                
+                # Declare as a type if not clearly a different kind of construct
+                type_decl_atom = f"(: {type_name} Type)"
+                if type_decl_atom not in metta_atoms:  # Avoid duplicates
+                    metta_atoms.append(type_decl_atom)
+                    logging.debug(f"  Generated domain type declaration atom: {type_decl_atom}")
+                    
+                    # Also mark it as a domain-specific type for analysis
+                    domain_type_atom = f"(domain-specific-type {type_name})"
+                    metta_atoms.append(domain_type_atom)
+                    logging.debug(f"  Generated domain-specific type atom: {domain_type_atom}")
+                
             else:
-                logging.warning(f"  Skipping unknown atom type: {atom['type']}")
+                logging.warning(f"  Skipping still unsupported atom type: {atom['type']}")
         except Exception as e:
             logging.error(f"Error processing atom {i+1}: {atom}. Error: {e}", exc_info=True)
 
-
+    # Process the rest of the method same as before...
+    # (Module relationships, class hierarchies, function dependencies, etc.)
+    
     # Add ontological relationships
     logging.debug("Processing ontological relationships...")
     
@@ -872,28 +941,6 @@ def convert_to_metta_atoms(decomposer: CodeDecomposer) -> List[str]:
             logging.debug(f"  Generated arithmetic op pattern atom {i}: {arith_op_atom}")
          except Exception as e:
             logging.error(f"Error processing arithmetic op pattern {i}: {op}. Error: {e}", exc_info=True)
-    
-     # Add type safety atoms
-    for atom in decomposer.atoms:
-        if atom["type"] == "literal_zero_value":
-            zero_atom = f"(literal-zero-value {atom['scope']} {atom['line']})"
-            metta_atoms.append(zero_atom)
-            logging.debug(f"  Generated zero value atom: {zero_atom}")
-        
-        elif atom["type"] == "function_call_param_type":
-            param_type_atom = f"(function-call-param-type {atom['func']} {atom['idx']} {atom['scope']} {atom['line']} {atom['type']})"
-            metta_atoms.append(param_type_atom)
-            logging.debug(f"  Generated function call param type atom: {param_type_atom}")
-        
-        elif atom["type"] == "null_value_in_args":
-            null_atom = f"(null-value-in-args {atom['func']} {atom['args']} {atom['scope']} {atom['line']})"
-            metta_atoms.append(null_atom)
-            logging.debug(f"  Generated null value in args atom: {null_atom}")
-        
-        elif atom["type"] == "function_return":
-            return_atom = f"(function-return {atom['func']} {atom['type']} {atom['line']})"
-            metta_atoms.append(return_atom)
-            logging.debug(f"  Generated function return atom: {return_atom}")
 
     # Loop patterns
     logging.debug(f"Processing {len(decomposer.loop_patterns)} loop patterns...")
