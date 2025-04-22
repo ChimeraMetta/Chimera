@@ -1,6 +1,6 @@
 <div align="center">
   <a>
-    <img src="https://github.com/ChimeraMetta/Chimera/blob/main/assets/header.jpg?raw=true" alt="Logo" style="width:200px">
+    <img src="https://github.com/ChimeraMetta/Chimera/blob/main/assets/header.jpg?raw=true" alt="Logo">
   </a>
 
   <h2 align="center">Chimera</h2> <div style="height:30px"></div>
