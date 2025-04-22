@@ -694,195 +694,136 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         import traceback
         traceback.print_exc()
 
-def find_function_complexity():
-    """
-    Analyze function complexity using a minimal, stable approach that avoids interpreter crashes.
-    """
-    print("\n=== Function Complexity Analysis ===")
+def analyze_function_complexity(file_path):
+    """Analyze complexity of functions in a file with our enhanced metrics."""
+    print(f"Analyzing complexity in {file_path}...")
     
-    # Use minimal queries to avoid crashes
-    print("Gathering function information...")
+    # Decompose the file
+    result = decompose_file(file_path)
     
-    # Get binary operations - simple query
-    bin_ops = []
-    try:
-        bin_ops_result = monitor.query("(match &self (bin-op $op $left $right $scope $line) $op)")
-        if bin_ops_result:
-            bin_ops = [op for op in bin_ops_result if not str(op).startswith("(Error")]
-    except Exception as e:
-        print(f"Warning: Error getting binary operations: {e}")
-    
-    # Get loops - simple query
-    loops = []
-    try:
-        loops_result = monitor.query("(match &self (loop-pattern $id $type $scope $line) $type)")
-        if loops_result:
-            loops = [loop for loop in loops_result if not str(loop).startswith("(Error")]
-    except Exception as e:
-        print(f"Warning: Error getting loops: {e}")
-    
-    # Get function calls - simple query
-    calls = []
-    try:
-        calls_result = monitor.query("(match &self (function-call $name $args $scope $line) $name)")
-        if calls_result:
-            calls = [call for call in calls_result if not str(call).startswith("(Error")]
-    except Exception as e:
-        print(f"Warning: Error getting function calls: {e}")
-    
-    # Use direct file examination to identify functions
-    import os
-    import re
-    
-    # Get the functions from test_file.py by direct examination
-    functions = []
-    try:
-        file_path = "test_file.py"  # Update with actual path
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                content = f.read()
-            
-            # Use regex to find function definitions
-            func_pattern = r'def\s+([a-zA-Z0-9_]+)\s*\('
-            func_matches = re.findall(func_pattern, content)
-            
-            # Use regex to find method definitions
-            class_pattern = r'class\s+([a-zA-Z0-9_]+)'
-            method_pattern = r'def\s+([a-zA-Z0-9_]+)\s*\('
-            
-            class_matches = re.finditer(class_pattern, content)
-            for class_match in class_matches:
-                class_name = class_match.group(1)
-                # Get the class body - crude approach
-                class_start = class_match.end()
-                next_class = content.find("class ", class_start)
-                if next_class == -1:
-                    next_class = len(content)
-                class_body = content[class_start:next_class]
-                
-                # Find methods in the class body
-                method_matches = re.finditer(method_pattern, class_body)
-                for method_match in method_matches:
-                    method_name = method_match.group(1)
-                    if method_name != "__init__":  # Skip constructor for simplicity
-                        func_matches.append(f"{class_name}.{method_name}")
-            
-            # Add the functions
-            for func_name in func_matches:
-                functions.append(func_name)
-            
-            print(f"Found {len(functions)} functions by direct file examination")
-        else:
-            print(f"Warning: File {file_path} not found")
-    except Exception as e:
-        print(f"Warning: Error examining file: {e}")
-    
-    # If direct examination didn't work, try a basic MeTTa query
-    if not functions:
-        try:
-            # Try to get function names from type signatures
-            type_sigs = monitor.query("(match &self (: $func (-> $params $return)) $func)")
-            for sig in type_sigs:
-                func_name = str(sig).strip()
-                if func_name and not func_name.startswith("(Error"):
-                    functions.append(func_name)
-            print(f"Found {len(functions)} functions from type signatures")
-        except Exception as e:
-            print(f"Warning: Error getting type signatures: {e}")
-    
-    # If we still have no functions, use a fallback list of known functions
-    if not functions:
-        print("Using fallback function list")
-        functions = [
-            "calculate_tax", "parse_date", "days_between_dates", 
-            "format_currency", "process_order", "generate_receipt",
-            "Product.__init__", "DiscountedProduct.__init__", "ShoppingCart.__init__",
-            "ShoppingCart.add_item", "ShoppingCart.remove_item", "ShoppingCart.calculate_total",
-            "StringUtils.capitalize_words", "StringUtils.truncate",
-            "MathUtils.round_to_nearest", "MathUtils.calculate_percentage",
-            "apply_discount_strategy", "bulk_discount_strategy",
-            "merge_data", "filter_products_by_category", "sort_products_by_price"
-        ]
-    
-    # Now map the operations to each function
-    complexity_data = []
-    
-    # Create a rough mapping based on name matching
-    print("Analyzing complexity...")
-    for func_name in functions:
-        try:
-            # Estimate operations - count operations that might be related to this function
-            ops_count = 0
-            for op in bin_ops:
-                op_str = str(op)
-                if func_name.lower() in op_str.lower():
-                    ops_count += 1
-            
-            # Estimate loops - count loops that might be related to this function
-            loops_count = 0
-            for loop in loops:
-                loop_str = str(loop)
-                if func_name.lower() in loop_str.lower():
-                    loops_count += 1
-            
-            # Estimate calls - count calls that might be related to this function
-            calls_count = 0
-            for call in calls:
-                call_str = str(call)
-                if func_name.lower() in call_str.lower():
-                    calls_count += 1
-            
-            # Make simple complexity estimation based on function name and return type
-            if ops_count == 0 and loops_count == 0 and calls_count == 0:
-                # Estimate complexity based on name and what we know about the test_file.py functions
-                if "calculate" in func_name.lower():
-                    ops_count = 2  # Likely has at least one calculation
-                if "parse" in func_name.lower():
-                    ops_count = 3  # Parsing usually involves multiple operations
-                if "format" in func_name.lower():
-                    ops_count = 2  # Formatting usually involves string ops
-                if "days_between" in func_name.lower():
-                    ops_count = 2  # Date arithmetic
-                if "process" in func_name.lower():
-                    ops_count = 5  # Processing likely involves multiple steps
-                    calls_count = 2
-                if "generate" in func_name.lower():
-                    ops_count = 4  # Generation likely involves string building
-                    loops_count = 1  # Probably a loop
-                if "add" in func_name.lower() or "remove" in func_name.lower():
-                    ops_count = 1  # Simple operations
-                if "filter" in func_name.lower() or "sort" in func_name.lower():
-                    ops_count = 2  # These usually involve comparisons
-                    loops_count = 1  # Usually have loops
-            
-            # Calculate complexity score
-            score = ops_count + loops_count * 3 + calls_count
-            
-            # Add to results
-            complexity_data.append((func_name, score, ops_count, loops_count, calls_count))
-            
-        except Exception as e:
-            print(f"Error analyzing complexity for {func_name}: {e}")
-    
-    if not complexity_data:
-        print("No function complexity data could be determined.")
+    if "error" in result and result["error"]:
+        print(f"Error: {result['error']}")
         return
     
-    # Sort by complexity score
-    complexity_data.sort(key=lambda x: x[1], reverse=True)
+    atoms = result["metta_atoms"]
     
-    print(f"\nFunction complexity ranking (top 10):")
-    for i, (name, score, ops, loops, calls) in enumerate(complexity_data[:10], 1):
-        print(f"{i}. {name}: score {score} ({ops} operations, {loops} loops, {calls} calls)")
+    # Extract function definitions
+    function_defs = {}
+    for atom in atoms:
+        if atom.startswith("(function-def "):
+            parts = atom.strip("()").split()
+            if len(parts) >= 5:
+                func_name = parts[1]
+                scope = " ".join(parts[2:-2])
+                line_start = int(parts[-2])
+                line_end = int(parts[-1])
+                function_defs[func_name] = {
+                    "scope": scope,
+                    "line_start": line_start,
+                    "line_end": line_end,
+                    "operations": 0,
+                    "loops": 0,
+                    "calls": 0
+                }
     
-    # Identify potentially complex functions
-    complex_funcs = [(name, score) for name, score, _, _, _ in complexity_data if score > 8]  # Lower threshold
+    # Count operations (bin_op)
+    for atom in atoms:
+        if atom.startswith("(bin-op "):
+            parts = atom.strip("()").split()
+            if len(parts) >= 6:
+                op = parts[1]
+                scope = " ".join(parts[4:-1])
+                line = int(parts[-1])
+                
+                # Find which function this operation belongs to
+                for func_name, func_info in function_defs.items():
+                    if (scope == func_info["scope"] or 
+                        scope.startswith(func_info["scope"]) or 
+                        func_info["scope"] == "global") and \
+                       line >= func_info["line_start"] and \
+                       line <= func_info["line_end"]:
+                        func_info["operations"] += 1
+    
+    # Count loops (both explicit and implicit)
+    for atom in atoms:
+        if atom.startswith("(loop-pattern ") or atom.startswith("(implicit-loop "):
+            parts = atom.strip("()").split()
+            if len(parts) >= 5:
+                loop_id = parts[1]
+                loop_type = parts[2]
+                scope = " ".join(parts[3:-1])
+                line = int(parts[-1])
+                
+                # Find which function this loop belongs to
+                for func_name, func_info in function_defs.items():
+                    if (scope == func_info["scope"] or 
+                        scope.startswith(func_info["scope"]) or 
+                        func_info["scope"] == "global") and \
+                       line >= func_info["line_start"] and \
+                       line <= func_info["line_end"]:
+                        func_info["loops"] += 1
+    
+    # Count function calls
+    for atom in atoms:
+        if atom.startswith("(function-call "):
+            parts = atom.strip("()").split()
+            if len(parts) >= 5:
+                callee = parts[1]
+                args = parts[2]
+                scope = " ".join(parts[3:-1])
+                line = int(parts[-1])
+                
+                # Find which function this call belongs to
+                for func_name, func_info in function_defs.items():
+                    if (scope == func_info["scope"] or 
+                        scope.startswith(func_info["scope"]) or 
+                        func_info["scope"] == "global") and \
+                       line >= func_info["line_start"] and \
+                       line <= func_info["line_end"]:
+                        func_info["calls"] += 1
+    
+    # Calculate overall complexity scores
+    for func_name, func_info in function_defs.items():
+        # Weighted score: operations + 3*loops + 0.5*calls
+        func_info["score"] = (
+            func_info["operations"] + 
+            3 * func_info["loops"] + 
+            0.5 * func_info["calls"]
+        )
+    
+    # Sort functions by complexity score
+    sorted_functions = sorted(
+        function_defs.items(), 
+        key=lambda x: x[1]["score"], 
+        reverse=True
+    )
+    
+    # Print complexity ranking
+    print("\n=== Function Complexity Analysis ===")
+    print("Function complexity ranking:")
+    for i, (func_name, func_info) in enumerate(sorted_functions):
+        print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
+        if i > 20:  # Only show top 20 functions
+            print("(... and more functions)")
+            break
+    
+    # Identify complex functions based on criteria
+    complex_funcs = []
+    for func_name, func_info in function_defs.items():
+        if (func_info["operations"] > 10 or 
+            func_info["loops"] > 2 or 
+            func_info["score"] > 15):
+            complex_funcs.append((func_name, func_info))
+    
+    # Sort complex functions by score
+    complex_funcs.sort(key=lambda x: x[1]["score"], reverse=True)
+    
+    print("\n=== Complex Functions Detected ===")
     if complex_funcs:
-        print(f"\nPotentially complex functions that might benefit from refactoring:")
-        for name, score in complex_funcs:
-            print(f"- {name} (complexity score: {score})")
+        for i, (func_name, func_info) in enumerate(complex_funcs):
+            print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
     else:
-        print("\nNo excessively complex functions detected.")
+        print("No complex functions detected")
 
 def analyze_domain_concepts():
     """Analyze potential domain concepts in the codebase."""
@@ -967,6 +908,7 @@ if __name__ == "__main__":
     analyze_type_safety()
 
     analyze_temporal_evolution(path, monitor)
+    analyze_function_complexity(path)
     
     # Perform relationship analysis
     find_function_relationships()
@@ -975,5 +917,4 @@ if __name__ == "__main__":
     find_module_relationships()
     find_operation_patterns()
     analyze_structural_patterns()
-    find_function_complexity()
     analyze_domain_concepts()
