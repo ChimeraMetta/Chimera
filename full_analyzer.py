@@ -490,6 +490,8 @@ def analyze_structural_patterns():
                 print(f"- {scope}: {counts['functions']} functions, {counts['classes']} classes, {counts['variables']} variables")
 
 # Function to analyze temporal code evolution
+# This is a direct replacement for the analyze_temporal_evolution function in full_analyzer.py
+
 def analyze_temporal_evolution(repo_path, monitor=None):
     """Analyze temporal code evolution using Git history."""
     print("\n=== Temporal Code Evolution Analysis ===")
@@ -506,76 +508,191 @@ def analyze_temporal_evolution(repo_path, monitor=None):
     if not temporal_analyzer.analyze_history(max_commits=20):  # Limit to 20 commits for faster processing
         print("Could not analyze Git history. Skipping temporal analysis.")
         return
+        
+    # DIRECT FIX: Rewrite the approach completely to use more direct queries and careful result handling
     
-    # Find functions with frequent changes
-    frequent_changes = monitor.query("""
-        (match &self 
-               (function-change-frequency $func $freq)
-               (> $freq 3)
-               ($func $freq))
-    """)
-    
-    if frequent_changes:
-        print(f"\nFound {len(frequent_changes)} functions with frequent changes:")
-        for fc in frequent_changes:
-            parts = str(fc).strip('()').split(' ')
-            if len(parts) >= 2:
-                func, freq = parts[0], parts[1]
-                cleaned_func = func.strip('"')
-                print(f"- {cleaned_func}: changed {freq} times")
-    
-    # Find functions that grew in complexity
-    complexity_growth = monitor.query("""
-        (match &self 
-               (function-complexity-growth $func $start $end $change)
-               (> $change 0)
-               ($func $change))
-    """)
-    
-    if complexity_growth:
-        print(f"\nFound {len(complexity_growth)} functions that grew in complexity:")
-        for cg in complexity_growth:
-            parts = str(cg).strip('()').split(' ')
-            if len(parts) >= 2:
-                func, change = parts[0], parts[1]
-                cleaned_func = func.strip('"')
-                print(f"- {cleaned_func}: complexity increased by {change}")
-    
-    # Find co-evolving functions
-    co_evolving = monitor.query("""
-        (match &self 
-               (functions-co-evolve $func1 $func2 0.7)
-               ($func1 $func2))
-    """)
-    
-    if co_evolving:
-        print(f"\nFound {len(co_evolving)} co-evolving function pairs:")
-        for ce in co_evolving:
-            parts = str(ce).strip('()').split(' ')
-            if len(parts) >= 2:
-                func1, func2 = parts[0], parts[1]
-                cleaned_func1 = func1.strip('"')
-                cleaned_func2 = func2.strip('"')
-                print(f"- {cleaned_func1} and {cleaned_func2} frequently change together")
-    
-    # Find potential hotspots
-    hotspots = monitor.query("""
-        (match &self 
-               (function-hotspot $func $confidence)
-               ($func $confidence))
-    """)
-    
-    if hotspots:
-        print(f"\nFound {len(hotspots)} potential code hotspots:")
-        for hs in hotspots:
-            parts = str(hs).strip('()').split(' ')
-            if len(parts) >= 2:
-                func, confidence = parts[0], parts[1]
-                cleaned_func = func.strip('"')
-                print(f"- {cleaned_func}: {confidence} confidence")
-    
-    if not (frequent_changes or complexity_growth or co_evolving or hotspots):
-        print("No significant temporal patterns detected in the analyzed commits.")
+    try:
+        # === Find functions with frequent changes ===
+        print("\nFunctions with frequent changes:")
+        
+        # Use a more direct query to find function names first
+        func_names = monitor.query("""(match &self (function-signature-at $func $commit $_) $func)""")
+        
+        # Convert to a set of unique function names
+        unique_funcs = set()
+        for func_atom in func_names:
+            try:
+                func_name = str(func_atom)
+                if not func_name.startswith("("):  # Skip complex expressions
+                    unique_funcs.add(func_name)
+            except:
+                continue
+        
+        # For each function, count its changes directly
+        frequent_changes = []
+        for func_name in unique_funcs:
+            try:
+                # Count commits where this function appears - directly in Python
+                count_query = monitor.query(f"""(match &self (function-signature-at "{func_name}" $commit $_) $commit)""")
+                change_count = len(count_query)
+                
+                if change_count > 3:  # Threshold for "frequent"
+                    frequent_changes.append((func_name, change_count))
+            except Exception as e:
+                print(f"Error analyzing changes for {func_name}: {e}")
+        
+        # Sort by frequency
+        frequent_changes.sort(key=lambda x: x[1], reverse=True)
+        
+        # Display results
+        if frequent_changes:
+            print(f"Found {len(frequent_changes)} functions with frequent changes:")
+            for func, count in frequent_changes[:10]:  # Show top 10
+                print(f"- {func}: changed {count} times")
+        else:
+            print("No functions with frequent changes found.")
+            
+        # === Find functions with complexity growth ===
+        print("\nFunctions with complexity growth:")
+        
+        complexity_growth = []
+        for func_name in unique_funcs:
+            try:
+                # Get all complexity measurements for this function
+                complexity_query = monitor.query(f"""(match &self (function-complexity-at "{func_name}" $commit $complexity) ($commit $complexity))""")
+                
+                if len(complexity_query) < 2:
+                    continue  # Need at least 2 measurements to calculate growth
+                
+                # Extract and parse commit IDs and complexity values
+                measurements = []
+                for result in complexity_query:
+                    try:
+                        # Handle different result formats
+                        result_str = str(result)
+                        if result_str.startswith("(") and result_str.endswith(")"):
+                            # Parse (commit_id complexity) format
+                            content = result_str[1:-1].strip()
+                            parts = content.split(None, 1)
+                            if len(parts) == 2:
+                                commit_id = parts[0]
+                                try:
+                                    complexity = int(parts[1])
+                                    measurements.append((commit_id, complexity))
+                                except ValueError:
+                                    pass
+                    except:
+                        continue
+                
+                if len(measurements) < 2:
+                    continue
+                    
+                # Simplistic approach: just check if last complexity > first complexity
+                # For real timestamp-based sorting, we would need to use the commit timestamps
+                measurements.sort()  # Alphabetic sort by commit ID as a rough proxy
+                first_complexity = measurements[0][1]
+                last_complexity = measurements[-1][1]
+                
+                growth = last_complexity - first_complexity
+                if growth > 0:
+                    complexity_growth.append((func_name, growth))
+            except Exception as e:
+                print(f"Error analyzing complexity for {func_name}: {e}")
+        
+        # Sort by growth
+        complexity_growth.sort(key=lambda x: x[1], reverse=True)
+        
+        # Display results
+        if complexity_growth:
+            print(f"Found {len(complexity_growth)} functions that grew in complexity:")
+            for func, growth in complexity_growth[:10]:  # Show top 10
+                print(f"- {func}: complexity increased by {growth}")
+        else:
+            print("No functions with complexity growth found.")
+            
+        # === Find co-evolving functions ===
+        print("\nCo-evolving function pairs:")
+        
+        # This is computationally expensive, so limit to most frequently changing functions
+        top_funcs = [f for f, _ in frequent_changes[:20]]
+        
+        co_evolving = []
+        processed_pairs = set()
+        
+        for i, func1 in enumerate(top_funcs):
+            for func2 in top_funcs[i+1:]:
+                pair_key = tuple(sorted([func1, func2]))
+                if pair_key in processed_pairs:
+                    continue
+                    
+                processed_pairs.add(pair_key)
+                
+                try:
+                    # Get commits where func1 appears
+                    func1_commits = set(str(c) for c in monitor.query(f"""(match &self (function-signature-at "{func1}" $commit $_) $commit)"""))
+                    
+                    # Get commits where func2 appears
+                    func2_commits = set(str(c) for c in monitor.query(f"""(match &self (function-signature-at "{func2}" $commit $_) $commit)"""))
+                    
+                    # Find common commits
+                    common_commits = func1_commits.intersection(func2_commits)
+                    
+                    # Calculate co-change ratio
+                    if len(func1_commits) > 0 and len(func2_commits) > 0:
+                        co_change_ratio = len(common_commits) / min(len(func1_commits), len(func2_commits))
+                        
+                        if co_change_ratio > 0.7:  # Threshold for co-evolution
+                            co_evolving.append((func1, func2, co_change_ratio))
+                except Exception as e:
+                    print(f"Error analyzing co-evolution for {func1}/{func2}: {e}")
+        
+        # Sort by co-change ratio
+        co_evolving.sort(key=lambda x: x[2], reverse=True)
+        
+        # Display results
+        if co_evolving:
+            print(f"Found {len(co_evolving)} co-evolving function pairs:")
+            for func1, func2, ratio in co_evolving[:10]:  # Show top 10
+                print(f"- {func1} and {func2}: co-change ratio {ratio:.2f}")
+        else:
+            print("No co-evolving function pairs found.")
+            
+        # === Identify potential hotspots ===
+        print("\nPotential code hotspots:")
+        
+        # Combine frequency and complexity to find hotspots
+        hotspots = []
+        
+        func_to_freq = dict(frequent_changes)
+        func_to_growth = dict(complexity_growth)
+        
+        # Score functions based on frequency and complexity growth
+        for func in set(func_to_freq.keys()).union(func_to_growth.keys()):
+            freq = func_to_freq.get(func, 0)
+            growth = func_to_growth.get(func, 0)
+            
+            # Simple scoring algorithm
+            score = freq * 0.6 + growth * 0.4
+            
+            if score > 3:  # Threshold for hotspot
+                confidence = "high" if score > 8 else "medium"
+                hotspots.append((func, score, confidence))
+        
+        # Sort by score
+        hotspots.sort(key=lambda x: x[1], reverse=True)
+        
+        # Display results
+        if hotspots:
+            print(f"Found {len(hotspots)} potential code hotspots:")
+            for func, score, confidence in hotspots[:10]:  # Show top 10
+                print(f"- {func}: score {score:.2f} ({confidence} confidence)")
+        else:
+            print("No potential code hotspots detected.")
+        
+    except Exception as e:
+        print(f"Error in temporal analysis: {e}")
+        import traceback
+        traceback.print_exc()
 
 def find_function_complexity():
     """
