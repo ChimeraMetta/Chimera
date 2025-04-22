@@ -606,7 +606,7 @@ def generate_receipt(order: Dict[str, Any]) -> str:
     # Add satisfaction survey
     receipt += "\n" + "-" * 40 + "\n"
     receipt += "Please rate your shopping experience (1-5 stars):\n"
-    receipt += "☆ ☆ ☆ ☆ ☆\n\n"
+    receipt += "* * * * *\n\n"
     
     # Add promotional footer
     receipt += "Thank you for shopping with us!\n"
