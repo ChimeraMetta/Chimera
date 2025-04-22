@@ -468,6 +468,206 @@ class CodeDecomposer(ast.NodeVisitor):
         # Continue visiting children
         self.generic_visit(node)
     
+    def visit_ListComp(self, node):
+        """Process list comprehensions, which are implicit loops."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # Add as a loop pattern (these are implicit loops)
+        self.loop_patterns.append({
+            "type": "list_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Create a loop pattern atom
+        self.atoms.append({
+            "type": "implicit_loop",
+            "loop_type": "list_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_DictComp(self, node):
+        """Process dictionary comprehensions, which are implicit loops."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # Add as a loop pattern
+        self.loop_patterns.append({
+            "type": "dict_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Create a loop pattern atom
+        self.atoms.append({
+            "type": "implicit_loop",
+            "loop_type": "dict_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_SetComp(self, node):
+        """Process set comprehensions, which are implicit loops."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # Add as a loop pattern
+        self.loop_patterns.append({
+            "type": "set_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Create a loop pattern atom
+        self.atoms.append({
+            "type": "implicit_loop",
+            "loop_type": "set_comp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_GeneratorExp(self, node):
+        """Process generator expressions, which are implicit loops."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # Add as a loop pattern
+        self.loop_patterns.append({
+            "type": "gen_exp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Create a loop pattern atom
+        self.atoms.append({
+            "type": "implicit_loop",
+            "loop_type": "gen_exp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_Compare(self, node):
+        """Process comparison operations, which are often missed binary operations."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # For each comparator, create a binary operation
+        for i, op in enumerate(node.ops):
+            op_type = type(op).__name__
+            
+            # The left operand for the first comparison is node.left,
+            # for subsequent comparisons it's the right operand of the previous comparison
+            left = node.left if i == 0 else node.comparators[i-1]
+            right = node.comparators[i]
+            
+            left_type = self._infer_type_from_value(left)
+            right_type = self._infer_type_from_value(right)
+            
+            # Create binary operation atom (similar to visit_BinOp)
+            self.atoms.append({
+                "type": "bin_op",
+                "op": op_type,
+                "left_type": left_type or "Any",
+                "right_type": right_type or "Any", 
+                "scope": current_scope,
+                "line": node.lineno
+            })
+            
+            # Track patterns for donor system
+            if left_type == "String" or right_type == "String":
+                self.string_operations.append({
+                    "op": op_type,
+                    "left_type": left_type,
+                    "right_type": right_type,
+                    "line": node.lineno
+                })
+            elif left_type == "Number" and right_type == "Number":
+                self.arithmetic_operations.append({
+                    "op": op_type,
+                    "line": node.lineno
+                })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_BoolOp(self, node):
+        """Process boolean operations (and, or), which are often missed binary operations."""
+        current_scope = ".".join(self.scope_stack)
+        op_type = type(node.op).__name__
+        
+        # Boolean operations can have multiple values
+        # For each pair of consecutive values, create a binary operation
+        for i in range(len(node.values) - 1):
+            left = node.values[i]
+            right = node.values[i+1]
+            
+            left_type = self._infer_type_from_value(left)
+            right_type = self._infer_type_from_value(right)
+            
+            # Create binary operation atom
+            self.atoms.append({
+                "type": "bin_op",
+                "op": op_type,
+                "left_type": left_type or "Any",
+                "right_type": right_type or "Any", 
+                "scope": current_scope,
+                "line": node.lineno
+            })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_UnaryOp(self, node):
+        """Process unary operations (not, etc.)."""
+        current_scope = ".".join(self.scope_stack)
+        op_type = type(node.op).__name__
+        operand_type = self._infer_type_from_value(node.operand)
+        
+        # Create unary operation atom
+        self.atoms.append({
+            "type": "unary_op",
+            "op": op_type,
+            "operand_type": operand_type or "Any",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+
+    def visit_IfExp(self, node):
+        """Process inline if expressions (ternary operations)."""
+        current_scope = ".".join(self.scope_stack)
+        
+        # Create if expression atom
+        self.atoms.append({
+            "type": "if_exp",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Count this as a binary operation for complexity
+        self.atoms.append({
+            "type": "bin_op",
+            "op": "TernaryIf",
+            "left_type": "Bool",
+            "right_type": "Any",
+            "scope": current_scope,
+            "line": node.lineno
+        })
+        
+        # Continue visiting children
+        self.generic_visit(node)
+    
     def _get_name(self, node):
         """Extract name from a node."""
         if isinstance(node, ast.Name):
