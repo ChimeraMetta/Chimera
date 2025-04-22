@@ -299,63 +299,280 @@ class TemporalCodeAnalyzer:
         # Create a unique hash from available information
         hash_input = f"{name}:{lineno_start}:{lineno_end}"
         return hashlib.md5(hash_input.encode()).hexdigest()
-    
+
     def function_history(self, func_name):
-        """Get complete history of a function's evolution."""
-        # Create query atom
-        query_atom = self.metta.parse_single(f'(match &self (function-signature-at "{func_name}" $commit $_) $commit)')
-        commits = self.monitor.metta_space.query(query_atom)
+        """Get complete history of a function's evolution with improved error handling."""
+        # Create query atom for finding all commits with this function
+        query_atom = self.metta.parse_single(f'(function-commits "{func_name}" $commits)')
+        commits_result = self.monitor.metta_space.query(query_atom)
+        
+        if not commits_result or not commits_result[0]:
+            print(f"No history found for function {func_name}")
+            return []
+        
+        # Try to get the sorted commits using MeTTa's sorting
+        commits_atom = commits_result[0]
+        sort_atom = self.metta.parse_single(f'(sort-by-timestamp {commits_atom} $sorted)')
+        sorted_result = self.monitor.metta_space.query(sort_atom)
+        
+        # If MeTTa sorting fails, use a fallback approach
+        if not sorted_result or not sorted_result[0]:
+            print(f"Warning: Could not sort commits in MeTTa. Using Python fallback.")
+            # Extract commit IDs using atom iteration
+            commit_ids = []
+            for c in commits_atom.iterate():
+                commit_ids.append(str(c))
+            sorted_commits = self._sort_commits_by_timestamp(commit_ids)
+        else:
+            # Process the sorted result from MeTTa
+            sorted_commits = []
+            for c in sorted_result[0].iterate():
+                sorted_commits.append(str(c))
         
         history = []
-        for commit in commits:
-            commit_id = str(commit).strip('"')
-            
-            # Create atoms for querying signature and complexity
-            sig_query = self.metta.parse_single(f'(match &self (function-signature-at "{func_name}" "{commit_id}" $sig) $sig)')
-            signature_result = self.monitor.metta_space.query(sig_query)
-            signature = signature_result[0] if signature_result else None
-            
-            complex_query = self.metta.parse_single(f'(match &self (function-complexity-at "{func_name}" "{commit_id}" $c) $c)')
-            complexity_result = self.monitor.metta_space.query(complex_query)
-            complexity = complexity_result[0] if complexity_result else None
-            
-            # Get commit info
-            info_query = self.metta.parse_single(f'(match &self (commit-info "{commit_id}" $author $timestamp $msg) ($timestamp $author $msg))')
-            commit_info_result = self.monitor.metta_space.query(info_query)
-            commit_info = commit_info_result[0] if commit_info_result else None
-            
-            if commit_info and signature is not None and complexity is not None:
-                timestamp, author, message = str(commit_info).strip('()').split(' ', 2)
+        for commit_id in sorted_commits:
+            try:
+                # Skip if not a valid commit ID
+                if not commit_id or commit_id == "Empty":
+                    continue
+                    
+                # Create atoms for querying signature and complexity
+                sig_query = self.metta.parse_single(f'(function-signature-at "{func_name}" {commit_id} $sig)')
+                signature_result = self.monitor.metta_space.query(sig_query)
+                
+                signature = None
+                if signature_result and signature_result[0]:
+                    signature_atom = signature_result[0]
+                    signature = str(signature_atom)
+                else:
+                    signature = "Unknown"
+                
+                # Query complexity
+                complex_query = self.metta.parse_single(f'(get-complexity "{func_name}" {commit_id} $c)')
+                complexity_result = self.monitor.metta_space.query(complex_query)
+                
+                # Extract complexity value
+                complexity = 0
+                if complexity_result and complexity_result[0]:
+                    complexity_atom = complexity_result[0]
+                    try:
+                        complexity = int(str(complexity_atom))
+                    except ValueError:
+                        pass
+                
+                # Get commit info
+                info_query = self.metta.parse_single(f'(match &self (commit-info {commit_id} $author $timestamp $msg) ($author $timestamp $msg))')
+                commit_info_result = self.monitor.metta_space.query(info_query)
+                
+                timestamp = "Unknown"
+                author = "Unknown"
+                message = "Unknown"
+                
+                if commit_info_result and commit_info_result[0]:
+                    # Extract parts from the result atom
+                    info_atom = commit_info_result[0]
+                    parts = []
+                    
+                    # Extract the three parts using atom iteration
+                    for part in info_atom.iterate():
+                        parts.append(str(part))
+                    
+                    if len(parts) >= 3:
+                        author = parts[0]
+                        timestamp = parts[1]
+                        message = parts[2]
+                
                 history.append({
                     'commit_id': commit_id,
-                    'timestamp': timestamp.strip('"'),
-                    'author': author.strip('"'),
-                    'message': message.strip('"'),
-                    'signature': str(signature).strip('"'),
-                    'complexity': int(str(complexity))
+                    'timestamp': timestamp,
+                    'author': author,
+                    'message': message,
+                    'signature': signature,
+                    'complexity': complexity
                 })
+            except Exception as e:
+                print(f"Error processing commit {commit_id}: {e}")
+                continue
+        
+        return history
+
+    def _sort_commits_by_timestamp(self, commit_ids):
+        """Sort commit IDs by timestamp (fallback Python implementation)."""
+        commit_data = []
+        
+        for commit_id in commit_ids:
+            try:
+                # Query timestamp using MeTTa
+                timestamp_query = self.metta.parse_single(f'(get-commit-timestamp {commit_id} $ts)')
+                ts_result = self.monitor.metta_space.query(timestamp_query)
+                
+                timestamp = 0
+                if ts_result and ts_result[0]:
+                    timestamp_atom = ts_result[0]
+                    try:
+                        timestamp = int(str(timestamp_atom))
+                    except ValueError:
+                        # If can't parse as int, use string comparison
+                        timestamp = str(timestamp_atom)
+                
+                commit_data.append((commit_id, timestamp))
+            except Exception as e:
+                # If we can't get timestamp, put at the end
+                print(f"Error getting timestamp for {commit_id}: {e}")
+                commit_data.append((commit_id, float('inf') if isinstance(timestamp, (int, float)) else "ZZZZZZ"))
         
         # Sort by timestamp
-        history.sort(key=lambda x: x['timestamp'])
-        return history
-    
-    def identify_hotspots(self):
-        """Identify code hotspots based on change frequency and complexity."""
-        # Create query atom for hotspots
-        hotspot_query = self.metta.parse_single('(match &self (function-hotspot $func $confidence) ($func $confidence))')
-        hotspots = self.monitor.metta_space.query(hotspot_query)
+        try:
+            commit_data.sort(key=lambda x: x[1])
+        except Exception as e:
+            # If sorting fails, return unsorted
+            print(f"Warning: Failed to sort commits by timestamp: {e}")
         
-        results = []
-        for hotspot in hotspots:
-            func, confidence = str(hotspot).strip('()').split(' ')
-            
-            # Get function summary
-            summary = self.function_evolution_summary(func.strip('"'))
-            results.append({
-                "function": func.strip('"'),
-                "confidence": confidence.strip('"'),
-                "total_changes": summary.get("total_changes", 0),
-                "complexity_change": summary.get("complexity_change", 0)
+        return [c[0] for c in commit_data]
+
+    def identify_hotspots(self):
+        """Identify code hotspots with improved error handling."""
+        # Use the improved MeTTa rules
+        hotspots = []
+        
+        # First get functions with high change frequency
+        frequency_query = self.metta.parse_single('(match &self (function-change-frequency $func $freq) (> $freq 3) ($func $freq))')
+        frequency_result = self.monitor.metta_space.query(frequency_query)
+        
+        for result in frequency_result:
+            try:
+                # Extract function name and frequency by iterating through the atom
+                parts = []
+                for part in result.iterate():
+                    parts.append(str(part))
+                
+                if len(parts) >= 2:
+                    func_name, freq = parts[0], parts[1]
+                    try:
+                        freq_val = int(freq)
+                    except ValueError:
+                        freq_val = 0
+                    
+                    hotspots.append({
+                        "function": func_name,
+                        "metric": "change_frequency",
+                        "value": freq_val,
+                        "confidence": "high" if freq_val > 5 else "medium"
+                    })
+            except Exception as e:
+                print(f"Error processing frequency result: {e}")
+        
+        # Then get functions with high complexity
+        complexity_query = self.metta.parse_single('(match &self (complexity-hotspot $func High) $func)')
+        complexity_result = self.monitor.metta_space.query(complexity_query)
+        
+        for func_atom in complexity_result:
+            func_name = str(func_atom)
+            hotspots.append({
+                "function": func_name,
+                "metric": "complexity",
+                "value": self._get_max_complexity(func_name),
+                "confidence": "high"
             })
         
-        return sorted(results, key=lambda x: x['total_changes'], reverse=True)
+        # Sort by confidence and value
+        hotspots.sort(key=lambda x: (0 if x["confidence"] == "high" else 1, -x["value"]))
+        
+        return hotspots
+
+    def _get_max_complexity(self, func_name):
+        """Get maximum complexity for a function across all commits."""
+        query = self.metta.parse_single(f'(match &self (function-complexity-at "{func_name}" $commit $complexity) $complexity)')
+        complexity_results = self.monitor.metta_space.query(query)
+        
+        max_complexity = 0
+        for c_atom in complexity_results:
+            try:
+                complexity = int(str(c_atom))
+                max_complexity = max(max_complexity, complexity)
+            except ValueError:
+                pass
+        
+        return max_complexity
+
+    def function_evolution_summary(self, func_name):
+        """Get summary metrics for function evolution."""
+        history = self.function_history(func_name)
+        
+        if not history:
+            return {"total_changes": 0, "complexity_change": 0}
+        
+        # Count total versions
+        total_changes = len(history)
+        
+        # Calculate complexity change from first to last version
+        try:
+            first_complexity = history[0].get('complexity', 0)
+            last_complexity = history[-1].get('complexity', 0)
+            complexity_change = last_complexity - first_complexity
+        except (IndexError, KeyError):
+            complexity_change = 0
+        
+        return {
+            "total_changes": total_changes,
+            "complexity_change": complexity_change,
+            "first_commit": history[0].get('commit_id') if history else None,
+            "last_commit": history[-1].get('commit_id') if history else None
+        }
+
+    # For full_analyzer.py - Helper function to process MeTTa results properly
+    def process_temporal_result(result_atom):
+        """Extract data from MeTTa result atoms properly."""
+        try:
+            # For atoms that implement iterate
+            if hasattr(result_atom, 'iterate'):
+                parts = []
+                for part in result_atom.iterate():
+                    parts.append(str(part))
+                
+                if len(parts) == 1:
+                    return parts[0], None
+                elif len(parts) >= 2:
+                    return parts[0], parts[1]
+            
+            # Fallback for other types of atoms
+            result_str = str(result_atom)
+            if "(" in result_str and ")" in result_str:
+                # This is a less reliable fallback
+                return None, None
+            
+            return result_str, None
+        except Exception as e:
+            print(f"Error processing result {result_atom}: {e}")
+            return None, None
+
+    # Modify analyze_temporal_evolution in full_analyzer.py to use this method
+    def get_temporal_functions_with_changes(monitor):
+        """Get functions with frequent changes using proper atom processing."""
+        try:
+            # Query for functions with change frequency > 3
+            query = monitor.metta.parse_single('(match &self (function-change-frequency $func $freq) (> $freq 3) ($func $freq))')
+            results = monitor.metta_space.query(query)
+            
+            functions = []
+            for result in results:
+                try:
+                    # Process each result using atom iteration
+                    parts = []
+                    for part in result.iterate():
+                        parts.append(str(part))
+                    
+                    if len(parts) >= 2:
+                        func_name, freq = parts[0], parts[1]
+                        try:
+                            freq_val = int(freq)
+                            functions.append((func_name, freq_val))
+                        except ValueError:
+                            pass
+                except Exception as e:
+                    print(f"Error processing result: {e}")
+            
+            return functions
+        except Exception as e:
+            print(f"Error querying functions with changes: {e}")
+            return []
