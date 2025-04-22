@@ -101,6 +101,10 @@ class TemporalCodeAnalyzer:
             print(f"No git repository found at {repo_path}")
         
         self.load_metta_rules(TEMPORAL_RULE_PATH)
+        
+        # Merge rules space into monitor space
+        for atom in self.metta_space.get_atoms():
+            self.monitor.metta_space.add_atom(atom)
     
     def load_metta_rules(self, rules_file: str) -> bool:
         """
@@ -218,9 +222,6 @@ class TemporalCodeAnalyzer:
                 # Restore original HEAD
                 self.repo.git.checkout(original_head, force=True)
         
-        # Add temporal reasoning rules
-        self._add_temporal_rules()
-        
         return True
     
     def _process_file_analysis(self, analysis: Dict[str, Any], file_path: str, commit_id: str):
@@ -303,7 +304,7 @@ class TemporalCodeAnalyzer:
         """Get complete history of a function's evolution."""
         # Create query atom
         query_atom = self.metta.parse_single(f'(match &self (function-signature-at "{func_name}" $commit $_) $commit)')
-        commits = self.space.query(query_atom)
+        commits = self.monitor.metta_space.query(query_atom)
         
         history = []
         for commit in commits:
@@ -311,17 +312,20 @@ class TemporalCodeAnalyzer:
             
             # Create atoms for querying signature and complexity
             sig_query = self.metta.parse_single(f'(match &self (function-signature-at "{func_name}" "{commit_id}" $sig) $sig)')
-            signature = self.space.query(sig_query)[0]
+            signature_result = self.monitor.metta_space.query(sig_query)
+            signature = signature_result[0] if signature_result else None
             
             complex_query = self.metta.parse_single(f'(match &self (function-complexity-at "{func_name}" "{commit_id}" $c) $c)')
-            complexity = self.space.query(complex_query)[0]
+            complexity_result = self.monitor.metta_space.query(complex_query)
+            complexity = complexity_result[0] if complexity_result else None
             
             # Get commit info
             info_query = self.metta.parse_single(f'(match &self (commit-info "{commit_id}" $author $timestamp $msg) ($timestamp $author $msg))')
-            commit_info = self.space.query(info_query)
+            commit_info_result = self.monitor.metta_space.query(info_query)
+            commit_info = commit_info_result[0] if commit_info_result else None
             
-            if commit_info:
-                timestamp, author, message = str(commit_info[0]).strip('()').split(' ', 2)
+            if commit_info and signature is not None and complexity is not None:
+                timestamp, author, message = str(commit_info).strip('()').split(' ', 2)
                 history.append({
                     'commit_id': commit_id,
                     'timestamp': timestamp.strip('"'),
@@ -339,7 +343,7 @@ class TemporalCodeAnalyzer:
         """Identify code hotspots based on change frequency and complexity."""
         # Create query atom for hotspots
         hotspot_query = self.metta.parse_single('(match &self (function-hotspot $func $confidence) ($func $confidence))')
-        hotspots = self.space.query(hotspot_query)
+        hotspots = self.monitor.metta_space.query(hotspot_query)
         
         results = []
         for hotspot in hotspots:
