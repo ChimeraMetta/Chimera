@@ -263,28 +263,75 @@
 ;; Function Complexity Analysis
 ;; =====================
 
-;; Function complexity based on operation count
+;; Function complexity based on operation count - also count implicit loops
 (= (function-operation-complexity $func $count)
    (case (match &self (function-def $func $scope $start $end)
-                (match &self (bin-op $op $left $right $scope $line)
-                       (and (>= $line $start) (<= $line $end)))
+                (match &self (bin-op $op $left $right $scope-inner $line)
+                       (and (starts-with $scope-inner $scope) 
+                            (>= $line $start) 
+                            (<= $line $end)))
                 (aggregate-count))
      (Empty 0)
      ($count $count)))
 
-;; Function complexity based on loop count
+;; Function complexity based on loop count - include both explicit and implicit loops
 (= (function-loop-complexity $func $count)
+   (+ (function-explicit-loop-complexity $func 0)
+      (function-implicit-loop-complexity $func 0)))
+
+;; Count explicit loops (for/while)
+(= (function-explicit-loop-complexity $func $count)
    (case (match &self (function-def $func $scope $start $end)
                 (match &self (loop-pattern $id $type $loop-scope $line)
-                       (and (= $scope $loop-scope) (>= $line $start) (<= $line $end)))
+                       (and (starts-with $loop-scope $scope) 
+                            (>= $line $start) 
+                            (<= $line $end)))
                 (aggregate-count))
      (Empty 0)
      ($count $count)))
 
-;; Function is complex
+;; Count implicit loops (comprehensions, generator expressions)
+(= (function-implicit-loop-complexity $func $count)
+   (case (match &self (function-def $func $scope $start $end)
+                (match &self (implicit-loop $type $loop-scope $line)
+                       (and (starts-with $loop-scope $scope) 
+                            (>= $line $start) 
+                            (<= $line $end)))
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
+
+;; Count function call complexity - can be useful for functions that delegate complexity
+(= (function-call-complexity $func $count)
+   (case (match &self (function-def $func $scope $start $end)
+                (match &self (function-call $callee $args $call-scope $line)
+                       (and (starts-with $call-scope $scope) 
+                            (>= $line $start) 
+                            (<= $line $end)))
+                (aggregate-count))
+     (Empty 0)
+     ($count $count)))
+
+;; Unified weighted complexity score (customizable weights)
+(= (function-complexity-score $func)
+   (+ (* 1 (function-operation-complexity $func 0))    ; Binary operations weight
+      (* 3 (function-loop-complexity $func 0))         ; Loops have higher weight
+      (* 0.5 (function-call-complexity $func 0))))     ; Function calls lower weight
+
+;; Function is complex - revised definition with better thresholds
 (= (complex-function $func)
-   (or (> (function-operation-complexity $func 0) 10)
-       (> (function-loop-complexity $func 0) 2)))
+   (or (> (function-operation-complexity $func 0) 10)        ; Many operations
+       (> (function-loop-complexity $func 0) 2)              ; Multiple loops
+       (> (function-complexity-score $func) 15)))            ; High overall score
+
+;; Check if a scope is a prefix of another scope
+(= (starts-with $scope-to-check $prefix)
+   (or (= $scope-to-check $prefix)
+       (starts-with-string $scope-to-check $prefix)))
+
+;; String prefix check (simplified implementation)
+(= (starts-with-string $str $prefix)
+   (= $str (concat $prefix $any-suffix)))
 
 ;; =====================
 ;; Type System Analysis
