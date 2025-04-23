@@ -19,9 +19,10 @@ high performance, knowledgeable agent capable of providing deeper insights and m
 
 - [x] Complexity Analysis
 - [ ] Temporal Analysis
+- [x] Function Call Flow
 - [ ] Type Flow Analysis
-- [ ] Domain Analysis
+- [x] Domain Analysis
 - [ ] Structural Patterns
-- [ ] Class Relationships
+- [x] Class Relationships
 - [ ] Module Relationships
 - [ ] Operational Patterns
