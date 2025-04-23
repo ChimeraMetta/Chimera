@@ -888,6 +888,176 @@ def analyze_domain_concepts():
     else:
         print("\nNo clear domain concepts found in naming patterns")
 
+def analyze_function_call_relationships(file_path):
+    """Analyze function call relationships with proper handling of class methods."""
+    print(f"Analyzing function call relationships in {file_path}...")
+    
+    # Decompose the file
+    result = decompose_file(file_path)
+    
+    if "error" in result and result["error"]:
+        print(f"Error: {result['error']}")
+        return
+    
+    atoms = result["metta_atoms"]
+    
+    # Extract function definitions with full scope information
+    function_defs = {}
+    for atom in atoms:
+        if atom.startswith("(function-def "):
+            # Parse the function definition atom
+            match = re.match(r'\(function-def\s+(\S+)\s+(.*?)\s+(\d+)\s+(\d+)\)', atom)
+            if match:
+                func_name = match.group(1)
+                scope = match.group(2).strip()
+                line_start = int(match.group(3))
+                line_end = int(match.group(4))
+                
+                # Create a qualified name that includes the class for methods
+                qualified_name = func_name
+                if scope and scope != "global":
+                    # If it's a class method, include the class name
+                    if scope.startswith("class-"):
+                        class_name = scope.replace("class-", "", 1)
+                        qualified_name = f"{class_name}.{func_name}"
+                
+                function_defs[qualified_name] = {
+                    "name": func_name,
+                    "scope": scope,
+                    "line_start": line_start,
+                    "line_end": line_end,
+                    "calls": []
+                }
+    
+    # Extract direct function calls
+    direct_calls = []
+    for atom in atoms:
+        if atom.startswith("(direct-call "):
+            # Parse the direct call atom
+            match = re.match(r'\(direct-call\s+(\S+)\s+(\S+)\s+(\d+)\)', atom)
+            if match:
+                caller = match.group(1)
+                callee = match.group(2)
+                line = int(match.group(3))
+                direct_calls.append((caller, callee, line))
+    
+    # Extract function calls with their scopes
+    function_calls = []
+    for atom in atoms:
+        if atom.startswith("(function-call "):
+            # Parse the function call atom
+            match = re.match(r'\(function-call\s+(\S+)\s+(\d+)\s+(.*?)\s+(\d+)\)', atom)
+            if match:
+                callee = match.group(1)
+                args = int(match.group(2))
+                scope = match.group(3).strip()
+                line = int(match.group(4))
+                function_calls.append((callee, scope, line))
+    
+    # Associate function calls with their callers
+    call_relationships = defaultdict(list)
+    
+    # First, process direct calls which are already associated with callers
+    for caller, callee, line in direct_calls:
+        # Find the qualified name for the caller
+        caller_qualified = None
+        for qname, func_info in function_defs.items():
+            if func_info["name"] == caller:
+                caller_qualified = qname
+                break
+        
+        # Find the qualified name for the callee
+        callee_qualified = None
+        for qname, func_info in function_defs.items():
+            if func_info["name"] == callee or qname == callee:
+                callee_qualified = qname
+                break
+        
+        if caller_qualified and callee_qualified:
+            call_relationships[caller_qualified].append(callee_qualified)
+    
+    # Then, process general function calls by determining their callers based on scope
+    for callee, scope, line in function_calls:
+        # Find which function this call belongs to
+        for qname, func_info in function_defs.items():
+            call_scope = scope
+            func_scope = func_info["scope"]
+            
+            # Check if the call is within this function's scope and lines
+            is_in_scope = (call_scope == func_scope or 
+                          call_scope.startswith(func_scope) or 
+                          (func_scope == "global" and not call_scope.startswith("class-")))
+            
+            is_in_lines = (line >= func_info["line_start"] and line <= func_info["line_end"])
+            
+            if is_in_scope and is_in_lines:
+                # Find the qualified name for the callee
+                callee_qualified = None
+                for callee_qname, callee_info in function_defs.items():
+                    if callee_info["name"] == callee or callee_qname == callee:
+                        callee_qualified = callee_qname
+                        break
+                
+                if callee_qualified:
+                    call_relationships[qname].append(callee_qualified)
+    
+    # Print function call relationships
+    print("\n=== Function Call Relationships ===")
+    print(f"Found {len(call_relationships)} function call relationships")
+    print("Function call relationships:")
+    
+    for caller, callees in sorted(call_relationships.items()):
+        # Remove duplicates while preserving order
+        unique_callees = []
+        for callee in callees:
+            if callee not in unique_callees:
+                unique_callees.append(callee)
+        
+        print(f"- {caller} calls: {', '.join(unique_callees)}")
+    
+    # Print debugging information
+    print("Debugging information:")
+    print(f"Total function definitions: {len(function_defs)}")
+    for qname, info in sorted(function_defs.items()):
+        print(f"  ({info['name']} {info['scope']} {info['line_start']} {info['line_end']})")
+    
+    print(f"Total function calls: {len(function_calls)}")
+    
+    # Identify potential call chains
+    print("\n=== Function Call Chains ===")
+    call_chains = find_call_chains(call_relationships)
+    if call_chains:
+        print(f"Found {len(call_chains)} significant call chains:")
+        for i, chain in enumerate(call_chains[:10], 1):  # Show top 10
+            print(f"{i}. {' → '.join(chain)}")
+    else:
+        print("No significant call chains found")
+
+def find_call_chains(call_relationships, min_length=3):
+    """Find significant call chains in the codebase."""
+    chains = []
+    
+    def dfs(current, path, visited):
+        """Depth-first search to find call chains."""
+        if current in visited:
+            return
+        
+        new_path = path + [current]
+        visited.add(current)
+        
+        if len(new_path) >= min_length:
+            chains.append(new_path)
+        
+        for callee in call_relationships.get(current, []):
+            dfs(callee, new_path, visited.copy())
+    
+    # Start DFS from each function
+    for caller in call_relationships:
+        dfs(caller, [], set())
+    
+    # Sort chains by length (longest first)
+    return sorted(chains, key=len, reverse=True)
+
 if __name__ == "__main__":
     # Initialize MeTTa monitor
     monitor = DynamicMonitor()
@@ -911,7 +1081,8 @@ if __name__ == "__main__":
     analyze_function_complexity(path)
     
     # Perform relationship analysis
-    find_function_relationships()
+    # find_function_relationships()
+    analyze_function_call_relationships(path)
     find_type_relationships()
     find_class_relationships()
     find_module_relationships()
