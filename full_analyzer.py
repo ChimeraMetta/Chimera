@@ -2,7 +2,9 @@ from static_analyzer import decompose_file
 from dynamic_monitor import DynamicMonitor
 from temporal_analyzer import TemporalCodeAnalyzer
 import os
+import re
 import sys
+from collections import defaultdict
 
 ONTOLOGY_PATH = "metta/ontology.metta"
 
