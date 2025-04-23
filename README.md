@@ -14,3 +14,14 @@ Chimera is a new kind of agent, an autonomous AI that improves and fixes your co
 
 It's an evolutionary system that combines the symbolic reasoning of MeTTa with statistical LLM inference, producing a 
 high performance, knowledgeable agent capable of providing deeper insights and more accurate changes to your context.
+
+## TODO
+
+- [x] Complexity Analysis
+- [ ] Temporal Analysis
+- [ ] Type Flow Analysis
+- [ ] Domain Analysis
+- [ ] Structural Patterns
+- [ ] Class Relationships
+- [ ] Module Relationships
+- [ ] Operational Patterns
