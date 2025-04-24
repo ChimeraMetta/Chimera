@@ -5,7 +5,7 @@ Provides functionality to add dynamic monitoring to Python functions.
 
 import os
 from typing import List, Dict, Any, Optional
-from file_processor import extract_functions, check_monitoring_status
+from commands.file_processor import extract_functions, check_monitoring_status
 
 
 class MonitorCommand:
