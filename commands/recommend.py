@@ -135,7 +135,7 @@ class RecommendCommand:
         """Find the file containing a function."""
         for file_path in self.code_manager.code_files:
             try:
-                from file_processor import extract_functions
+                from commands.file_processor import extract_functions
                 functions = extract_functions(file_path)
                 
                 for func in functions:
