@@ -39,8 +39,6 @@ class OpenAIRequests:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-
-        messages = [{"role": "user", "content": messages }]
         
         payload = {
             "model": self.model,
@@ -317,9 +315,11 @@ class ProofProcessorWithPatterns:
         
         ONLY RETURN THE JSON OBJECT, NO OTHER TEXT.
         """
+
+        messages = [{"role": "user", "content": prompt }]
         
         # Call OpenAI API
-        llm_response = self._call_openai_api(prompt)
+        llm_response = self._call_openai_api(messages)
         
         # Extract JSON from response
         # Look for JSON content
