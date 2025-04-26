@@ -39,6 +39,9 @@ class OpenAIRequests:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+
+        logging.info("Model: " + self.model)
+        logging.info("HEADERS: " + str(headers))
         
         payload = {
             "model": self.model,
@@ -46,6 +49,8 @@ class OpenAIRequests:
             "temperature": temperature,
             "max_tokens": max_tokens
         }
+
+        logging.info("Payload: " + str(payload))
         
         logging.info("URL request: " + f"{self.base_url}/chat/completions")
         try:
@@ -111,6 +116,9 @@ class ProofProcessorWithPatterns:
             {"role": "system", "content": "You are a helpful assistant specialized in formal verification and pattern analysis."},
             {"role": "user", "content": prompt}
         ]
+
+        logging.info("Messages: " + str(messages))
+        logging.info("API key: " + self.api_key)
         
         return self.openai_client.get_completion_text(messages)
     
@@ -315,11 +323,9 @@ class ProofProcessorWithPatterns:
         
         ONLY RETURN THE JSON OBJECT, NO OTHER TEXT.
         """
-
-        messages = [{"role": "user", "content": prompt }]
         
         # Call OpenAI API
-        llm_response = self._call_openai_api(messages)
+        llm_response = self._call_openai_api(prompt)
         
         # Extract JSON from response
         # Look for JSON content
