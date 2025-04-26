@@ -131,13 +131,59 @@ class ProofProcessorWithPatterns:
         # Get natural language description if available
         description = component.get("natural_language", "")
         
-        # Use pattern mapper to identify patterns and generate atoms
-        pattern_atoms = self.pattern_mapper.generate_metta_atoms(
-            expr_id, expr_content, description
-        )
+        # Explicitly create the merged content for pattern search - this ensures both
+        # expression content and description are considered together
+        content_for_pattern_search = f"{expr_content} {description}"
+        
+        # Use pattern mapper to identify patterns on the combined content
+        patterns = self.pattern_mapper.identify_patterns(content_for_pattern_search)
+        
+        # If no patterns found with the combined approach, try separate searches
+        if not patterns:
+            # Try just the expression
+            patterns = self.pattern_mapper.identify_patterns(expr_content)
+            
+            # If still no patterns, try just the description
+            if not patterns and description:
+                patterns = self.pattern_mapper.identify_patterns(description)
         
         # Add pattern atoms to MeTTa components
-        metta_components.extend(pattern_atoms)
+        for pattern_atom, property_type in patterns:
+            # First ensure the property type exists
+            metta_components.append(f"(: {property_type} Property)")
+            
+            # Relate the expression to the property
+            expression_property = f"(Expression-Property {expr_id} {property_type})"
+            if expression_property not in metta_components:  # Avoid duplicates
+                metta_components.append(expression_property)
+            
+            # Add pattern-property relationship
+            pattern_property = f"(pattern-property {pattern_atom} {property_type})"
+            if pattern_property not in metta_components:  # Avoid duplicates
+                metta_components.append(pattern_property)
+        
+        # If no patterns were found, add a generic property based on the component type
+        if not patterns:
+            # Map component type to a property
+            component_type = component.get("type", "unknown")
+            if component_type == "loop_invariant":
+                property_type = "termination-guarantee"
+            elif "bound" in expr_content.lower() or "index" in expr_content.lower():
+                property_type = "bound-check"
+            elif "order" in expr_content.lower() or "sort" in expr_content.lower():
+                property_type = "ordering-check"
+            elif "null" in expr_content.lower() or "empty" in expr_content.lower():
+                property_type = "null-check"
+            elif "error" in expr_content.lower() or "exception" in expr_content.lower():
+                property_type = "error-handling"
+            else:
+                property_type = "generic-property"
+            
+            # Ensure property type exists
+            metta_components.append(f"(: {property_type} Property)")
+            
+            # Add expression-property relationship
+            metta_components.append(f"(Expression-Property {expr_id} {property_type})")
     
     def _map_property_to_metta_atom(self, property: str) -> str:
         """
@@ -190,6 +236,17 @@ class ProofProcessorWithPatterns:
         metta_components = []
         
         try:
+            # First, ensure necessary type definitions are included
+            metta_components.append("(: Expression Type)")
+            metta_components.append("(: Property Type)")
+            metta_components.append("(: bound-check Property)")
+            metta_components.append("(: ordering-check Property)")
+            metta_components.append("(: null-check Property)")
+            metta_components.append("(: termination-guarantee Property)")
+            metta_components.append("(: error-handling Property)")
+            metta_components.append("(: Expression-Property (--> Expression Property Bool))")
+            
+            # Process each proof component
             for component in proof_json.get("proof_components", []):
                 component_type = component.get("type", "unknown")
                 
@@ -248,7 +305,7 @@ class ProofProcessorWithPatterns:
             metta_components.append(f"(VerificationStrategy {strategy_id})")
             
             # Add property annotations for strategy using pattern mapper
-            self._add_property_annotations(metta_components, strategy_id, approach, {})
+            self._add_property_annotations(metta_components, strategy_id, approach, {"natural_language": approach})
             
             # Add lemmas as atoms with descriptive names
             for i, lemma in enumerate(strategy.get("key_lemmas", [])):
@@ -258,10 +315,10 @@ class ProofProcessorWithPatterns:
                 metta_components.append(f"(KeyLemma {lemma_id})")
                 
                 # Add property annotations for lemma using pattern mapper
-                self._add_property_annotations(metta_components, lemma_id, lemma, {})
+                self._add_property_annotations(metta_components, lemma_id, lemma, {"natural_language": lemma})
                 
         except Exception as e:
-            logging.error(f"Error converting JSON to MeTTa proof: {e}")
+            logging.error(f"Error converting JSON to MeTTa proof: {e}", exc_info=True)
             error_id = f"error_{len(metta_components)}"
             metta_components.append(f"(: {error_id} Error)")
             metta_components.append(f"(= ({error_id}) \"Error converting to MeTTa: {str(e)}\")")
