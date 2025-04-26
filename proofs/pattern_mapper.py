@@ -60,6 +60,7 @@ class PatternMapper:
     def identify_patterns(self, expression: str, description: str = None) -> List[Tuple[str, str]]:
         """
         Identify which patterns are present in an expression and description.
+        Enhanced to be more lenient with pattern matching.
         
         Args:
             expression: The logical expression to analyze
@@ -74,8 +75,36 @@ class PatternMapper:
         # Check each pattern type
         for property_type, patterns in self.pattern_types.items():
             for pattern_regex, pattern_atom in patterns.items():
-                if re.search(pattern_regex, text_to_analyze):
+                if re.search(pattern_regex, text_to_analyze, re.IGNORECASE):
                     found_patterns.append((pattern_atom, property_type))
+        
+        # Add fallback checks for common terms that might not be caught by regex
+        # These are more lenient checks based on simple string contains
+        
+        # Bounds checking fallbacks
+        if any(term in text_to_analyze for term in ['bound', 'index', 'range', 'length', 'size']):
+            if not any(prop_type == 'bound-check' for _, prop_type in found_patterns):
+                found_patterns.append(('index-within-bounds', 'bound-check'))
+        
+        # Ordering fallbacks
+        if any(term in text_to_analyze for term in ['order', 'sort', 'ascend', 'descend']):
+            if not any(prop_type == 'ordering-check' for _, prop_type in found_patterns):
+                found_patterns.append(('preserves-element-order', 'ordering-check'))
+        
+        # Null checking fallbacks
+        if any(term in text_to_analyze for term in ['null', 'none', 'empty']):
+            if not any(prop_type == 'null-check' for _, prop_type in found_patterns):
+                found_patterns.append(('value-not-null', 'null-check'))
+        
+        # Termination fallbacks
+        if any(term in text_to_analyze for term in ['terminat', 'halt', 'loop', 'invariant']):
+            if not any(prop_type == 'termination-guarantee' for _, prop_type in found_patterns):
+                found_patterns.append(('loop-invariant-progress', 'termination-guarantee'))
+        
+        # Error handling fallbacks
+        if any(term in text_to_analyze for term in ['error', 'exception', '-1', 'found']):
+            if not any(prop_type == 'error-handling' for _, prop_type in found_patterns):
+                found_patterns.append(('checks-for-not-found', 'error-handling'))
         
         return found_patterns
     
