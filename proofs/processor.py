@@ -381,8 +381,25 @@ class ProofProcessorWithPatterns:
             
         added_atoms = []
         
+        # Ensure type definitions exist
+        type_atoms = [
+            "(: Type Type)",
+            "(: Property Type)",
+            f"(: {func_name} Function)",
+            "(: Function Type)"
+        ]
+        
+        for atom in type_atoms:
+            self.monitor.add_atom(atom)
+            added_atoms.append(atom)
+        
         # Convert property to MeTTa atom
         property_atom = self.pattern_mapper.map_requirement_to_property(property)
+        
+        # Ensure the property type is defined
+        property_type_atom = f"(: {property_atom} Property)"
+        self.monitor.add_atom(property_type_atom)
+        added_atoms.append(property_type_atom)
         
         # Add property relationship to MeTTa space
         property_atom_expr = f"(function-has-property {func_name} {property_atom})"
@@ -391,7 +408,7 @@ class ProofProcessorWithPatterns:
         
         # Add property name definitions if it's a non-standard property
         if property_atom.startswith("property-"):
-            property_name = property_atom.strip("()").split("-", 1)[1]
+            property_name = property_atom.strip("()").split("-", 1)[1] if "(" in property_atom else property_atom.split("-", 1)[1]
             type_def = f"(: {property_name} Property)"
             value_def = f"(= ({property_name}) \"{property}\")"
             
@@ -400,6 +417,11 @@ class ProofProcessorWithPatterns:
             
             added_atoms.extend([type_def, value_def])
             
+        # Ensure the property type has a function-has-property relationship defined
+        relationship_atom = "(: function-has-property (--> Function Property Bool))"
+        self.monitor.add_atom(relationship_atom)
+        added_atoms.append(relationship_atom)
+        
         return added_atoms
     
     def analyze_function_for_proof(self, function_code: str, function_name: str = None,
