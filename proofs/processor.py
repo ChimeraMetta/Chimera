@@ -1,15 +1,46 @@
 from typing import Dict, List, Any
 import logging
+import json
+import re
+import openai  # Import the OpenAI module
 from proofs.pattern_mapper import PatternMapper
 
 class ProofProcessorWithPatterns:
     """Integration code for the proof generation system with improved pattern mapping."""
     
-    def __init__(self, monitor=None):
+    def __init__(self, monitor=None, model_name="gpt-4"):
         """Initialize with the pattern mapper and monitor."""
         self.monitor = monitor
         self.pattern_mapper = PatternMapper()
+        self.model_name = model_name
         
+    def _call_openai_api(self, prompt: str) -> str:
+        """
+        Call OpenAI API with the given prompt.
+        
+        Args:
+            prompt: The prompt to send to the API
+            
+        Returns:
+            The response text from the API
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant specialized in formal verification and pattern analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,  # Lower temperature for more deterministic responses
+                max_tokens=2048
+            )
+            
+            # Extract the content from the response
+            return response.choices[0].message['content'].strip()
+        except Exception as e:
+            logging.error(f"OpenAI API call failed: {e}")
+            return f"Error calling OpenAI API: {str(e)}"
+    
     def _add_property_annotations(self, metta_components: List[str], expr_id: str, 
                                 expr_content: str, component: Dict[str, Any]) -> None:
         """
@@ -165,66 +196,96 @@ class ProofProcessorWithPatterns:
                         essential_properties: List[str]) -> Dict[str, Any]:
         """
         Verify that an adaptation preserves essential properties.
-        Uses pattern mapper for property identification.
+        Uses pattern mapper for property identification and OpenAI for verification.
         """
         logging.info("Verifying adaptation preserves essential properties")
         
-        # Generate proofs for both functions
-        original_proof = self.analyze_function_for_proof(original_func, "original")
-        adapted_proof = self.analyze_function_for_proof(adapted_func, "adapted")
+        # Analyze both functions with OpenAI
+        prompt = f"""
+        I need to verify that an adapted function preserves essential properties from the original function.
         
-        if not original_proof["success"] or not adapted_proof["success"]:
+        ORIGINAL FUNCTION:
+        ```python
+        {original_func}
+        ```
+        
+        ADAPTED FUNCTION:
+        ```python
+        {adapted_func}
+        ```
+        
+        ESSENTIAL PROPERTIES TO PRESERVE:
+        {', '.join(essential_properties)}
+        
+        Please analyze both functions and determine if the adaptation preserves the essential properties.
+        For each property, indicate whether it is PRESERVED or VIOLATED in the adapted function.
+        Provide a brief explanation for each property.
+        
+        Return your analysis in JSON format:
+        {{
+            "preserved_properties": [
+                {{
+                    "property": "property name",
+                    "explanation": "why it's preserved"
+                }}
+            ],
+            "violated_properties": [
+                {{
+                    "property": "property name",
+                    "explanation": "why it's violated"
+                }}
+            ]
+        }}
+        
+        ONLY RETURN THE JSON OBJECT, NO OTHER TEXT.
+        """
+        
+        # Call OpenAI API
+        llm_response = self._call_openai_api(prompt)
+        
+        # Extract JSON from response
+        # Look for JSON content
+        json_match = re.search(r'(\{[\s\S]*\})', llm_response)
+        if json_match:
+            json_content = json_match.group(1)
+        else:
+            json_content = llm_response
+            
+        try:
+            result = json.loads(json_content)
+            
+            # Add MeTTa atoms for verification results if monitor is available
+            if hasattr(self, 'monitor') and self.monitor:
+                # Add preserved properties
+                for prop_info in result.get("preserved_properties", []):
+                    prop = prop_info.get("property")
+                    property_type = self.pattern_mapper.map_requirement_to_property(prop)
+                    self.monitor.add_atom(f"(adaptation-preserves-property {property_type})")
+                
+                # Add violated properties
+                for prop_info in result.get("violated_properties", []):
+                    prop = prop_info.get("property")
+                    property_type = self.pattern_mapper.map_requirement_to_property(prop)
+                    self.monitor.add_atom(f"(adaptation-violates-property {property_type})")
+            
+            # Check if all essential properties are preserved
+            preserved = [p.get("property") for p in result.get("preserved_properties", [])]
+            violated = [p.get("property") for p in result.get("violated_properties", [])]
+            
+            return {
+                "success": all(prop in preserved for prop in essential_properties),
+                "preserved_properties": preserved,
+                "violated_properties": violated,
+                "details": result
+            }
+            
+        except Exception as e:
+            logging.error(f"Error parsing verification result: {e}")
             return {
                 "success": False,
-                "error": "Failed to generate proofs for comparison",
-                "original_proof_success": original_proof["success"],
-                "adapted_proof_success": adapted_proof["success"]
+                "error": f"Failed to verify adaptation: {str(e)}",
+                "raw_response": llm_response
             }
-        
-        # Check which essential properties are preserved
-        preserved = []
-        violated = []
-        
-        for prop in essential_properties:
-            property_type = self.pattern_mapper.map_requirement_to_property(prop)
-            
-            # Add to MeTTa for verification
-            if hasattr(self, 'monitor') and self.monitor:
-                func_name_orig = "original_func"
-                func_name_adapted = "adapted_func"
-                
-                # Add property requirement to MeTTa space
-                property_atoms_orig = self._add_property_to_metta(func_name_orig, prop)
-                property_atoms_adapted = self._add_property_to_metta(func_name_adapted, prop)
-                
-                # Query MeTTa to check if property is preserved
-                preserved_query = f"""
-                (match &self 
-                    (function-has-property {func_name_orig} {property_type})
-                    (function-has-property {func_name_adapted} {property_type})
-                    True)
-                """
-                
-                preservation_result = self.monitor.query(preserved_query)
-                if preservation_result and len(preservation_result) > 0 and preservation_result[0]:
-                    preserved.append(prop)
-                else:
-                    violated.append(prop)
-            else:
-                # Fallback to Python implementation if monitor not available
-                if (self._check_property_satisfied(original_proof.get("json_ir", {}), prop) and
-                    self._check_property_satisfied(adapted_proof.get("json_ir", {}), prop)):
-                    preserved.append(prop)
-                else:
-                    violated.append(prop)
-        
-        return {
-            "success": len(violated) == 0,
-            "preserved_properties": preserved,
-            "violated_properties": violated,
-            "original_proof": original_proof.get("proof", []),
-            "adapted_proof": adapted_proof.get("proof", [])
-        }
     
     def _add_property_to_metta(self, func_name: str, property: str) -> List[str]:
         """
@@ -259,7 +320,117 @@ class ProofProcessorWithPatterns:
     
     def analyze_function_for_proof(self, function_code: str, function_name: str = None,
                                 context: str = None, max_attempts: int = 3) -> Dict[str, Any]:
-        """Analyze function and generate proof using the pattern mapper."""
-        # Implementation would depend on your full system setup
-        # This is a placeholder showing integration with the pattern mapping approach
-        return {"success": True, "proof": [], "json_ir": {}}  # Placeholder
+        """
+        Analyze function and generate proof using OpenAI.
+        This is a simplified version that delegates to the OpenAI API directly.
+        """
+        logging.info(f"Analyzing function{' ' + function_name if function_name else ''} for proof generation")
+        
+        # Create a prompt for OpenAI
+        context_info = f"Domain context: {context}\n\n" if context else ""
+        
+        prompt = f"""
+        {context_info}
+        Please generate a formal proof for this Python function:
+        
+        ```python
+        {function_code}
+        ```
+        
+        I need you to generate proof components in a structured JSON format with this schema:
+        {{
+            "proof_components": [
+                {{
+                    "type": "precondition",
+                    "expression": "logical expression",
+                    "natural_language": "explanation in natural language"
+                }},
+                {{
+                    "type": "loop_invariant",
+                    "location": "loop identifier",
+                    "expression": "invariant expression",
+                    "natural_language": "explanation in natural language"
+                }},
+                {{
+                    "type": "assertion",
+                    "location": "code location identifier",
+                    "expression": "assertion expression",
+                    "natural_language": "explanation in natural language"
+                }}
+            ],
+            "verification_strategy": {{
+                "approach": "description of proof approach",
+                "key_lemmas": ["list of key lemmas or principles used"]
+            }}
+        }}
+        
+        The approach should focus on identifying necessary loop invariants, key assertions, and the logical sequencing of proof elements.
+        Please ensure all expressions are logically precise and all components are properly typed. ONLY RETURN THE JSON OBJECT, NO OTHER TEXT.
+        """
+        
+        # Track attempts
+        for attempt in range(max_attempts):
+            # Call OpenAI API
+            llm_response = self._call_openai_api(prompt)
+            
+            # Extract JSON from response
+            json_match = re.search(r'(\{[\s\S]*\})', llm_response)
+            if json_match:
+                json_content = json_match.group(1)
+            else:
+                json_content = llm_response
+                
+            try:
+                # Parse the JSON response
+                proof_json = json.loads(json_content)
+                
+                # Validate the structure
+                if not isinstance(proof_json, dict) or "proof_components" not in proof_json:
+                    if attempt < max_attempts - 1:
+                        # Try again with more specific instructions
+                        prompt += "\n\nYour previous response did not have the correct JSON structure. Please ensure your response contains a 'proof_components' array and a 'verification_strategy' object."
+                        continue
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Failed to generate valid proof JSON after multiple attempts",
+                            "raw_response": llm_response
+                        }
+                
+                # Convert JSON to MeTTa proof
+                metta_proof = self._json_to_metta_proof(proof_json)
+                
+                # Add to MeTTa space if monitor is available
+                if hasattr(self, 'monitor') and self.monitor:
+                    for component in metta_proof:
+                        self.monitor.add_atom(component)
+                    
+                    # Add function verification status
+                    func_name = function_name or "unnamed_function"
+                    self.monitor.add_atom(f"(verified-function {func_name})")
+                
+                return {
+                    "success": True,
+                    "proof": metta_proof,
+                    "function": function_code,
+                    "function_name": function_name,
+                    "json_ir": proof_json,
+                    "attempts": attempt + 1
+                }
+                
+            except Exception as e:
+                logging.error(f"Failed to process proof on attempt {attempt + 1}: {e}")
+                if attempt < max_attempts - 1:
+                    # Try again with more specific error feedback
+                    prompt += f"\n\nYour previous response had an error: {str(e)}. Please ensure you return a valid JSON object."
+                    continue
+        
+        # If all attempts failed
+        return {
+            "success": False,
+            "function": function_code,
+            "function_name": function_name,
+            "attempts": max_attempts,
+            "error": "Maximum proof generation attempts reached",
+            "raw_response": llm_response
+        }

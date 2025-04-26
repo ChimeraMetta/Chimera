@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Dict, List, Any, Optional
+import openai  # Import the OpenAI module
 
 from hyperon import *
 from dynamic_monitor import DynamicMonitor
@@ -137,6 +138,33 @@ class MettaProofGenerator:
                 
         return specs
     
+    def _call_openai_api(self, prompt: str) -> str:
+        """
+        Call OpenAI API with the given prompt.
+        
+        Args:
+            prompt: The prompt to send to the API
+            
+        Returns:
+            The response text from the API
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant specialized in formal verification and proof generation."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,  # Lower temperature for more deterministic responses
+                max_tokens=2048
+            )
+            
+            # Extract the content from the response
+            return response.choices[0].message['content'].strip()
+        except Exception as e:
+            logging.error(f"OpenAI API call failed: {e}")
+            return f"Error calling OpenAI API: {str(e)}"
+    
     def _generate_specifications(self, function_code: str) -> Dict[str, Any]:
         """Generate specifications using LLM when not found in code."""
         prompt = f"""
@@ -157,11 +185,8 @@ class MettaProofGenerator:
         """
         
         try:
-            # Call LLM through MeTTa-Motto
-            llm_response = self.monitor.query(f"""
-            ((chat-gpt-agent "{self.model_name}") 
-             (user "{prompt.replace('"', '\\"')}"))
-            """)
+            # Call OpenAI API directly
+            llm_response = self._call_openai_api(prompt)
             
             # Extract JSON from response
             json_content = self._extract_json_from_llm_response(llm_response)
@@ -252,11 +277,8 @@ class MettaProofGenerator:
         """
         
         try:
-            # Call LLM through MeTTa-Motto
-            llm_response = self.monitor.query(f"""
-            ((chat-gpt-agent "{self.model_name}") 
-             (user "{prompt.replace('"', '\\"')}"))
-            """)
+            # Call OpenAI API directly
+            llm_response = self._call_openai_api(prompt)
             
             # Extract JSON from response
             json_content = self._extract_json_from_llm_response(llm_response)
@@ -283,50 +305,6 @@ class MettaProofGenerator:
     def _json_to_metta_proof(self, proof_json: Dict[str, Any]) -> List[str]:
         """Convert proof component JSON to MeTTa representation."""
         return self.pattern_processor._json_to_metta_proof(proof_json)
-        
-    def _add_property_annotations(self, metta_components: List[str], expr_id: str, 
-                                expr_content: str, component: Dict[str, Any]) -> None:
-        """
-        Add property annotations for expressions based on content and metadata.
-        This creates proper MeTTa atoms rather than relying on string matching.
-        """
-        # Check for bound checking properties
-        if any(term in expr_content.lower() for term in ["<=", ">=", "<", ">", "bounds", "index"]):
-            metta_components.append(f"(Expression-Property {expr_id} bound-check)")
-        
-        # Check for ordering properties
-        if any(term in expr_content.lower() for term in ["sort", "order", "<=>"]):
-            metta_components.append(f"(Expression-Property {expr_id} ordering-check)")
-        
-        # Check for null checking
-        if any(term in expr_content.lower() for term in ["null", "none", "!= null"]):
-            metta_components.append(f"(Expression-Property {expr_id} null-check)")
-        
-        # Check for termination guarantees
-        if any(term in expr_content.lower() for term in ["terminat", "progress", "decrease"]):
-            metta_components.append(f"(Expression-Property {expr_id} termination-guarantee)")
-        
-        # Check for error handling
-        if any(term in expr_content.lower() for term in ["error", "exception", "valid"]):
-            metta_components.append(f"(Expression-Property {expr_id} error-handling)")
-        
-        # Also consider the natural language description when identifying properties
-        description = component.get("natural_language", "").lower()
-        
-        if "bound" in description or "range" in description or "index" in description:
-            metta_components.append(f"(Expression-Property {expr_id} bound-check)")
-            
-        if "order" in description or "sort" in description:
-            metta_components.append(f"(Expression-Property {expr_id} ordering-check)")
-            
-        if "null" in description or "none" in description:
-            metta_components.append(f"(Expression-Property {expr_id} null-check)")
-            
-        if "terminat" in description or "halt" in description or "loop invariant" in description:
-            metta_components.append(f"(Expression-Property {expr_id} termination-guarantee)")
-            
-        if "error" in description or "exception" in description or "valid" in description:
-            metta_components.append(f"(Expression-Property {expr_id} error-handling)")
     
     def _verify_proof(self, function_code: str, specs: Dict[str, Any], 
                      metta_proof: List[str]) -> Dict[str, Any]:
@@ -414,11 +392,8 @@ class MettaProofGenerator:
         """
         
         try:
-            # Call LLM through MeTTa-Motto
-            llm_response = self.monitor.query(f"""
-            ((chat-gpt-agent "{self.model_name}") 
-             (user "{prompt.replace('"', '\\"')}"))
-            """)
+            # Call OpenAI API directly
+            llm_response = self._call_openai_api(prompt)
             
             # Extract JSON from response
             json_content = self._extract_json_from_llm_response(llm_response)
@@ -449,7 +424,7 @@ class MettaProofGenerator:
         if not llm_response:
             return "{}"
             
-        response_str = str(llm_response[0]) if isinstance(llm_response, list) and llm_response else str(llm_response)
+        response_str = str(llm_response)
         
         # Look for JSON content between triple backticks
         import re

@@ -3,6 +3,7 @@ import time
 import json
 import os
 from typing import Dict, List, Any
+from unittest.mock import patch, MagicMock
 
 from hyperon import *
 from dynamic_monitor import DynamicMonitor
@@ -85,6 +86,11 @@ class MettaProofSystemTests(unittest.TestCase):
                 "key_lemmas": ["Binary search terminates in logarithmic time", "Array remains sorted"]
             }
         }
+        
+        # Mock OpenAI API response for testing
+        self.mock_openai_response = MagicMock()
+        self.mock_openai_response.choices = [MagicMock()]
+        self.mock_openai_response.choices[0].message = {'content': json.dumps(self.sample_proof_json)}
     
     def tearDown(self):
         """Clean up after each test."""
@@ -268,26 +274,92 @@ class MettaProofSystemTests(unittest.TestCase):
                        "Failed to add and verify property in MeTTa")
     
     # ===================================
+    # OpenAI API Integration Tests
+    # ===================================
+    
+    @patch('openai.ChatCompletion.create')
+    def test_openai_api_integration(self, mock_create):
+        """Test integration with OpenAI API."""
+        # Configure the mock to return a sample response
+        mock_create.return_value = self.mock_openai_response
+        
+        # Test generator's call to OpenAI API
+        processor = self.analyzer.pattern_processor
+        result = processor._call_openai_api("Test prompt")
+        
+        # Verify the mock was called
+        mock_create.assert_called_once()
+        
+        # Verify we got the expected result
+        self.assertEqual(result, json.dumps(self.sample_proof_json),
+                       "Failed to get expected response from mock OpenAI API")
+    
+    @patch('openai.ChatCompletion.create')
+    def test_proof_generation_with_openai(self, mock_create):
+        """Test proof generation using OpenAI API."""
+        # Configure the mock to return a sample response
+        mock_create.return_value = self.mock_openai_response
+        
+        # Test analyze_function_for_proof with mocked OpenAI
+        result = self.analyzer.analyze_function_for_proof(
+            self.binary_search,
+            function_name="binary_search",
+            max_attempts=1
+        )
+        
+        # Verify the API was called
+        self.assertTrue(mock_create.called,
+                       "OpenAI API was not called during proof generation")
+        
+        # Check that proof generation produced results
+        self.assertTrue("proof" in result,
+                       "Proof generation did not produce proof components")
+    
+    @patch('openai.ChatCompletion.create')
+    def test_adaptation_verification_with_openai(self, mock_create):
+        """Test adaptation verification using OpenAI API."""
+        # Create a modified binary search that uses a different variable name
+        modified_binary_search = self.binary_search.replace("left", "lo").replace("right", "hi")
+        
+        # Configure the mock to return a verification result
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message = {'content': json.dumps({
+            "preserved_properties": [
+                {"property": "maintains array bounds", "explanation": "Both versions check bounds correctly"}
+            ],
+            "violated_properties": []
+        })}
+        mock_create.return_value = mock_response
+        
+        # Test adaptation verification
+        result = self.analyzer.verify_adaptation(
+            self.binary_search,
+            modified_binary_search,
+            ["maintains array bounds"]
+        )
+        
+        # Verify the API was called
+        self.assertTrue(mock_create.called,
+                       "OpenAI API was not called during adaptation verification")
+        
+        # Check verification result
+        self.assertTrue(result["success"],
+                       "Adaptation verification did not succeed with mocked API")
+    
+    # ===================================
     # Mock Proof Generation Tests
     # ===================================
     
-    def test_mock_proof_generation(self):
+    @patch.object(MettaProofGenerator, '_call_openai_api')
+    def test_mock_proof_generation(self, mock_call_api):
         """
-        Test proof generation with mock LLM responses.
-        This test substitutes actual LLM calls with predetermined responses.
+        Test proof generation with mock API responses.
         """
-        # Create a mock LLM response
-        mock_proof_json = self.sample_proof_json
+        # Configure mock to return JSON string
+        mock_call_api.return_value = json.dumps(self.sample_proof_json)
         
-        # Create a subclass of MettaProofGenerator for testing
-        class MockProofGenerator(MettaProofGenerator):
-            def _generate_proof_json(self, *args, **kwargs):
-                return mock_proof_json
-        
-        # Replace the proof generator with our mock
-        self.analyzer.proof_generator = MockProofGenerator(self.monitor)
-        
-        # Test analysis with the mock generator
+        # Test analysis with mocked API call
         result = self.analyzer.analyze_function_for_proof(
             self.binary_search, 
             function_name="binary_search",
@@ -302,39 +374,35 @@ class MettaProofSystemTests(unittest.TestCase):
         self.assertTrue(len(result.get("proof", [])) > 0,
                        "Mock proof generation failed to create MeTTa atoms")
     
-    def test_mock_adaptation_verification(self):
-        """Test adaptation verification with mock proofs."""
+    @patch.object(ProofProcessorWithPatterns, '_call_openai_api')
+    def test_mock_adaptation_verification(self, mock_call_api):
+        """Test adaptation verification with mocked API."""
         # Create a modified binary search that uses a different variable name
         modified_binary_search = self.binary_search.replace("left", "lo").replace("right", "hi")
         
-        # Create mock property verification
-        def mock_check_property(*args, **kwargs):
-            return True
+        # Configure mock to return verification result
+        mock_call_api.return_value = json.dumps({
+            "preserved_properties": [
+                {"property": "maintains array bounds", "explanation": "Both versions check bounds"},
+                {"property": "handles target not found case", "explanation": "Both return -1"}
+            ],
+            "violated_properties": []
+        })
         
-        # Save original method
-        original_check = self.analyzer.pattern_processor._check_property_satisfied
+        # Test adaptation verification
+        result = self.analyzer.verify_adaptation(
+            self.binary_search,
+            modified_binary_search,
+            ["maintains array bounds", "handles target not found case"]
+        )
         
-        try:
-            # Replace with mock
-            self.analyzer.pattern_processor._check_property_satisfied = mock_check_property
-            
-            # Test adaptation verification
-            result = self.analyzer.verify_adaptation(
-                self.binary_search,
-                modified_binary_search,
-                ["maintains array bounds", "handles target not found case"]
-            )
-            
-            # Check that verification succeeded with our mock
-            self.assertTrue(result["success"],
-                          "Mock adaptation verification failed to produce success result")
-            
-            # Check that properties were preserved
-            self.assertEqual(len(result.get("preserved_properties", [])), 2,
-                           "Mock adaptation verification failed to preserve properties")
-        finally:
-            # Restore original method
-            self.analyzer.pattern_processor._check_property_satisfied = original_check
+        # Check that verification succeeded with our mock
+        self.assertTrue(result["success"],
+                       "Mock adaptation verification failed to produce success result")
+        
+        # Check that properties were preserved
+        self.assertEqual(len(result.get("preserved_properties", [])), 2,
+                         "Mock adaptation verification failed to preserve properties")
     
     # ===================================
     # Performance Tests
