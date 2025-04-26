@@ -31,7 +31,7 @@ class MettaProofSystemTests(unittest.TestCase):
             self.monitor.load_metta_rules(ontology_path)
         
         # Create a mock API key for testing
-        self.mock_api_key = "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"
+        self.mock_api_key = "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"
         
         # Initialize the immune system analyzer with test configuration
         self.analyzer = ImmuneSystemProofAnalyzer(
