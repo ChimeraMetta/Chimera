@@ -40,7 +40,7 @@ class OpenAIRequests:
             "Content-Type": "application/json"
         }
 
-        messages = {"role": "user", "content": messages }
+        messages = [{"role": "user", "content": messages }]
         
         payload = {
             "model": self.model,
