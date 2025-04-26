@@ -115,7 +115,7 @@ class ImmuneSystemProofAnalyzer:
         
     def _load_proof_ontology(self):
         """Load MeTTa ontology rules for proof reasoning."""
-        ontology_file = os.path.join(os.path.dirname(__file__), "metta", "proof_ontology.metta")
+        ontology_file = os.path.join(os.path.dirname(__file__), "..", "metta", "proof_ontology.metta")
         if os.path.exists(ontology_file):
             success = self.monitor.load_metta_rules(ontology_file)
             if success:
