@@ -53,6 +53,7 @@ class OpenAIRequests:
             response.raise_for_status()  # Raise exception for HTTP errors
             return response.json()
         except Exception as e:
+            logging.info("OpenAI API key for requester: " + self.api_key)
             logging.error(f"OpenAI API request failed: {e}")
             return {"error": str(e)}
     
