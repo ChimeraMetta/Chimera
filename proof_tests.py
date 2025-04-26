@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 from hyperon import *
 from dynamic_monitor import DynamicMonitor
-from proofs.generator import MettaProofGenerator
+from proofs.generator import MettaProofGenerator, OpenAIRequests
 from proofs.pattern_mapper import PatternMapper
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 
@@ -30,8 +30,15 @@ class MettaProofSystemTests(unittest.TestCase):
         if os.path.exists(ontology_path):
             self.monitor.load_metta_rules(ontology_path)
         
+        # Create a mock API key for testing
+        self.mock_api_key = "test_api_key"
+        
         # Initialize the immune system analyzer with test configuration
-        self.analyzer = ImmuneSystemProofAnalyzer(self.monitor.metta_space, model_name="test-model")
+        self.analyzer = ImmuneSystemProofAnalyzer(
+            self.monitor.metta_space, 
+            model_name="test-model",
+            api_key=self.mock_api_key
+        )
         
         # Sample binary search implementation for tests
         self.binary_search = """
@@ -87,10 +94,8 @@ class MettaProofSystemTests(unittest.TestCase):
             }
         }
         
-        # Mock OpenAI API response for testing
-        self.mock_openai_response = MagicMock()
-        self.mock_openai_response.choices = [MagicMock()]
-        self.mock_openai_response.choices[0].message = {'content': json.dumps(self.sample_proof_json)}
+        # Mock API response for testing
+        self.mock_api_response = json.dumps(self.sample_proof_json)
     
     def tearDown(self):
         """Clean up after each test."""
@@ -274,90 +279,69 @@ class MettaProofSystemTests(unittest.TestCase):
                        "Failed to add and verify property in MeTTa")
     
     # ===================================
-    # OpenAI API Integration Tests
+    # API Client Tests
     # ===================================
     
-    @patch('openai.ChatCompletion.create')
-    def test_openai_api_integration(self, mock_create):
-        """Test integration with OpenAI API."""
-        # Configure the mock to return a sample response
-        mock_create.return_value = self.mock_openai_response
-        
-        # Test generator's call to OpenAI API
-        processor = self.analyzer.pattern_processor
-        result = processor._call_openai_api("Test prompt")
-        
-        # Verify the mock was called
-        mock_create.assert_called_once()
-        
-        # Verify we got the expected result
-        self.assertEqual(result, json.dumps(self.sample_proof_json),
-                       "Failed to get expected response from mock OpenAI API")
+    def test_openai_requests_init(self):
+        """Test initialization of OpenAIRequests client."""
+        client = OpenAIRequests(self.mock_api_key, "test-model")
+        self.assertEqual(client.api_key, self.mock_api_key, "API key not set correctly")
+        self.assertEqual(client.model, "test-model", "Model name not set correctly")
+        self.assertEqual(client.base_url, "https://api.openai.com/v1", "Base URL not set correctly")
     
-    @patch('openai.ChatCompletion.create')
-    def test_proof_generation_with_openai(self, mock_create):
-        """Test proof generation using OpenAI API."""
-        # Configure the mock to return a sample response
-        mock_create.return_value = self.mock_openai_response
-        
-        # Test analyze_function_for_proof with mocked OpenAI
-        result = self.analyzer.analyze_function_for_proof(
-            self.binary_search,
-            function_name="binary_search",
-            max_attempts=1
-        )
-        
-        # Verify the API was called
-        self.assertTrue(mock_create.called,
-                       "OpenAI API was not called during proof generation")
-        
-        # Check that proof generation produced results
-        self.assertTrue("proof" in result,
-                       "Proof generation did not produce proof components")
-    
-    @patch('openai.ChatCompletion.create')
-    def test_adaptation_verification_with_openai(self, mock_create):
-        """Test adaptation verification using OpenAI API."""
-        # Create a modified binary search that uses a different variable name
-        modified_binary_search = self.binary_search.replace("left", "lo").replace("right", "hi")
-        
-        # Configure the mock to return a verification result
+    @patch('requests.post')
+    def test_openai_requests_chat_completion(self, mock_post):
+        """Test chat completion method of OpenAIRequests."""
+        # Setup mock response
         mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message = {'content': json.dumps({
-            "preserved_properties": [
-                {"property": "maintains array bounds", "explanation": "Both versions check bounds correctly"}
-            ],
-            "violated_properties": []
-        })}
-        mock_create.return_value = mock_response
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": self.mock_api_response}}]
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
         
-        # Test adaptation verification
-        result = self.analyzer.verify_adaptation(
-            self.binary_search,
-            modified_binary_search,
-            ["maintains array bounds"]
-        )
+        # Create client and call method
+        client = OpenAIRequests(self.mock_api_key, "test-model")
+        result = client.chat_completion([{"role": "user", "content": "Test prompt"}])
         
-        # Verify the API was called
-        self.assertTrue(mock_create.called,
-                       "OpenAI API was not called during adaptation verification")
+        # Verify request was made correctly
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        self.assertEqual(kwargs["headers"]["Authorization"], f"Bearer {self.mock_api_key}")
+        self.assertEqual(kwargs["json"]["model"], "test-model")
         
-        # Check verification result
-        self.assertTrue(result["success"],
-                       "Adaptation verification did not succeed with mocked API")
+        # Verify response was processed correctly
+        self.assertEqual(result["choices"][0]["message"]["content"], self.mock_api_response)
+    
+    @patch('requests.post')
+    def test_openai_requests_get_completion_text(self, mock_post):
+        """Test get_completion_text method of OpenAIRequests."""
+        # Setup mock response
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": self.mock_api_response}}]
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+        
+        # Create client and call method
+        client = OpenAIRequests(self.mock_api_key, "test-model")
+        result = client.get_completion_text([{"role": "user", "content": "Test prompt"}])
+        
+        # Verify result
+        self.assertEqual(result, self.mock_api_response)
     
     # ===================================
-    # Mock Proof Generation Tests
+    # Mock API Integration Tests
     # ===================================
     
-    @patch.object(MettaProofGenerator, '_call_openai_api')
-    def test_mock_proof_generation(self, mock_call_api):
+    @patch.object(OpenAIRequests, 'get_completion_text')
+    def test_mock_proof_generation(self, mock_get_completion):
         """
         Test proof generation with mock API responses.
         """
         # Configure mock to return JSON string
-        mock_call_api.return_value = json.dumps(self.sample_proof_json)
+        mock_get_completion.return_value = self.mock_api_response
         
         # Test analysis with mocked API call
         result = self.analyzer.analyze_function_for_proof(
@@ -374,14 +358,14 @@ class MettaProofSystemTests(unittest.TestCase):
         self.assertTrue(len(result.get("proof", [])) > 0,
                        "Mock proof generation failed to create MeTTa atoms")
     
-    @patch.object(ProofProcessorWithPatterns, '_call_openai_api')
-    def test_mock_adaptation_verification(self, mock_call_api):
+    @patch.object(OpenAIRequests, 'get_completion_text')
+    def test_mock_adaptation_verification(self, mock_get_completion):
         """Test adaptation verification with mocked API."""
         # Create a modified binary search that uses a different variable name
         modified_binary_search = self.binary_search.replace("left", "lo").replace("right", "hi")
         
         # Configure mock to return verification result
-        mock_call_api.return_value = json.dumps({
+        mock_get_completion.return_value = json.dumps({
             "preserved_properties": [
                 {"property": "maintains array bounds", "explanation": "Both versions check bounds"},
                 {"property": "handles target not found case", "explanation": "Both return -1"}

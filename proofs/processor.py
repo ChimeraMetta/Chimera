@@ -2,21 +2,98 @@ from typing import Dict, List, Any
 import logging
 import json
 import re
-import openai  # Import the OpenAI module
+import requests
 from proofs.pattern_mapper import PatternMapper
+
+class OpenAIRequests:
+    """
+    A minimal OpenAI API client using the requests library instead of the official SDK.
+    This avoids the dependency issues with PyPy 3.8.
+    """
+    
+    def __init__(self, api_key: str, model: str = "gpt-4"):
+        """
+        Initialize the OpenAI client.
+        
+        Args:
+            api_key: Your OpenAI API key
+            model: The model to use for completions
+        """
+        self.api_key = api_key
+        self.model = model
+        self.base_url = "https://api.openai.com/v1"
+        
+    def chat_completion(self, messages: list, temperature: float = 0.3, max_tokens: int = 2048) -> Dict[str, Any]:
+        """
+        Send a chat completion request to the OpenAI API.
+        
+        Args:
+            messages: List of message dictionaries with 'role' and 'content' keys
+            temperature: Controls randomness (0 to 1, lower is more deterministic)
+            max_tokens: Maximum number of tokens to generate
+            
+        Returns:
+            The API response as a dictionary
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()  # Raise exception for HTTP errors
+            return response.json()
+        except Exception as e:
+            logging.error(f"OpenAI API request failed: {e}")
+            return {"error": str(e)}
+    
+    def get_completion_text(self, messages: list, temperature: float = 0.3, max_tokens: int = 2048) -> str:
+        """
+        Get just the completion text from a chat completion request.
+        
+        Args:
+            messages: List of message dictionaries
+            temperature: Controls randomness
+            max_tokens: Maximum tokens to generate
+            
+        Returns:
+            The text of the completion, or an error message
+        """
+        response = self.chat_completion(messages, temperature, max_tokens)
+        
+        try:
+            return response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError):
+            error_msg = response.get("error", {}).get("message", "Unknown error")
+            logging.error(f"Failed to extract completion text: {error_msg}")
+            return f"Error: {error_msg}"
 
 class ProofProcessorWithPatterns:
     """Integration code for the proof generation system with improved pattern mapping."""
     
-    def __init__(self, monitor=None, model_name="gpt-4"):
+    def __init__(self, monitor=None, model_name="gpt-4", api_key=None):
         """Initialize with the pattern mapper and monitor."""
         self.monitor = monitor
         self.pattern_mapper = PatternMapper()
         self.model_name = model_name
+        self.api_key = api_key
+        self.openai_client = OpenAIRequests(api_key, model_name) if api_key else None
         
     def _call_openai_api(self, prompt: str) -> str:
         """
-        Call OpenAI API with the given prompt.
+        Call OpenAI API with the given prompt using requests-based client.
         
         Args:
             prompt: The prompt to send to the API
@@ -24,22 +101,16 @@ class ProofProcessorWithPatterns:
         Returns:
             The response text from the API
         """
-        try:
-            response = openai.ChatCompletion.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant specialized in formal verification and pattern analysis."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,  # Lower temperature for more deterministic responses
-                max_tokens=2048
-            )
+        if not self.openai_client:
+            logging.error("OpenAI client not initialized. API key may be missing.")
+            return "Error: OpenAI client not initialized"
             
-            # Extract the content from the response
-            return response.choices[0].message['content'].strip()
-        except Exception as e:
-            logging.error(f"OpenAI API call failed: {e}")
-            return f"Error calling OpenAI API: {str(e)}"
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant specialized in formal verification and pattern analysis."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        return self.openai_client.get_completion_text(messages)
     
     def _add_property_annotations(self, metta_components: List[str], expr_id: str, 
                                 expr_content: str, component: Dict[str, Any]) -> None:
@@ -198,6 +269,9 @@ class ProofProcessorWithPatterns:
         Verify that an adaptation preserves essential properties.
         Uses pattern mapper for property identification and OpenAI for verification.
         """
+        if not self.api_key or not self.openai_client:
+            return {"success": False, "error": "OpenAI API key not provided. Cannot verify adaptation."}
+            
         logging.info("Verifying adaptation preserves essential properties")
         
         # Analyze both functions with OpenAI
@@ -324,6 +398,9 @@ class ProofProcessorWithPatterns:
         Analyze function and generate proof using OpenAI.
         This is a simplified version that delegates to the OpenAI API directly.
         """
+        if not self.api_key or not self.openai_client:
+            return {"success": False, "error": "OpenAI API key not provided. Cannot analyze function."}
+            
         logging.info(f"Analyzing function{' ' + function_name if function_name else ''} for proof generation")
         
         # Create a prompt for OpenAI
