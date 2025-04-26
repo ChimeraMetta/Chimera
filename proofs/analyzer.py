@@ -1,6 +1,7 @@
 import os
 import logging
 from typing import Dict, List, Any
+import openai  # Import the OpenAI module
 
 from hyperon import *
 from dynamic_monitor import DynamicMonitor, monitor
@@ -24,6 +25,7 @@ class ImmuneSystemProofAnalyzer:
         self.monitor = monitor if monitor else DynamicMonitor(metta_space)
         self.proof_generator = MettaProofGenerator(self.monitor, model_name)
         self.pattern_processor = ProofProcessorWithPatterns(self.monitor)
+        self.model_name = model_name
         
         # Load ontology rules for proof verification
         self._load_proof_ontology()
@@ -39,6 +41,33 @@ class ImmuneSystemProofAnalyzer:
                 logger.warning(f"Failed to load proof ontology from {ontology_file}")
         else:
             logger.warning(f"Proof ontology file not found: {ontology_file}")
+    
+    def _call_openai_api(self, prompt: str) -> str:
+        """
+        Call OpenAI API with the given prompt.
+        
+        Args:
+            prompt: The prompt to send to the API
+            
+        Returns:
+            The response text from the API
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant specialized in formal verification and software analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,  # Lower temperature for more deterministic responses
+                max_tokens=2048
+            )
+            
+            # Extract the content from the response
+            return response.choices[0].message['content'].strip()
+        except Exception as e:
+            logging.error(f"OpenAI API call failed: {e}")
+            return f"Error calling OpenAI API: {str(e)}"
             
     def analyze_function_for_proof(self, function_code: str, function_name: str = None,
                                  context: str = None, max_attempts: int = 3) -> Dict[str, Any]:
