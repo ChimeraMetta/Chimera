@@ -8,7 +8,7 @@ class OpenAIRequests:
     This avoids the dependency issues with PyPy 3.8.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         """
         Initialize the OpenAI client.
         

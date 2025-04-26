@@ -14,7 +14,7 @@ class OpenAIRequests:
     This avoids the dependency issues with PyPy 3.8.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         """
         Initialize the OpenAI client.
         
@@ -90,7 +90,7 @@ class MettaProofGenerator:
     Uses a structured JSON IR as an intermediate representation between LLMs and MeTTa.
     """
     
-    def __init__(self, monitor: Optional[DynamicMonitor] = None, model_name: str = "gpt-4", api_key: str = None):
+    def __init__(self, monitor: Optional[DynamicMonitor] = None, model_name: str = "gpt-4o-mini", api_key: str = None):
         """
         Initialize the proof generator.
         
