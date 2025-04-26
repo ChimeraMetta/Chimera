@@ -22,7 +22,7 @@ class OpenAIRequests:
     This avoids the dependency issues with PyPy 3.8.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         """
         Initialize the OpenAI client.
         
@@ -98,7 +98,7 @@ class ImmuneSystemProofAnalyzer:
     Acts as a core component of the software immune system for donor identification.
     """
     
-    def __init__(self, metta_space=None, model_name="gpt-4", api_key=None):
+    def __init__(self, metta_space=None, model_name="gpt-4o-mini", api_key=None):
         """Initialize the proof analyzer."""
         self.monitor = monitor if monitor else DynamicMonitor(metta_space)
         self.model_name = model_name

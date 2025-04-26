@@ -11,7 +11,7 @@ class OpenAIRequests:
     This avoids the dependency issues with PyPy 3.8.
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         """
         Initialize the OpenAI client.
         
@@ -47,6 +47,7 @@ class OpenAIRequests:
             "max_tokens": max_tokens
         }
         
+        logging.info("URL request: " + f"{self.base_url}/chat/completions")
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
@@ -84,7 +85,7 @@ class OpenAIRequests:
 class ProofProcessorWithPatterns:
     """Integration code for the proof generation system with improved pattern mapping."""
     
-    def __init__(self, monitor=None, model_name="gpt-4", api_key=None):
+    def __init__(self, monitor=None, model_name="gpt-4o-mini", api_key=None):
         """Initialize with the pattern mapper and monitor."""
         self.monitor = monitor
         self.pattern_mapper = PatternMapper()
