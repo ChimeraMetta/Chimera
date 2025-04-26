@@ -36,7 +36,7 @@ class MettaProofSystemTests(unittest.TestCase):
         # Initialize the immune system analyzer with test configuration
         self.analyzer = ImmuneSystemProofAnalyzer(
             self.monitor.metta_space, 
-            model_name="test-model",
+            model_name="gpt-4o-mini",
             api_key=self.mock_api_key
         )
         
@@ -284,9 +284,9 @@ class MettaProofSystemTests(unittest.TestCase):
     
     def test_openai_requests_init(self):
         """Test initialization of OpenAIRequests client."""
-        client = OpenAIRequests(self.mock_api_key, "test-model")
+        client = OpenAIRequests(self.mock_api_key, "gpt-4o-mini")
         self.assertEqual(client.api_key, self.mock_api_key, "API key not set correctly")
-        self.assertEqual(client.model, "test-model", "Model name not set correctly")
+        self.assertEqual(client.model, "gpt-4o-mini", "Model name not set correctly")
         self.assertEqual(client.base_url, "https://api.openai.com/v1", "Base URL not set correctly")
     
     @patch('requests.post')
@@ -301,14 +301,14 @@ class MettaProofSystemTests(unittest.TestCase):
         mock_post.return_value = mock_response
         
         # Create client and call method
-        client = OpenAIRequests(self.mock_api_key, "test-model")
+        client = OpenAIRequests(self.mock_api_key, "gpt-4o-mini")
         result = client.chat_completion([{"role": "user", "content": "Test prompt"}])
         
         # Verify request was made correctly
         mock_post.assert_called_once()
         args, kwargs = mock_post.call_args
         self.assertEqual(kwargs["headers"]["Authorization"], f"Bearer {self.mock_api_key}")
-        self.assertEqual(kwargs["json"]["model"], "test-model")
+        self.assertEqual(kwargs["json"]["model"], "gpt-4o-mini")
         
         # Verify response was processed correctly
         self.assertEqual(result["choices"][0]["message"]["content"], self.mock_api_response)
@@ -325,7 +325,7 @@ class MettaProofSystemTests(unittest.TestCase):
         mock_post.return_value = mock_response
         
         # Create client and call method
-        client = OpenAIRequests(self.mock_api_key, "test-model")
+        client = OpenAIRequests(self.mock_api_key, "gpt-4o-mini")
         result = client.get_completion_text([{"role": "user", "content": "Test prompt"}])
         
         # Verify result
