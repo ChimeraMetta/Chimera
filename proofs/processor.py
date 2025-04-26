@@ -21,7 +21,7 @@ class OpenAIRequests:
         """
         self.api_key = api_key
         self.model = model
-        self.base_url = "https://proj_UYxB8idaDqHJWoy5C9MH3ebR.api.openai.com/v1"
+        self.base_url = "https://api.openai.com/v1"
         
     def chat_completion(self, messages: list, temperature: float = 0.3, max_tokens: int = 2048) -> Dict[str, Any]:
         """
@@ -39,6 +39,8 @@ class OpenAIRequests:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+
+        messages = {"role": "user", "content": messages }
         
         payload = {
             "model": self.model,
