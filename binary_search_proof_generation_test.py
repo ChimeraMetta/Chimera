@@ -102,16 +102,19 @@ class BinarySearchProofGenerationTest(unittest.TestCase):
         """Test basic proof generation for binary search."""
         logger.info("Running test_basic_proof_generation")
         
+        # Binary search is already defined as a string in self.binary_search
+        # No need to convert it - pass directly to analyze_function_for_proof
+        
         # Generate proof
         result = self.analyzer.analyze_function_for_proof(
             self.binary_search,
-            function_name="binary_search",
+            function_name="binary_search",  # Explicitly provide function name
             max_attempts=1
         )
         
         # Check proof was generated
         self.assertTrue(result["success"], 
-                       f"Failed to generate proof for binary search: {result.get('error', '')}")
+                    f"Failed to generate proof for binary search: {result.get('error', '')}")
         
         # Check that proof components exist
         self.assertIn("proof", result, "Result should contain 'proof' key")

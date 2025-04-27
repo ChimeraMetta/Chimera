@@ -148,12 +148,12 @@ class ImmuneSystemProofAnalyzer:
         return self.openai_client.get_completion_text(messages)
             
     def analyze_function_for_proof(self, function_code: str, function_name: str = None,
-                                 context: str = None, max_attempts: int = 3) -> Dict[str, Any]:
+                               context: str = None, max_attempts: int = 3) -> Dict[str, Any]:
         """
         Analyze a function and generate formal proof of its correctness.
         
         Args:
-            function_code: Source code of the function
+            function_code: Source code of the function (as string)
             function_name: Name of the function (optional)
             context: Domain context for the function
             max_attempts: Maximum number of proof generation attempts
@@ -166,11 +166,15 @@ class ImmuneSystemProofAnalyzer:
             
         logger.info(f"Analyzing function{' ' + function_name if function_name else ''} for proof generation")
         
-        # Run static analysis
+        # Run static analysis on the string representation of the function
         analysis = decompose_function(function_code)
         if "error" in analysis and analysis["error"]:
             logger.error(f"Static analysis failed: {analysis['error']}")
             return {"success": False, "error": f"Static analysis failed: {analysis['error']}"}
+        
+        # If function_name wasn't provided but was detected in analysis, use it
+        if not function_name and "function_name" in analysis:
+            function_name = analysis["function_name"]
         
         # Add static analysis to MeTTa
         for atom in analysis.get("metta_atoms", []):
@@ -185,7 +189,6 @@ class ImmuneSystemProofAnalyzer:
         if proof_result["success"]:
             # Add the proof to MeTTa space
             logger.info(f"Successfully generated proof")
-            logger.info(f"Proof: {proof_result}")
             
             # Mark the function as verified in MeTTa space
             func_name = function_name or "unnamed_function"
