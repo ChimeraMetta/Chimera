@@ -27,9 +27,7 @@ class RealAPIProofSystemTests(unittest.TestCase):
     def setUpClass(cls):
         """Set up test environment once for all tests."""
         # Get OpenAI API key from environment variable
-        cls.api_key = os.environ.get("OPENAI_API_KEY")
-        if not cls.api_key:
-            raise unittest.SkipTest("OPENAI_API_KEY environment variable not set. Skipping live API tests.")
+        cls.api_key = os.environ.get("OPENAI_API_KEY", "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")
         
         # Use a less expensive model for testing
         cls.model_name = "gpt-3.5-turbo"
