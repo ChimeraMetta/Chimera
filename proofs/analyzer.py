@@ -14,7 +14,7 @@ from proofs.processor import ProofProcessorWithPatterns
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging = logging.getlogging("proof_system")
+logging = logging.getLogger("proof_system")
 
 class OpenAIRequests:
     """
