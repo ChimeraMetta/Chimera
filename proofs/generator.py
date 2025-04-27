@@ -116,12 +116,12 @@ class MettaProofGenerator:
         }
     
     def generate_proof(self, function_code: str, context: Optional[str] = None, 
-                      max_attempts: int = 3, debug_failed_proofs: bool = True) -> Dict[str, Any]:
+                  max_attempts: int = 3, debug_failed_proofs: bool = True) -> Dict[str, Any]:
         """
         Generate a formal proof for a Python function.
         
         Args:
-            function_code: Source code of the function to prove
+            function_code: Source code of the function (as string)
             context: Optional domain context information
             max_attempts: Maximum number of generation attempts
             debug_failed_proofs: Whether to attempt debugging failed proofs
@@ -146,6 +146,9 @@ class MettaProofGenerator:
         # Add specifications to MeTTa space
         self._add_specs_to_metta(specs)
         
+        # Extract function name if available
+        function_name = analysis.get("function_name", "unnamed_function")
+        
         # Generate proof using JSON IR
         for attempt in range(max_attempts):
             self.inference_attempts += 1
@@ -166,6 +169,7 @@ class MettaProofGenerator:
                     "success": True,
                     "proof": metta_proof,
                     "function": function_code,
+                    "function_name": function_name,
                     "specifications": specs,
                     "json_ir": proof_json,
                     "attempts": attempt + 1
@@ -184,6 +188,7 @@ class MettaProofGenerator:
                         "success": True,
                         "proof": debug_result["proof"],
                         "function": function_code,
+                        "function_name": function_name,
                         "specifications": specs,
                         "json_ir": debug_result["json_ir"],
                         "debug_message": verification_result["error_message"],
@@ -195,6 +200,7 @@ class MettaProofGenerator:
         return {
             "success": False,
             "function": function_code,
+            "function_name": function_name if "function_name" in analysis else "unnamed_function",
             "specifications": specs,
             "attempts": max_attempts,
             "error": "Maximum proof generation attempts reached"

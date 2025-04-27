@@ -1220,16 +1220,33 @@ def decompose_source(source: str) -> Dict:
 
 
 def decompose_function(func) -> Dict:
-    """Decompose a Python function into a type-theoretic structure."""
+    """
+    Decompose a Python function into a type-theoretic structure.
+    Accepts either a function object or a string with function code.
+    """
     try:
-        source = inspect.getsource(func)
-        return decompose_source(source)
+        if isinstance(func, str):
+            # If func is a string, assume it's the source code directly
+            source = func
+            func_name = "<unnamed_function>"  # Default name for string inputs
+        else:
+            # Otherwise, get the source code using inspect
+            source = inspect.getsource(func)
+            func_name = func.__name__
+            
+        result = decompose_source(source)
+        
+        # Add function name to the result for reference
+        result["function_name"] = func_name
+        
+        return result
+        
     except Exception as e:
+        func_name = func.__name__ if not isinstance(func, str) else "<string_function>"
         return {
             "metta_atoms": [],
-            "error": f"Failed to decompose function {func.__name__}: {e}"
+            "error": f"Failed to decompose function {func_name}: {e}"
         }
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
