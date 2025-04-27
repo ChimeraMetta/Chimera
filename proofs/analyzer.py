@@ -147,6 +147,170 @@ class ImmuneSystemProofAnalyzer:
         
         return self.openai_client.get_completion_text(messages)
     
+    def _convert_proof_to_json_ir(self, proof_components: List, function_name: str) -> Dict:
+        """
+        Convert proof components to JSON Intermediate Representation.
+        Works with any algorithm type, not just binary search.
+        
+        Args:
+            proof_components: List of proof components
+            function_name: Name of the function being analyzed
+            
+        Returns:
+            JSON IR structure
+        """
+        logging.info(f"Converting proof components to JSON IR for {function_name}")
+        
+        # Initialize the JSON IR structure
+        json_ir = {
+            "proof_components": [],
+            "verification_strategy": {
+                "approach": "",
+                "key_lemmas": []
+            }
+        }
+        
+        # Extract component types for analysis
+        component_types = set(comp["type"] for comp in proof_components if "type" in comp)
+        
+        # Determine algorithm class and appropriate verification approach
+        algorithm_class = self._infer_algorithm_class(function_name, proof_components)
+        
+        # Set verification strategy based on algorithm class
+        if algorithm_class == "search":
+            json_ir["verification_strategy"]["approach"] = "Search algorithm correctness verification using loop invariants and boundary analysis"
+            json_ir["verification_strategy"]["key_lemmas"] = [
+                "The search space reduces in each iteration",
+                "If target exists, it remains in the current search range",
+                "The algorithm terminates",
+                "The algorithm returns the correct result or appropriate indicator"
+            ]
+        elif algorithm_class == "sort":
+            json_ir["verification_strategy"]["approach"] = "Sorting algorithm correctness verification using loop invariants and ordering properties"
+            json_ir["verification_strategy"]["key_lemmas"] = [
+                "The algorithm preserves the elements of the input",
+                "The algorithm terminates",
+                "The result is sorted according to the ordering relation"
+            ]
+        elif algorithm_class == "graph":
+            json_ir["verification_strategy"]["approach"] = "Graph algorithm verification using invariants and reachability properties"
+            json_ir["verification_strategy"]["key_lemmas"] = [
+                "The algorithm correctly traverses the graph",
+                "The algorithm terminates",
+                "The algorithm computes the correct result for the graph property"
+            ]
+        else:
+            # Generic approach for other algorithms
+            json_ir["verification_strategy"]["approach"] = "Algorithm correctness verification using invariants and property analysis"
+            json_ir["verification_strategy"]["key_lemmas"] = [
+                "The algorithm terminates for all valid inputs",
+                "The algorithm computes the correct result for all valid inputs",
+                "The algorithm handles edge cases appropriately"
+            ]
+        
+        # Add specific lemmas based on component types
+        if "loop_invariant" in component_types:
+            json_ir["verification_strategy"]["key_lemmas"].append("Loop invariants are preserved in each iteration")
+        if "precondition" in component_types:
+            json_ir["verification_strategy"]["key_lemmas"].append("Preconditions are sufficient for function correctness")
+        if "postcondition" in component_types:
+            json_ir["verification_strategy"]["key_lemmas"].append("Postconditions establish the correctness criteria")
+        
+        # Process each proof component and add to JSON IR
+        for component in proof_components:
+            # Create a component entry for the JSON IR
+            ir_component = {
+                "type": component.get("type", "unknown"),
+                "expression": component.get("expression", ""),
+                "natural_language": component.get("explanation", "")
+            }
+            
+            # Add location information if available
+            if "location" in component and component["location"] != "function":
+                ir_component["location"] = component["location"]
+            
+            # Add additional metadata specific to component types
+            if component.get("type") == "loop_invariant":
+                ir_component["ensures_termination"] = self._check_termination_property(component)
+                ir_component["ensures_correctness"] = self._check_correctness_property(component)
+            
+            # Add the component to the JSON IR
+            json_ir["proof_components"].append(ir_component)
+        
+        return json_ir
+
+    def _infer_algorithm_class(self, function_name: str, proof_components: List) -> str:
+        """
+        Infer the algorithm class from function name and proof components.
+        
+        Args:
+            function_name: Name of the function
+            proof_components: List of proof components
+            
+        Returns:
+            Inferred algorithm class
+        """
+        # Convert to lowercase for case-insensitive matching
+        function_name_lower = function_name.lower()
+        
+        # Check function name for common algorithm types
+        if any(term in function_name_lower for term in ["search", "find", "locate", "binary"]):
+            return "search"
+        elif any(term in function_name_lower for term in ["sort", "merge", "quick", "bubble", "insertion"]):
+            return "sort"
+        elif any(term in function_name_lower for term in ["graph", "path", "traverse", "bfs", "dfs", "dijkstra"]):
+            return "graph"
+        
+        # If function name is not indicative, check proof component content
+        all_text = " ".join([
+            comp.get("expression", "") + " " + comp.get("explanation", "")
+            for comp in proof_components
+        ]).lower()
+        
+        if any(term in all_text for term in ["search", "target", "find", "key", "locate"]):
+            return "search"
+        elif any(term in all_text for term in ["sort", "order", "arrange", "comparison"]):
+            return "sort"
+        elif any(term in all_text for term in ["graph", "node", "edge", "vertex", "path"]):
+            return "graph"
+        
+        # Default to generic if no specific pattern is detected
+        return "generic"
+
+    def _check_termination_property(self, component: Dict) -> bool:
+        """
+        Check if a component ensures termination.
+        
+        Args:
+            component: Proof component
+            
+        Returns:
+            True if component ensures termination, False otherwise
+        """
+        text = (component.get("expression", "") + " " + component.get("explanation", "")).lower()
+        termination_indicators = [
+            "terminat", "halt", "stop", "progress", "decrease", "increase", 
+            "bound", "decrement", "increment", "counter", "index"
+        ]
+        return any(indicator in text for indicator in termination_indicators)
+
+    def _check_correctness_property(self, component: Dict) -> bool:
+        """
+        Check if a component ensures result correctness.
+        
+        Args:
+            component: Proof component
+            
+        Returns:
+            True if component ensures correctness, False otherwise
+        """
+        text = (component.get("expression", "") + " " + component.get("explanation", "")).lower()
+        correctness_indicators = [
+            "correct", "result", "output", "valid", "property", "maintain", 
+            "invariant", "preserve", "ensure", "guarantee"
+        ]
+        return any(indicator in text for indicator in correctness_indicators)
+    
     def _create_proof_generation_prompt(self, function_code: str, function_name: str) -> str:
         """
         Create a prompt for the LLM to generate a formal proof with explicit instructions
