@@ -14,7 +14,7 @@ from proofs.processor import ProofProcessorWithPatterns
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("proof_system")
+logging = logging.getlogging("proof_system")
 
 class OpenAIRequests:
     """
@@ -120,11 +120,11 @@ class ImmuneSystemProofAnalyzer:
         if os.path.exists(ontology_file):
             success = self.monitor.load_metta_rules(ontology_file)
             if success:
-                logger.info(f"Successfully loaded proof ontology from {ontology_file}")
+                logging.info(f"Successfully loaded proof ontology from {ontology_file}")
             else:
-                logger.warning(f"Failed to load proof ontology from {ontology_file}")
+                logging.warning(f"Failed to load proof ontology from {ontology_file}")
         else:
-            logger.warning(f"Proof ontology file not found: {ontology_file}")
+            logging.warning(f"Proof ontology file not found: {ontology_file}")
     
     def _call_openai_api(self, prompt: str) -> str:
         """
@@ -208,7 +208,7 @@ class ImmuneSystemProofAnalyzer:
         Returns:
             Dictionary with proof results
         """
-        self.logger.info(f"Analyzing function {function_name} for proof generation")
+        logging.info(f"Analyzing function {function_name} for proof generation")
         
         # Initialize OpenAI client if not already done
         from proofs.generator import OpenAIRequests
@@ -229,7 +229,7 @@ class ImmuneSystemProofAnalyzer:
         
         # Make multiple attempts if needed
         for attempt in range(1, max_attempts + 1):
-            self.logger.info(f"Proof generation attempt {attempt}/{max_attempts}")
+            logging.info(f"Proof generation attempt {attempt}/{max_attempts}")
             
             try:
                 # Generate proof using OpenAI
@@ -237,7 +237,7 @@ class ImmuneSystemProofAnalyzer:
                 
                 # Add progressively stronger instructions if we're retrying
                 if attempt > 1:
-                    self.logger.info(f"Enhancing prompt for retry attempt {attempt}")
+                    logging.info(f"Enhancing prompt for retry attempt {attempt}")
                     prompt += f"""
                     
                     RETRY ATTEMPT #{attempt}: Your previous response was missing required component types.
@@ -267,19 +267,19 @@ class ImmuneSystemProofAnalyzer:
                     # Add components to MeTTa space
                     self._add_proof_to_metta_space(proof_components, function_name)
                     
-                    self.logger.info(f"Successfully generated proof for {function_name}")
+                    logging.info(f"Successfully generated proof for {function_name}")
                     break
                 else:
-                    self.logger.warning(f"Attempt {attempt}: Empty proof components")
+                    logging.warning(f"Attempt {attempt}: Empty proof components")
             
             except ValueError as e:
                 # This is the expected error when components are missing
-                self.logger.warning(f"Attempt {attempt} failed: {str(e)}")
+                logging.warning(f"Attempt {attempt} failed: {str(e)}")
                 if attempt == max_attempts:
                     proof_result["error"] = str(e)
             
             except Exception as e:
-                self.logger.error(f"Proof generation error on attempt {attempt}: {str(e)}")
+                logging.error(f"Proof generation error on attempt {attempt}: {str(e)}")
                 proof_result["error"] = str(e)
                 # For unexpected errors, we might want to break early
                 if "OpenAI API" in str(e):  # API errors won't be resolved by retries
@@ -299,7 +299,7 @@ class ImmuneSystemProofAnalyzer:
         Returns:
             List of structured proof components
         """
-        self.logger.info("Parsing proof response")
+        logging.info("Parsing proof response")
         
         # Extract proof components using regex patterns
         components = []
@@ -357,11 +357,11 @@ class ImmuneSystemProofAnalyzer:
         missing_types = required_types - current_types
         
         if missing_types:
-            self.logger.warning(f"Missing required component types: {missing_types}. The LLM response is incomplete.")
+            logging.warning(f"Missing required component types: {missing_types}. The LLM response is incomplete.")
             # Rather than generating synthetic components, fail early so we can retry with a better prompt
             raise ValueError(f"Proof generation failed: missing required component types: {missing_types}")
         
-        self.logger.info(f"Extracted {len(components)} proof components")
+        logging.info(f"Extracted {len(components)} proof components")
         return components
     
     def identify_potential_donors(self, target_properties: List[str], 
@@ -381,12 +381,12 @@ class ImmuneSystemProofAnalyzer:
         if not self.api_key:
             return []
             
-        logger.info(f"Identifying potential donors from {len(candidate_functions)} candidates")
+        logging.info(f"Identifying potential donors from {len(candidate_functions)} candidates")
         
         suitable_donors = []
         
         for i, func_code in enumerate(candidate_functions):
-            logger.info(f"Analyzing candidate {i+1}/{len(candidate_functions)}")
+            logging.info(f"Analyzing candidate {i+1}/{len(candidate_functions)}")
             
             # Generate proof for candidate function
             proof_result = self.analyze_function_for_proof(
@@ -410,7 +410,7 @@ class ImmuneSystemProofAnalyzer:
         # Sort by compatibility score
         suitable_donors.sort(key=lambda x: x["compatibility_score"], reverse=True)
         
-        logger.info(f"Found {len(suitable_donors)} suitable donors")
+        logging.info(f"Found {len(suitable_donors)} suitable donors")
         return suitable_donors
 
     def _get_satisfied_properties(self, proof_result: Dict[str, Any], 
@@ -593,7 +593,7 @@ class ImmuneSystemProofAnalyzer:
         if not self.api_key:
             return {"success": False, "error": "OpenAI API key not provided. Cannot incorporate execution evidence."}
             
-        logger.info(f"Incorporating execution evidence from {len(inputs)} executions")
+        logging.info(f"Incorporating execution evidence from {len(inputs)} executions")
         
         # Add execution evidence to MeTTa
         for i, (input_val, output_val, state) in enumerate(zip(inputs, outputs, states)):
