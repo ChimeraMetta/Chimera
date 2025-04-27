@@ -185,6 +185,7 @@ class ImmuneSystemProofAnalyzer:
         if proof_result["success"]:
             # Add the proof to MeTTa space
             logger.info(f"Successfully generated proof")
+            logger.info(f"Proof: {proof_result}")
             
             # Mark the function as verified in MeTTa space
             func_name = function_name or "unnamed_function"
