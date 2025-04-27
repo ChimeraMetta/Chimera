@@ -146,67 +146,223 @@ class ImmuneSystemProofAnalyzer:
         ]
         
         return self.openai_client.get_completion_text(messages)
-            
-    def analyze_function_for_proof(self, function_code: str, function_name: str = None,
-                               context: str = None, max_attempts: int = 3) -> Dict[str, Any]:
+    
+    def _create_proof_generation_prompt(self, function_code: str, function_name: str) -> str:
         """
-        Analyze a function and generate formal proof of its correctness.
+        Create a prompt for the LLM to generate a formal proof with explicit instructions
+        to include all required component types.
         
         Args:
-            function_code: Source code of the function (as string)
-            function_name: Name of the function (optional)
-            context: Domain context for the function
-            max_attempts: Maximum number of proof generation attempts
+            function_code: Source code of the function
+            function_name: Name of the function
             
         Returns:
-            Dictionary with analysis results including proof if successful
+            Formatted prompt string
         """
-        if not self.api_key:
-            return {"success": False, "error": "OpenAI API key not provided. Cannot analyze function."}
+        prompt = f"""
+        You are a formal verification expert specializing in algorithm correctness proofs. Your task is to create a
+        formal proof of correctness for the following function:
+        
+        ```python
+        {function_code}
+        ```
+        
+        IMPORTANT: Your proof MUST include ALL of the following component types:
+        
+        1. Preconditions: Conditions that must be true before the function is called
+        - For binary search, this typically includes that the array is sorted
+        - If there are no meaningful preconditions (which is rare), explicitly state this and provide at least one trivial precondition
+        
+        2. Loop invariants: Properties that remain true throughout each iteration of any loops
+        - These are essential for proving correctness of algorithms with loops
+        - For each loop in the code, provide at least one invariant
+        
+        3. Assertions: Statements that must be true at specific points in the code
+        - Include at least one assertion about the algorithm's state or properties
+        
+        4. Postconditions: Conditions that will be true after the function completes
+        - Describe what the function guarantees upon successful completion
+        
+        For each component, include:
+        - The precise type (precondition, loop_invariant, assertion, postcondition)
+        - The specific location in the code where it applies (line number or description)
+        - The expression in mathematical or logical notation
+        - A natural language explanation of what this component means
+        
+        Format your response in a structured way that clearly labels each component type.
+        Failure to include ALL component types will result in an incomplete proof.
+        """
+        
+        return prompt
             
-        logger.info(f"Analyzing function{' ' + function_name if function_name else ''} for proof generation")
+    def analyze_function_for_proof(self, function_code: str, function_name: str, max_attempts: int = 3) -> Dict:
+        """
+        Analyze a function and generate a formal proof of its correctness.
+        Implements retry logic to ensure all required component types are present.
         
-        # Run static analysis on the string representation of the function
-        analysis = decompose_function(function_code)
-        if "error" in analysis and analysis["error"]:
-            logger.error(f"Static analysis failed: {analysis['error']}")
-            return {"success": False, "error": f"Static analysis failed: {analysis['error']}"}
-        
-        # If function_name wasn't provided but was detected in analysis, use it
-        if not function_name and "function_name" in analysis:
-            function_name = analysis["function_name"]
-        
-        # Add static analysis to MeTTa
-        for atom in analysis.get("metta_atoms", []):
-            self.monitor.add_atom(atom)
-        
-        # Generate proof
-        proof_result = self.proof_generator.generate_proof(
-            function_code, context, max_attempts
-        )
-        
-        # Add proof-specific metrics to the result
-        if proof_result["success"]:
-            # Add the proof to MeTTa space
-            logger.info(f"Successfully generated proof")
+        Args:
+            function_code: Source code of the function
+            function_name: Name of the function
+            max_attempts: Maximum number of attempts for proof generation
             
-            # Mark the function as verified in MeTTa space
-            func_name = function_name or "unnamed_function"
-            self.monitor.add_atom(f"(verified-function {func_name})")
+        Returns:
+            Dictionary with proof results
+        """
+        self.logger.info(f"Analyzing function {function_name} for proof generation")
+        
+        # Initialize OpenAI client if not already done
+        from proofs.generator import OpenAIRequests
+        self.openai_client = OpenAIRequests(self.api_key, self.model_name)
+        
+        # Initialize proof structure
+        proof_result = {
+            "success": False,
+            "proof": [],
+            "json_ir": {
+                "proof_components": [],
+                "verification_strategy": {
+                    "approach": "",
+                    "key_lemmas": []
+                }
+            }
+        }
+        
+        # Make multiple attempts if needed
+        for attempt in range(1, max_attempts + 1):
+            self.logger.info(f"Proof generation attempt {attempt}/{max_attempts}")
             
-            # Add generated invariants to MeTTa space
-            for proof_component in proof_result.get("proof", []):
-                if proof_component.startswith("(LoopInvariant"):
-                    self.monitor.add_atom(f"(function-invariant {func_name} {proof_component})")
+            try:
+                # Generate proof using OpenAI
+                prompt = self._create_proof_generation_prompt(function_code, function_name)
+                
+                # Add progressively stronger instructions if we're retrying
+                if attempt > 1:
+                    self.logger.info(f"Enhancing prompt for retry attempt {attempt}")
+                    prompt += f"""
+                    
+                    RETRY ATTEMPT #{attempt}: Your previous response was missing required component types.
+                    
+                    Please ensure your proof EXPLICITLY includes ALL of the following component types:
+                    - Preconditions (at least one, even if trivial)
+                    - Loop invariants (at least one for each loop)
+                    - Assertions (at least one meaningful assertion)
+                    
+                    Label each component clearly with its type. This is critical for the proof to be valid.
+                    """
+                
+                # Get response from OpenAI
+                response = self.openai_client.generate_text(prompt)
+                
+                # Parse the response to extract proof components
+                proof_components = self._parse_proof_response(response, function_name)
+                
+                if proof_components:
+                    proof_result["success"] = True
+                    proof_result["proof"] = proof_components
+                    
+                    # Convert to JSON IR
+                    json_ir = self._convert_proof_to_json_ir(proof_components, function_name)
+                    proof_result["json_ir"] = json_ir
+                    
+                    # Add components to MeTTa space
+                    self._add_proof_to_metta_space(proof_components, function_name)
+                    
+                    self.logger.info(f"Successfully generated proof for {function_name}")
+                    break
+                else:
+                    self.logger.warning(f"Attempt {attempt}: Empty proof components")
             
-            # Analyze proof complexity
-            proof_complexity = len(proof_result.get("proof", []))
-            proof_result["complexity"] = proof_complexity
-            self.monitor.add_atom(f"(proof-complexity {func_name} {proof_complexity})")
-        else:
-            logger.warning(f"Failed to generate proof after {max_attempts} attempts")
+            except ValueError as e:
+                # This is the expected error when components are missing
+                self.logger.warning(f"Attempt {attempt} failed: {str(e)}")
+                if attempt == max_attempts:
+                    proof_result["error"] = str(e)
+            
+            except Exception as e:
+                self.logger.error(f"Proof generation error on attempt {attempt}: {str(e)}")
+                proof_result["error"] = str(e)
+                # For unexpected errors, we might want to break early
+                if "OpenAI API" in str(e):  # API errors won't be resolved by retries
+                    break
         
         return proof_result
+
+    def _parse_proof_response(self, response: str, function_name: str) -> List:
+        """
+        Parse the LLM response to extract structured proof components.
+        Verify that all required component types are present.
+        
+        Args:
+            response: Raw text response from the LLM
+            function_name: Name of the function being analyzed
+            
+        Returns:
+            List of structured proof components
+        """
+        self.logger.info("Parsing proof response")
+        
+        # Extract proof components using regex patterns
+        components = []
+        
+        # Pattern to match different component types
+        patterns = {
+            "precondition": r"(?:Precondition|Pre-condition|Requires)s?:?\s*(.*?)(?:\n\n|\Z)",
+            "loop_invariant": r"(?:Loop Invariant|Loop-Invariant|Invariant)s?:?\s*(.*?)(?:\n\n|\Z)",
+            "assertion": r"Assertion:?\s*(.*?)(?:\n\n|\Z)",
+            "postcondition": r"(?:Postcondition|Post-condition|Ensures)s?:?\s*(.*?)(?:\n\n|\Z)"
+        }
+        
+        for component_type, pattern in patterns.items():
+            matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+            
+            for match in matches:
+                # Extract location if mentioned
+                location_match = re.search(r"(?:at|on|line)\s+(\d+|the loop|while loop|for loop)", match, re.IGNORECASE)
+                location = location_match.group(1) if location_match else "function"
+                
+                # Extract expression - look for formatted math/code sections
+                expression_match = re.search(r"Expression:?\s*(.*?)(?:\n|$)", match, re.IGNORECASE)
+                if expression_match:
+                    expression = expression_match.group(1).strip()
+                else:
+                    # Try to find an expression using various patterns if not explicitly labeled
+                    code_match = re.search(r"```(.*?)```", match, re.DOTALL)
+                    if code_match:
+                        expression = code_match.group(1).strip()
+                    else:
+                        # Just use the first line or sentence
+                        expression = re.split(r"[\n\.]", match.strip())[0].strip()
+                
+                # Clean up the expression
+                expression = expression.replace("```", "").strip()
+                
+                # Extract explanation if present
+                explanation_match = re.search(r"(?:Explanation|Meaning|Description):?\s*(.*?)(?:\n\n|\Z)", match, re.DOTALL | re.IGNORECASE)
+                explanation = explanation_match.group(1).strip() if explanation_match else "No explanation provided"
+                
+                # Create a component object
+                component = {
+                    "type": component_type,
+                    "location": location,
+                    "expression": expression,
+                    "explanation": explanation,
+                    "function": function_name
+                }
+                
+                components.append(component)
+        
+        # Check if we have all required component types
+        required_types = {"precondition", "loop_invariant", "assertion"}
+        current_types = {comp["type"] for comp in components}
+        missing_types = required_types - current_types
+        
+        if missing_types:
+            self.logger.warning(f"Missing required component types: {missing_types}. The LLM response is incomplete.")
+            # Rather than generating synthetic components, fail early so we can retry with a better prompt
+            raise ValueError(f"Proof generation failed: missing required component types: {missing_types}")
+        
+        self.logger.info(f"Extracted {len(components)} proof components")
+        return components
     
     def identify_potential_donors(self, target_properties: List[str], 
                                 candidate_functions: List[str],
