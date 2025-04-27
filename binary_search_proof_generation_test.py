@@ -306,6 +306,7 @@ class BinarySearchProofGenerationTest(unittest.TestCase):
             # Store result if successful
             if result["success"]:
                 results.append(result)
+                logger.info(f"Generated proof: {result}")
                 
                 # Log key metrics
                 component_count = len(result.get("json_ir", {}).get("proof_components", []))
