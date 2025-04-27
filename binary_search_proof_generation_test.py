@@ -27,7 +27,7 @@ class BinarySearchProofGenerationTest(unittest.TestCase):
     def setUpClass(cls):
         """Set up test environment once for all tests."""
         # Get OpenAI API key from environment variable
-        cls.api_key = "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"
+        cls.api_key = os.environ.get("OPENAI_API_KEY")
         if not cls.api_key:
             raise unittest.SkipTest("OPENAI_API_KEY environment variable not set")
         
@@ -35,28 +35,27 @@ class BinarySearchProofGenerationTest(unittest.TestCase):
         cls.model_name = "gpt-3.5-turbo"
         logger.info(f"Using model: {cls.model_name} for proof generation tests")
         
-        # Standard binary search implementation
-        cls.binary_search = """
-        def binary_search(arr, target):
-            \"\"\"
-            Performs binary search on a sorted array.
-            Returns the index if found, otherwise -1.
-            \"\"\"
-            left = 0
-            right = len(arr) - 1
-            
-            while left <= right:
-                mid = left + (right - left) // 2
-                
-                if arr[mid] == target:
-                    return mid
-                elif arr[mid] < target:
-                    left = mid + 1
-                else:
-                    right = mid - 1
-            
-            return -1
-        """
+        # Standard binary search implementation with correct indentation
+        cls.binary_search = """def binary_search(arr, target):
+    \"\"\"
+    Performs binary search on a sorted array.
+    Returns the index if found, otherwise -1.
+    \"\"\"
+    left = 0
+    right = len(arr) - 1
+    
+    while left <= right:
+        mid = left + (right - left) // 2
+        
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    
+    return -1
+"""
     
     def setUp(self):
         """Set up test environment before each test."""
@@ -102,19 +101,16 @@ class BinarySearchProofGenerationTest(unittest.TestCase):
         """Test basic proof generation for binary search."""
         logger.info("Running test_basic_proof_generation")
         
-        # Binary search is already defined as a string in self.binary_search
-        # No need to convert it - pass directly to analyze_function_for_proof
-        
         # Generate proof
         result = self.analyzer.analyze_function_for_proof(
             self.binary_search,
-            function_name="binary_search",  # Explicitly provide function name
+            function_name="binary_search",
             max_attempts=1
         )
         
         # Check proof was generated
         self.assertTrue(result["success"], 
-                    f"Failed to generate proof for binary search: {result.get('error', '')}")
+                       f"Failed to generate proof for binary search: {result.get('error', '')}")
         
         # Check that proof components exist
         self.assertIn("proof", result, "Result should contain 'proof' key")
