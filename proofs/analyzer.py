@@ -238,6 +238,149 @@ class ImmuneSystemProofAnalyzer:
             json_ir["proof_components"].append(ir_component)
         
         return json_ir
+    
+    def _add_proof_to_metta_space(self, proof_components: List, function_name: str) -> None:
+        """
+        Add proof components to MeTTa space.
+        
+        Args:
+            proof_components: List of proof components
+            function_name: Name of the function
+        """
+        logging.info(f"Adding proof components to MeTTa space for {function_name}")
+        
+        # Mark the function as verified
+        self.monitor.metta_space.add_atom(f"(verified-function {function_name})")
+        
+        # Ensure required type definitions exist in MeTTa space
+        self.monitor.metta_space.add_atom("(: Type Type)")
+        self.monitor.metta_space.add_atom("(: Property Type)")
+        self.monitor.metta_space.add_atom("(: Function Type)")
+        self.monitor.metta_space.add_atom("(: Expression Type)")
+        self.monitor.metta_space.add_atom("(: bound-check Property)")
+        self.monitor.metta_space.add_atom("(: ordering-check Property)")
+        self.monitor.metta_space.add_atom("(: null-check Property)")
+        self.monitor.metta_space.add_atom("(: termination-guarantee Property)")
+        self.monitor.metta_space.add_atom("(: error-handling Property)")
+        self.monitor.metta_space.add_atom("(: function-has-property (--> Function Property Bool))")
+        self.monitor.metta_space.add_atom("(: Expression-Property (--> Expression Property Bool))")
+        
+        # Add each component based on its type
+        for component in proof_components:
+            component_type = component.get("type")
+            location = component.get("location", "function")
+            expression = component.get("expression", "")
+            explanation = component.get("explanation", "")
+            
+            # Escape special characters in expression
+            safe_expr = self._escape_string_for_metta(expression)
+            
+            if component_type == "precondition":
+                # Create a unique ID for this precondition
+                expr_id = f"precond_{hash(expression) % 10000}"
+                
+                # Add the precondition to MeTTa space
+                self.monitor.metta_space.add_atom(f"(: {expr_id} Expression)")
+                self.monitor.metta_space.add_atom(f"(Precondition {expr_id})")
+                self.monitor.metta_space.add_atom(f"(= {expr_id} \"{safe_expr}\")")
+                
+                # Add properties based on expression content
+                self._add_property_by_content(expr_id, expression, explanation)
+                
+            elif component_type == "loop_invariant":
+                # Create a unique ID for this loop invariant
+                expr_id = f"invariant_{hash(expression) % 10000}_{location}"
+                
+                # Add the loop invariant to MeTTa space
+                self.monitor.metta_space.add_atom(f"(: {expr_id} Expression)")
+                self.monitor.metta_space.add_atom(f"(LoopInvariant {location} {expr_id})")
+                self.monitor.metta_space.add_atom(f"(= {expr_id} \"{safe_expr}\")")
+                
+                # Loop invariants typically relate to termination
+                self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} termination-guarantee)")
+                
+                # Add other properties based on content
+                self._add_property_by_content(expr_id, expression, explanation)
+                
+            elif component_type == "assertion":
+                # Create a unique ID for this assertion
+                expr_id = f"assert_{hash(expression) % 10000}_{location}"
+                
+                # Add the assertion to MeTTa space
+                self.monitor.metta_space.add_atom(f"(: {expr_id} Expression)")
+                self.monitor.metta_space.add_atom(f"(Assertion {location} {expr_id})")
+                self.monitor.metta_space.add_atom(f"(= {expr_id} \"{safe_expr}\")")
+                
+                # Add properties based on content
+                self._add_property_by_content(expr_id, expression, explanation)
+                
+            elif component_type == "postcondition":
+                # Create a unique ID for this postcondition
+                expr_id = f"postcond_{hash(expression) % 10000}"
+                
+                # Add the postcondition to MeTTa space
+                self.monitor.metta_space.add_atom(f"(: {expr_id} Expression)")
+                self.monitor.metta_space.add_atom(f"(Postcondition {expr_id})")
+                self.monitor.metta_space.add_atom(f"(= {expr_id} \"{safe_expr}\")")
+                
+                # Add properties based on content
+                self._add_property_by_content(expr_id, expression, explanation)
+        
+        # Add function-level properties based on component types
+        # These are common properties that should apply to most algorithms
+        self.monitor.metta_space.add_atom(f"(function-has-property {function_name} termination-guarantee)")
+        if any(comp.get("type") == "precondition" for comp in proof_components):
+            self.monitor.metta_space.add_atom(f"(function-has-property {function_name} bound-check)")
+        
+        # Add additional function properties based on function name and components
+        algorithm_class = self._infer_algorithm_class(function_name, proof_components)
+        if algorithm_class == "search":
+            self.monitor.metta_space.add_atom(f"(function-has-property {function_name} ordering-check)")
+        elif algorithm_class == "sort":
+            self.monitor.metta_space.add_atom(f"(function-has-property {function_name} ordering-check)")
+
+    def _add_property_by_content(self, expr_id: str, expression: str, explanation: str) -> None:
+        """
+        Add properties to an expression based on its content.
+        
+        Args:
+            expr_id: Expression identifier
+            expression: The expression text
+            explanation: The explanation text
+        """
+        content = (expression + " " + explanation).lower()
+        
+        # Check for bounds-related content
+        if any(term in content for term in ["bound", "index", "length", "size", "range"]):
+            self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} bound-check)")
+        
+        # Check for ordering-related content
+        if any(term in content for term in ["sort", "order", "compare", "less", "greater"]):
+            self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} ordering-check)")
+        
+        # Check for null-checking content
+        if any(term in content for term in ["null", "none", "empty"]):
+            self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} null-check)")
+        
+        # Check for termination-related content
+        if any(term in content for term in ["terminat", "halt", "progress", "decreas", "increas"]):
+            self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} termination-guarantee)")
+        
+        # Check for error-handling content
+        if any(term in content for term in ["error", "exception", "not found", "return -1"]):
+            self.monitor.metta_space.add_atom(f"(Expression-Property {expr_id} error-handling)")
+
+    def _escape_string_for_metta(self, text: str) -> str:
+        """
+        Escape a string for use in MeTTa atoms.
+        
+        Args:
+            text: The text to escape
+            
+        Returns:
+            Escaped text
+        """
+        return text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
 
     def _infer_algorithm_class(self, function_name: str, proof_components: List) -> str:
         """
