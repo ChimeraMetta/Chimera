@@ -18,6 +18,8 @@ from proofs.pattern_mapper import PatternMapper
 from proofs.processor import ProofProcessorWithPatterns
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 
+API_KEY = "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"
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -28,32 +30,7 @@ def check_api_key():
     logger.info("Checking OpenAI API key...")
     
     # Try multiple sources for the API key
-    api_key = None
-    
-    # 1. Check environment variable
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        logger.info("✓ Found API key in environment variable")
-    else:
-        logger.warning("API key not found in environment variable")
-        
-        # 2. Check key file
-        try:
-            with open('.openai_key', 'r') as f:
-                api_key = f.read().strip()
-            logger.info("✓ Found API key in .openai_key file")
-        except FileNotFoundError:
-            logger.warning("API key file .openai_key not found")
-    
-    # 3. Use hardcoded key (from the test file) as fallback
-    if not api_key:
-        api_key = "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"
-        logger.warning("Using hardcoded API key (not recommended)")
-    
-    # Validate key format
-    if not api_key:
-        logger.error("✗ No API key found")
-        return None
+    api_key = API_KEY
     
     if not api_key.startswith(("sk-", "sk-proj-")):
         logger.warning("API key format doesn't match expected pattern")
