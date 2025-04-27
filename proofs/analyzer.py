@@ -250,8 +250,12 @@ class ImmuneSystemProofAnalyzer:
                     Label each component clearly with its type. This is critical for the proof to be valid.
                     """
                 
+                messages = [
+                    {"role": "system", "content": "You are a formal verification expert specializing in algorithm correctness proofs."},
+                    {"role": "user", "content": prompt}
+                ]
                 # Get response from OpenAI
-                response = self.openai_client.generate_text(prompt)
+                response = self.openai_client.get_completion_text(messages)
                 
                 # Parse the response to extract proof components
                 proof_components = self._parse_proof_response(response, function_name)
