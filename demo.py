@@ -366,5 +366,173 @@ def binary_search(arr, target):
         print("\nCode:")
         print(best_alt.get("alternative_function", "No code selected"))
 
+    # Normalize phone numbers example
+    normalize_phone_numbers_code = """
+def normalize_phone_numbers(text):
+    import re
+    
+    # Find all potential phone numbers
+    pattern = r'(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}'
+    matches = re.findall(pattern, text)
+    
+    # Normalize each match
+    normalized = []
+    for match in matches:
+        # Remove all non-digit characters
+        digits = re.sub(r'\D', '', match)
+        
+        # Ensure 10 digits (strip leading 1 if present, will add it back later)
+        if len(digits) == 11 and digits.startswith('1'):
+            digits = digits[1:]
+        
+        # Skip invalid numbers
+        if len(digits) != 10:
+            continue
+            
+        # Format as E.164 (+1XXXXXXXXXX)
+        normalized.append(f"+1{digits}")
+    
+    return normalized
+"""
+    logger.info("\n--- Testing normalize_phone_numbers ---")
+    alternatives_phone = analyzer.generate_verified_alternatives(
+        normalize_phone_numbers_code,
+        "normalize_phone_numbers",
+        count=2
+    )
+    for i, alt in enumerate(alternatives_phone):
+        print(f"\n--- Phone Alternative {i+1} ({alt.get('strategy', 'unknown')}) ---")
+        print(f"Success: {alt.get('success', False)}")
+        print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+        print("\nCode:")
+        print(alt.get("alternative_function", "No code generated"))
+    best_alt_phone = analyzer.select_best_alternative(alternatives_phone)
+    if best_alt_phone:
+        print("\n--- Best Phone Alternative ---")
+        print(f"Strategy: {best_alt_phone.get('strategy', 'unknown')}")
+        print("\nCode:")
+        print(best_alt_phone.get("alternative_function", "No code selected"))
+
+    # Weighted moving average example
+    weighted_moving_average_code = """
+def weighted_moving_average(data, window_size=5, weights=None):
+    if not data:
+        return []
+    
+    # Input validation
+    if window_size <= 0:
+        raise ValueError("Window size must be positive")
+    
+    if window_size > len(data):
+        window_size = len(data)
+    
+    # Default weights: linearly increasing importance
+    if weights is None:
+        weights = list(range(1, window_size + 1))
+    
+    # Ensure weights match window size
+    if len(weights) != window_size:
+        raise ValueError("Weights must have the same length as window size")
+    
+    # Calculate weight sum for normalization
+    weight_sum = sum(weights)
+    
+    # Calculate weighted moving average
+    result = []
+    for i in range(len(data)):
+        if i < window_size - 1:
+            # For initial points, use available data only
+            window = data[:i+1]
+            curr_weights = weights[-(i+1):]
+            curr_weight_sum = sum(curr_weights)
+        else:
+            # For later points, use full window
+            window = data[i-(window_size-1):i+1]
+            curr_weights = weights
+            curr_weight_sum = weight_sum
+        
+        # Calculate weighted average for current window
+        weighted_sum = sum(w * v for w, v in zip(curr_weights, window))
+        result.append(weighted_sum / curr_weight_sum)
+    
+    return result
+"""
+    logger.info("\n--- Testing weighted_moving_average ---")
+    alternatives_wma = analyzer.generate_verified_alternatives(
+        weighted_moving_average_code,
+        "weighted_moving_average",
+        count=2
+    )
+    for i, alt in enumerate(alternatives_wma):
+        print(f"\n--- WMA Alternative {i+1} ({alt.get('strategy', 'unknown')}) ---")
+        print(f"Success: {alt.get('success', False)}")
+        print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+        print("\nCode:")
+        print(alt.get("alternative_function", "No code generated"))
+    best_alt_wma = analyzer.select_best_alternative(alternatives_wma)
+    if best_alt_wma:
+        print("\n--- Best WMA Alternative ---")
+        print(f"Strategy: {best_alt_wma.get('strategy', 'unknown')}")
+        print("\nCode:")
+        print(best_alt_wma.get("alternative_function", "No code selected"))
+
+    # Validate credit card example
+    validate_credit_card_code = """
+def validate_credit_card(card_number):
+    # Remove spaces and hyphens
+    card_number = card_number.replace(' ', '').replace('-', '')
+    
+    # Check if string contains only digits
+    if not card_number.isdigit():
+        return False
+    
+    # Check length (most card numbers are 13-19 digits)
+    if not (13 <= len(card_number) <= 19):
+        return False
+    
+    # Luhn algorithm implementation
+    # 1. Double every second digit from right to left
+    # 2. If doubling results in a number > 9, subtract 9
+    # 3. Sum all digits
+    # 4. If sum is divisible by 10, card number is valid
+    
+    digits = [int(d) for d in card_number]
+    checksum = 0
+    
+    for i in range(len(digits) - 1, -1, -1):
+        digit = digits[i]
+        
+        # Double every second digit from right to left
+        if (len(digits) - i) % 2 == 0:
+            digit *= 2
+            # If result is > 9, subtract 9
+            if digit > 9:
+                digit -= 9
+        
+        checksum += digit
+    
+    # Valid if sum is divisible by 10
+    return checksum % 10 == 0
+"""
+    logger.info("\n--- Testing validate_credit_card ---")
+    alternatives_cc = analyzer.generate_verified_alternatives(
+        validate_credit_card_code,
+        "validate_credit_card",
+        count=2
+    )
+    for i, alt in enumerate(alternatives_cc):
+        print(f"\n--- CC Alternative {i+1} ({alt.get('strategy', 'unknown')}) ---")
+        print(f"Success: {alt.get('success', False)}")
+        print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+        print("\nCode:")
+        print(alt.get("alternative_function", "No code generated"))
+    best_alt_cc = analyzer.select_best_alternative(alternatives_cc)
+    if best_alt_cc:
+        print("\n--- Best CC Alternative ---")
+        print(f"Strategy: {best_alt_cc.get('strategy', 'unknown')}")
+        print("\nCode:")
+        print(best_alt_cc.get("alternative_function", "No code selected"))
+
+# Remove extra newline
 if __name__ == "__main__":
     demo_verified_alternative_generation()
