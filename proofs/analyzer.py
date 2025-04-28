@@ -9,6 +9,7 @@ from hyperon import *
 from dynamic_monitor import DynamicMonitor, monitor
 from static_analyzer import decompose_function
 from proofs.generator import MettaProofGenerator
+from proofs.example_generator import ExampleDrivenProofGenerator
 from proofs.processor import ProofProcessorWithPatterns
 
 # Configure logging
@@ -108,7 +109,7 @@ class ImmuneSystemProofAnalyzer:
         self.openai_client = OpenAIRequests(api_key, model_name) if api_key else None
         
         # Initialize components with OpenAI client
-        self.proof_generator = MettaProofGenerator(self.monitor, model_name, api_key)
+        self.proof_generator = ExampleDrivenProofGenerator(self.monitor, model_name, api_key)
         self.pattern_processor = ProofProcessorWithPatterns(self.monitor, model_name, api_key)
         
         # Load ontology rules for proof verification
