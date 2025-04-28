@@ -134,7 +134,8 @@ def process_data(data_list, threshold):
                 "success": success,
                 "component_count": len(proof_result.get("proof", [])),
                 "is_fallback": proof_result.get("fallback", False),
-                "error": proof_result.get("error", None)
+                "error": proof_result.get("error", None),
+                "proof_atoms": proof_result.get("proof", [])
             }
             
             # Save the detailed JSON IR
@@ -172,6 +173,10 @@ def process_data(data_list, threshold):
         fallback = " (FALLBACK)" if result.get("is_fallback", False) else ""
         components = result.get("component_count", 0)
         logger.info(f"  - {name}: {status}{fallback} - {components} components")
+        if result["success"] and result.get("proof_atoms"):
+            logger.info(f"    Proof for {name}:")
+            for atom in result["proof_atoms"]:
+                logger.info(f"      {atom}")
     
     return results
 
