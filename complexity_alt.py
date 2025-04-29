@@ -398,7 +398,8 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                             alt_func_name = func_def_match.group(1)
                         
                         # Use decompose_function to analyze the alternative
-                        alt_analysis = decompose_function(alt_code, alt_func_name)
+                        # decompose_function() accepts a string with function code directly
+                        alt_analysis = decompose_function(alt_code)
                         
                         if alt_analysis and "metta_atoms" in alt_analysis:
                             # Create a new temporary MeTTa space for this analysis
