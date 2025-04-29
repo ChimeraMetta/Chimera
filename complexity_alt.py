@@ -380,35 +380,147 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     count=2  # Generate 2 alternatives to keep processing time reasonable
                 )
                 
-                # Print results
+                # Analyze complexity of alternatives
+                print("\nAnalyzing complexity of alternative implementations...")
+                
+                for j, alt in enumerate(alternatives):
+                    if not alt.get("success", False) or not alt.get("alternative_function"):
+                        continue
+                        
+                    alt_code = alt.get("alternative_function", "")
+                    
+                    # Analyze the alternative's complexity
+                    try:
+                        # Extract function name from the alternative implementation
+                        alt_func_name = func_name  # Default to original name
+                        func_def_match = re.match(r'def\s+([a-zA-Z0-9_]+)\s*\(', alt_code)
+                        if func_def_match:
+                            alt_func_name = func_def_match.group(1)
+                        
+                        # Use decompose_function to analyze the alternative
+                        alt_analysis = decompose_function(alt_code, alt_func_name)
+                        
+                        if alt_analysis and "metta_atoms" in alt_analysis:
+                            # Create a new temporary MeTTa space for this analysis
+                            temp_monitor = DynamicMonitor()
+                            
+                            # Add the atoms to the space
+                            for atom_str in alt_analysis["metta_atoms"]:
+                                try:
+                                    temp_monitor.add_atom(atom_str)
+                                except Exception as e:
+                                    logger.debug(f"Error adding atom {atom_str}: {e}")
+                            
+                            # Calculate complexity metrics
+                            operations = 0
+                            loops = 0
+                            calls = 0
+                            
+                            # Count binary operations
+                            bin_ops = temp_monitor.query(f"(match &self (bin-op $op $left $right $scope $line) $op)")
+                            operations = len(bin_ops)
+                            
+                            # Count loops
+                            loop_patterns = temp_monitor.query(f"(match &self (loop-pattern $id $type $scope $line) $type)")
+                            implicit_loops = temp_monitor.query(f"(match &self (implicit-loop $id $type $scope $line) $type)")
+                            loops = len(loop_patterns) + len(implicit_loops)
+                            
+                            # Count function calls
+                            func_calls = temp_monitor.query(f"(match &self (function-call $name $args $scope $line) $name)")
+                            calls = len(func_calls)
+                            
+                            # Calculate complexity score using the same formula as the original
+                            alt_score = operations + 3 * loops + 0.5 * calls
+                            
+                            # Store complexity information in the alternative
+                            alt["complexity"] = {
+                                "operations": operations,
+                                "loops": loops,
+                                "calls": calls,
+                                "score": alt_score
+                            }
+                            
+                            # Calculate complexity reduction percentage
+                            original_score = func_info["score"]
+                            if original_score > 0:  # Avoid division by zero
+                                reduction_percentage = ((original_score - alt_score) / original_score) * 100
+                                alt["complexity_reduction"] = reduction_percentage
+                            else:
+                                alt["complexity_reduction"] = 0
+                            
+                        else:
+                            logger.warning(f"Could not analyze complexity of alternative {j+1} for {func_name}")
+                            alt["complexity"] = {"score": 0, "operations": 0, "loops": 0, "calls": 0}
+                            alt["complexity_reduction"] = 0
+                            
+                    except Exception as e:
+                        logger.error(f"Error analyzing complexity of alternative {j+1}: {e}")
+                        alt["complexity"] = {"score": 0, "operations": 0, "loops": 0, "calls": 0}
+                        alt["complexity_reduction"] = 0
+                
+                # Print results with complexity analysis
                 for j, alt in enumerate(alternatives):
                     print(f"\n--- Alternative {j+1} ({alt.get('strategy', 'unknown')}) ---")
                     print(f"Success: {alt.get('success', False)}")
                     print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+                    
+                    # Print complexity metrics if available
+                    if "complexity" in alt:
+                        complexity = alt["complexity"]
+                        print(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
+                        
+                        if "complexity_reduction" in alt:
+                            print(f"Complexity reduction: {alt['complexity_reduction']:.1f}%")
+                    
                     print("\nCode:")
                     print(alt.get("alternative_function", "No code generated"))
                 
-                # Select best alternative
-                best_alt = analyzer.select_best_alternative(alternatives, "efficiency")
+                # Sort alternatives by complexity reduction if available
+                if all("complexity_reduction" in alt for alt in alternatives if alt.get("success", False)):
+                    successful_alternatives = [alt for alt in alternatives if alt.get("success", False)]
+                    successful_alternatives.sort(key=lambda x: x.get("complexity_reduction", 0), reverse=True)
+                    
+                    # Update alternatives with sorted list
+                    alternatives = successful_alternatives
+                
+                # Select best alternative based on complexity reduction and property preservation
+                best_alt = None
+                if alternatives:
+                    # First filter for property preservation
+                    preserved_alternatives = [alt for alt in alternatives 
+                                            if alt.get("success", False) and 
+                                            alt.get("verification_result", {}).get("properties_preserved", False)]
+                    
+                    if preserved_alternatives:
+                        # Then select the one with the highest complexity reduction
+                        best_alt = max(preserved_alternatives, 
+                                     key=lambda x: x.get("complexity_reduction", 0))
+                    else:
+                        # If none preserve properties, just use the highest complexity reduction
+                        successful = [alt for alt in alternatives if alt.get("success", False)]
+                        if successful:
+                            best_alt = max(successful, 
+                                         key=lambda x: x.get("complexity_reduction", 0))
+                
                 if best_alt:
                     print("\n--- Best Alternative ---")
                     print(f"Strategy: {best_alt.get('strategy', 'unknown')}")
+                    
+                    # Print complexity metrics
+                    if "complexity" in best_alt:
+                        complexity = best_alt["complexity"]
+                        print(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
+                        
+                        # Compare with original
+                        old_score = func_info["score"]
+                        print(f"Original complexity score: {old_score:.1f}")
+                        
+                        if "complexity_reduction" in best_alt:
+                            reduction = best_alt["complexity_reduction"]
+                            print(f"Actual complexity reduction: {reduction:.1f}%")
+                    
                     print("\nCode:")
                     print(best_alt.get("alternative_function", "No code selected"))
-                    
-                    # Calculate estimated complexity reduction
-                    old_score = func_info["score"]
-                    # Naive estimation of complexity reduction based on code length and strategy
-                    # A more accurate approach would be to analyze the generated code
-                    if best_alt.get("strategy") == "optimized":
-                        estimated_reduction = "~40-60%"
-                    elif best_alt.get("strategy") == "simplified":
-                        estimated_reduction = "~30-50%"
-                    else:
-                        estimated_reduction = "~20-40%"
-                    
-                    print(f"\nEstimated complexity reduction: {estimated_reduction}")
-                    print(f"Original complexity score: {old_score:.1f}")
                     
                     # Add suggestions for where to save optimized version
                     original_path = file_path
