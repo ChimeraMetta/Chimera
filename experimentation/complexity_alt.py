@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("proof_system")
 
-ONTOLOGY_PATH = "metta/ontology.metta"
+ONTOLOGY_PATH = "metta/code_ontology.metta"
 COMPLEXITY_THRESHOLD = 15  # Threshold for considering a function complex
 
 def integrate_with_immune_system(analyzer):

@@ -6,7 +6,7 @@ import re
 import sys
 from collections import defaultdict
 
-ONTOLOGY_PATH = "metta/ontology.metta"
+ONTOLOGY_PATH = "metta/code_ontology.metta"
 
 def analyze_codebase(path):
     """Analyze a Python file or directory of Python files."""
