@@ -2,7 +2,6 @@ from typing import Dict, List, Any
 import logging
 import json
 import re
-import requests
 from proofs.pattern_mapper import PatternMapper
 from proofs.requester import OpenAIRequests
 
