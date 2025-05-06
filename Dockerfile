@@ -68,6 +68,6 @@ RUN mkdir /workspace
 WORKDIR /workspace
 
 # Set the entrypoint to execute the CLI script using the installed PyPy
-ENTRYPOINT ["python", "/app/main.py"]
+ENTRYPOINT ["python", "cli.py"]
 
 # CMD can provide default arguments if needed, e.g., CMD ["--help"] 

@@ -1,12 +1,12 @@
 import git
-from static_analyzer import decompose_source
+from reflectors.static_analyzer import decompose_source
 from tqdm import tqdm
 import glob
 import hashlib
 import time
 import os
 from hyperon import *
-from dynamic_monitor import DynamicMonitor
+from reflectors.dynamic_monitor import DynamicMonitor
 from typing import Dict, Any, Optional
 
 TEMPORAL_RULE_PATH = "metta/temporal.metta"

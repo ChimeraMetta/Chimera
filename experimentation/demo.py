@@ -3,9 +3,9 @@ import logging
 from typing import Dict, List, Any
 
 from hyperon import *
-from dynamic_monitor import DynamicMonitor
-from static_analyzer import decompose_function
-from impl_generator import ProofGuidedImplementationGenerator
+from reflectors.dynamic_monitor import DynamicMonitor
+from reflectors.static_analyzer import decompose_function
+from executors.impl_generator import ProofGuidedImplementationGenerator
 from proofs.verifier import MeTTaPropertyVerifier
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 

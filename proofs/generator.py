@@ -4,8 +4,8 @@ import requests
 from typing import Dict, List, Any, Optional
 
 from hyperon import *
-from dynamic_monitor import DynamicMonitor
-from static_analyzer import decompose_function
+from reflectors.dynamic_monitor import DynamicMonitor
+from reflectors.static_analyzer import decompose_function
 from proofs.processor import ProofProcessorWithPatterns
 from proofs.requester import OpenAIRequests
 
