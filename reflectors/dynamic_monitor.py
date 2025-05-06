@@ -8,7 +8,7 @@ import time
 from typing import Any, Dict, List, Callable, Optional, Union, Tuple
 
 # Import the static analyzer and type conversion function
-from static_analyzer import decompose_function, decompose_source, convert_python_type_to_metta
+from reflectors.static_analyzer import decompose_function, decompose_source, convert_python_type_to_metta
 
 # MeTTa integration through hyperon
 from hyperon import *

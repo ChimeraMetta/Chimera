@@ -2,8 +2,6 @@ import os
 import logging
 import sys
 import re
-from collections import defaultdict
-from typing import Dict, List, Any
 
 # Import existing components
 from hyperon import *
@@ -12,7 +10,6 @@ from reflectors.static_analyzer import decompose_file, decompose_function
 from executors.impl_generator import ProofGuidedImplementationGenerator
 from proofs.verifier import MeTTaPropertyVerifier
 from proofs.analyzer import ImmuneSystemProofAnalyzer
-from reflectors.temporal_analyzer import TemporalCodeAnalyzer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -43,7 +40,7 @@ def integrate_with_immune_system(analyzer):
     )
     
     # Load MeTTa ontology rules if not already loaded
-    load_metta_ontology(analyzer.monitor)
+    load_metta_proof_ontology(analyzer.monitor)
     
     # Add method to generate verified alternatives
     def generate_verified_alternatives(self, function_code, function_name, count=3):
@@ -108,7 +105,7 @@ def integrate_with_immune_system(analyzer):
     
     return analyzer
 
-def load_metta_ontology(monitor):
+def load_metta_proof_ontology(monitor):
     """
     Load MeTTa ontology rules for proof verification.
     

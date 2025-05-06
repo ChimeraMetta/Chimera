@@ -19,7 +19,7 @@ from commands.recommend import RecommendCommand
 
 # Check for required modules
 try:
-    from static_analyzer import decompose_file
+    from reflectors.static_analyzer import decompose_file
     ANALYZER_MODULES_AVAILABLE = True
 except ImportError:
     ANALYZER_MODULES_AVAILABLE = False

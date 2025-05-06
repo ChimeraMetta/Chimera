@@ -3,7 +3,7 @@ import re
 from typing import Dict, List, Any, Optional
 
 from hyperon import *
-from dynamic_monitor import DynamicMonitor
+from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.requester import OpenAIRequests
 
 class ExampleDrivenProofGenerator:
