@@ -162,24 +162,34 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - CLI - %(message)s')
 
     parser = argparse.ArgumentParser(
-        description="Chimera Indexer CLI tool for code analysis.",
+        description="Chimera Indexer: A CLI tool for analyzing Python codebases.",
+        epilog="Example usage:\\n"
+               "  python cli.py summary /path/to/your/code\\n"
+               "  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\\n"
+               "  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "command", 
         choices=["summary", "analyze"], 
-        help="The command to run:\n"
-             "  summary: Run comprehensive analysis (from exec/full_analyzer.py).\n"
-             "  analyze: Run complexity analysis and potential optimization (from exec/complexity.py)."
+        help="The analysis command to execute:\\n"
+             "  summary: Performs a comprehensive static analysis of the codebase structure,\\n"
+             "           relationships, patterns, and concepts (using exec/full_analyzer.py).\\n"
+             "  analyze: Focuses on function complexity analysis and offers potential\\n"
+             "           AI-driven optimization suggestions if an API key is provided\\n"
+             "           (using exec/complexity.py)."
     )
     parser.add_argument(
         "path", 
-        help="The path to the Python file or directory to analyze."
+        help="The path to the target Python file or directory to analyze."
     )
     parser.add_argument(
         "--api_key", 
-        help="API key for the 'analyze' command (OpenAI API key for alternative generation).\n"
-             "If not provided, checks the OPENAI_API_KEY environment variable.",
+        metavar='API_KEY',
+        help="[Optional] OpenAI API key required by the 'analyze' command for generating\\n"
+             "alternative code implementations. If omitted, the tool checks the\\n"
+             "OPENAI_API_KEY environment variable. If neither is provided, 'analyze'\\n"
+             "runs only the complexity analysis without suggesting alternatives.",
         default=None
     )
 
