@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import logging
+from typing import Union
 
 # --- Path Setup ---
 _WORKSPACE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -86,7 +87,7 @@ def run_summary_command(target_path: str):
 
     print(f"Summary analysis for {target_path} complete.")
 
-def run_analyze_command(target_path: str, api_key: str | None = None):
+def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     print(f"Running 'analyze' command for: {target_path} (API key: {'Provided' if api_key else 'Not provided'})")
     
     local_monitor = DynamicMonitor()
