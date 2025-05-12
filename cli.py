@@ -112,6 +112,9 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
 
     analyzer_instance_for_complexity = None
     if api_key:
+        # === DIAGNOSTIC PRINT START ===
+        print(f"[DEBUG] API key provided, attempting to initialize ImmuneSystemProofAnalyzer...")
+        # === DIAGNOSTIC PRINT END ===
         try:
             complexity_analyzer_module.logger.info("Initializing proof-guided implementation generator via CLI...")
             # The ImmuneSystemProofAnalyzer needs the *global* monitor from its module context for some ops if not passed around carefully
@@ -123,8 +126,14 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             complexity_analyzer_module.logger.error(f"Error initializing ImmuneSystemProofAnalyzer via CLI: {e}")
             complexity_analyzer_module.logger.exception("Full traceback for analyzer initialization error:")
             print("Could not initialize proof-guided implementation generator. Proceeding with complexity analysis only.")
+            # Ensure analyzer_instance_for_complexity remains None if initialization fails
+            analyzer_instance_for_complexity = None 
     else:
         print("No API key provided. Proceeding with complexity analysis only (no alternative generation).")
+
+    # === DIAGNOSTIC PRINT START ===
+    print(f"[DEBUG] Analyzer instance before calling analyze_function_complexity_and_optimize: {type(analyzer_instance_for_complexity)}")
+    # === DIAGNOSTIC PRINT END ===
 
     try:
         # Replicate the __main__ execution flow of complexity.py
