@@ -3,6 +3,7 @@ import logging
 import sys
 import re
 from colorama import init, Fore, Style
+from typing import Any
 
 # Initialize colorama
 init()
@@ -203,6 +204,25 @@ def _escape_code_for_metta(code: str) -> str:
     code = code.replace('\n', '\\n')
     return code
 
+def _create_metta_atom(atom_str: str) -> Any:
+    """
+    Create a MeTTa atom from a string representation.
+    
+    Args:
+        atom_str: String representation of the atom
+        
+    Returns:
+        MeTTa atom object
+    """
+    try:
+        # Parse the atom string
+        parsed = monitor.metta.parse_single(atom_str)
+        return parsed
+    except Exception as e:
+        logger.error(f"Error parsing atom: {atom_str}")
+        logger.error(f"Error details: {e}")
+        return None
+
 def analyze_codebase(path, analyzer=None):
     """Analyze a Python file or directory of Python files."""
     if os.path.isfile(path) and path.endswith('.py'):
@@ -227,22 +247,36 @@ def analyze_file(file_path, analyzer=None):
     # Add analysis results to MeTTa
     if "metta_atoms" in analysis_result and analysis_result["metta_atoms"]:
         atoms_added = 0
-        for atom_str in analysis_result["metta_atoms"]:
+        for i, atom_str in enumerate(analysis_result["metta_atoms"]):
             try:
-                # Escape any code in the atom string
+                logger.debug(f"Processing atom {i+1}/{len(analysis_result['metta_atoms'])}")
+                logger.debug(f"Atom string: {atom_str[:100]}...")  # Log first 100 chars
+                
+                # Handle function code atoms specially
                 if "= (" in atom_str and ")" in atom_str:
+                    logger.debug("Found function code atom")
                     # Extract the code part
                     code_start = atom_str.find('"') + 1
                     code_end = atom_str.rfind('"')
                     if code_start < code_end:
                         code = atom_str[code_start:code_end]
+                        logger.debug(f"Extracted code: {code[:100]}...")  # Log first 100 chars
                         escaped_code = _escape_code_for_metta(code)
+                        logger.debug(f"Escaped code: {escaped_code[:100]}...")  # Log first 100 chars
                         atom_str = atom_str[:code_start] + escaped_code + atom_str[code_end:]
+                        logger.debug(f"Modified atom string: {atom_str[:100]}...")  # Log first 100 chars
                 
+                logger.debug("Attempting to add atom to monitor")
                 monitor.add_atom(atom_str)
                 atoms_added += 1
+                logger.debug(f"Successfully added atom {i+1}")
+                
             except Exception as e:
-                print(f"{Fore.RED}Error adding atom {atom_str}: {e}{Style.RESET_ALL}")
+                logger.error(f"Error adding atom {i+1}: {atom_str[:100]}...")  # Log first 100 chars
+                logger.error(f"Error details: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 pass
                 
         print(f"{Fore.GREEN}Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}{Style.RESET_ALL}")
@@ -264,6 +298,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
         return
     
     atoms = result["metta_atoms"]
+    logger.debug(f"Found {len(atoms)} atoms in file")
     
     # Extract function definitions
     function_defs = {}
@@ -271,9 +306,11 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     
     # Also extract function source code if available
     if "functions" in result:
+        logger.debug(f"Found {len(result['functions'])} functions in result")
         for func_info in result["functions"]:
             if "name" in func_info and "source" in func_info:
                 function_source[func_info["name"]] = func_info["source"]
+                logger.debug(f"Extracted source for function: {func_info['name']}")
     
     # Extract from atoms as fallback
     for atom in atoms:
@@ -292,6 +329,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     "loops": 0,
                     "calls": 0
                 }
+                logger.debug(f"Found function definition: {func_name} at lines {line_start}-{line_end}")
     
     # Count operations (bin_op)
     for atom in atoms:
@@ -442,12 +480,6 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     
                     # Analyze the alternative's complexity
                     try:
-                        # Extract function name from the alternative implementation
-                        alt_func_name = func_name  # Default to original name
-                        func_def_match = re.match(r'def\s+([a-zA-Z0-9_]+)\s*\(', alt_code)
-                        if func_def_match:
-                            alt_func_name = func_def_match.group(1)
-                        
                         # Use decompose_function to analyze the alternative
                         # decompose_function() accepts a string with function code directly
                         alt_analysis = decompose_function(alt_code)
