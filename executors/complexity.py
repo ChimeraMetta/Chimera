@@ -184,6 +184,25 @@ def load_metta_proof_ontology(monitor):
     
     return success
 
+def _escape_code_for_metta(code: str) -> str:
+    """
+    Properly escape code for inclusion in MeTTa atoms.
+    Handles both backslashes and quotes, and preserves newlines.
+    
+    Args:
+        code: Original code string
+        
+    Returns:
+        Escaped code string
+    """
+    # First escape backslashes
+    code = code.replace('\\', '\\\\')
+    # Then escape quotes
+    code = code.replace('"', '\\"')
+    # Preserve newlines
+    code = code.replace('\n', '\\n')
+    return code
+
 def analyze_codebase(path, analyzer=None):
     """Analyze a Python file or directory of Python files."""
     if os.path.isfile(path) and path.endswith('.py'):
@@ -210,6 +229,16 @@ def analyze_file(file_path, analyzer=None):
         atoms_added = 0
         for atom_str in analysis_result["metta_atoms"]:
             try:
+                # Escape any code in the atom string
+                if "= (" in atom_str and ")" in atom_str:
+                    # Extract the code part
+                    code_start = atom_str.find('"') + 1
+                    code_end = atom_str.rfind('"')
+                    if code_start < code_end:
+                        code = atom_str[code_start:code_end]
+                        escaped_code = _escape_code_for_metta(code)
+                        atom_str = atom_str[:code_start] + escaped_code + atom_str[code_end:]
+                
                 monitor.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
