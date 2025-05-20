@@ -1,14 +1,10 @@
 import os
 import logging
-import requests
-import json
 import re
 from typing import Dict, List, Any
 
 from hyperon import *
 from reflectors.dynamic_monitor import DynamicMonitor, monitor
-from reflectors.static_analyzer import decompose_function
-from proofs.generator import MettaProofGenerator
 from proofs.example_generator import ExampleDrivenProofGenerator
 from proofs.processor import ProofProcessorWithPatterns
 from proofs.requester import OpenAIRequests

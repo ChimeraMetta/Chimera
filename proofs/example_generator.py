@@ -1,9 +1,8 @@
 import json
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 from hyperon import *
-from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.requester import OpenAIRequests
 
 class ExampleDrivenProofGenerator:
