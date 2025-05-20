@@ -5,6 +5,37 @@ import os
 import re
 import sys
 from collections import defaultdict
+from colorama import init, Fore, Style
+import logging
+
+# Initialize colorama
+init()
+
+# Custom formatter for colorful logging
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter that adds colors to different log levels"""
+    
+    COLORS = {
+        'DEBUG': Fore.BLUE,
+        'INFO': Fore.GREEN,
+        'WARNING': Fore.YELLOW,
+        'ERROR': Fore.RED,
+        'CRITICAL': Fore.RED + Style.BRIGHT
+    }
+
+    def format(self, record):
+        # Add color to the level name
+        if record.levelname in self.COLORS:
+            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
+        return super().format(record)
+
+# Configure logging
+handler = logging.StreamHandler()
+formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger = logging.getLogger("full_analyzer")
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 ONTOLOGY_PATH = "metta/code_ontology.metta"
 
@@ -20,11 +51,11 @@ def analyze_codebase(path):
                 if file.endswith('.py'):
                     analyze_file(os.path.join(root, file))
     else:
-        print(f"Invalid path or not a Python file: {path}")
+        print(f"{Fore.RED}Invalid path or not a Python file: {path}{Style.RESET_ALL}")
 
 def analyze_file(file_path):
     """Analyze a single Python file and add to the ontology."""
-    print(f"Analyzing {file_path}...")
+    print(f"{Fore.CYAN}Analyzing {file_path}...{Style.RESET_ALL}")
     
     # Run static analysis
     analysis_result = decompose_file(file_path)
@@ -37,16 +68,16 @@ def analyze_file(file_path):
                 monitor.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
-                print(f"Error adding atom {atom_str}: {e}")
+                print(f"{Fore.RED}Error adding atom {atom_str}: {e}{Style.RESET_ALL}")
                 pass
                 
-        print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
+        print(f"{Fore.GREEN}Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}{Style.RESET_ALL}")
     else:
-        print(f"No MeTTa atoms generated for {file_path}")
+        print(f"{Fore.YELLOW}No MeTTa atoms generated for {file_path}{Style.RESET_ALL}")
 
 def find_function_relationships():
     """Find and analyze function call relationships."""
-    print("\n=== Function Call Relationships ===")
+    print(f"\n{Fore.CYAN}=== Function Call Relationships ==={Style.RESET_ALL}")
     
     # Get function calls with a more robust query pattern
     # The old query may have had scope matching issues
@@ -83,7 +114,7 @@ def find_function_relationships():
         """)
     
     if results:
-        print(f"Found {len(results)} function call relationships")
+        print(f"{Fore.GREEN}Found {len(results)} function call relationships{Style.RESET_ALL}")
         
         # Build caller -> callee map
         call_graph = {}
@@ -107,10 +138,10 @@ def find_function_relationships():
                         reverse_graph[callee] = set()
                     reverse_graph[callee].add(caller)
             except Exception as e:
-                print(f"Error processing result {result}: {e}")
+                print(f"{Fore.RED}Error processing result {result}: {e}{Style.RESET_ALL}")
         
         # Display function call graph
-        print("\nFunction call relationships:")
+        print(f"\n{Fore.GREEN}Function call relationships:{Style.RESET_ALL}")
         for caller, callees in call_graph.items():
             print(f"- {caller} calls: {', '.join(callees)}")
         
@@ -119,7 +150,7 @@ def find_function_relationships():
         high_fan_in.sort(key=lambda x: x[1], reverse=True)
         
         if high_fan_in:
-            print("\nMost called functions (high fan-in):")
+            print(f"\n{Fore.GREEN}Most called functions (high fan-in):{Style.RESET_ALL}")
             for func, count in high_fan_in[:10]:  # Show top 10
                 print(f"- {func}: called by {count} functions")
         
@@ -128,12 +159,12 @@ def find_function_relationships():
         high_fan_out.sort(key=lambda x: x[1], reverse=True)
         
         if high_fan_out:
-            print("\nFunctions calling many others (high fan-out):")
+            print(f"\n{Fore.GREEN}Functions calling many others (high fan-out):{Style.RESET_ALL}")
             for func, count in high_fan_out[:10]:  # Show top 10
                 print(f"- {func}: calls {count} functions")
         
         # Additional debugging to show all function definitions and calls
-        print("\nDebugging information:")
+        print(f"\n{Fore.YELLOW}Debugging information:{Style.RESET_ALL}")
         
         func_defs = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
         print(f"Total function definitions: {len(func_defs)}")
@@ -147,7 +178,7 @@ def find_function_relationships():
             for c in func_calls:
                 print(f"  {c}")
     else:
-        print("No function call relationships found. Adding diagnostic information:")
+        print(f"{Fore.YELLOW}No function call relationships found. Adding diagnostic information:{Style.RESET_ALL}")
         
         # Diagnostic information
         func_defs = monitor.query("(match &self (function-def $name $scope $start $end) $name)")
@@ -160,12 +191,12 @@ def find_function_relationships():
         
         # Show sample function definitions and calls for debugging
         if func_defs:
-            print("\nSample function definitions:")
+            print(f"\n{Fore.YELLOW}Sample function definitions:{Style.RESET_ALL}")
             for i, func in enumerate(func_defs[:5]):
                 print(f"  {func}")
         
         if func_calls:
-            print("\nSample function calls:")
+            print(f"\n{Fore.YELLOW}Sample function calls:{Style.RESET_ALL}")
             for i, call in enumerate(func_calls[:5]):
                 print(f"  {call}")
 
@@ -698,13 +729,13 @@ def analyze_temporal_evolution(repo_path, monitor=None):
 
 def analyze_function_complexity(file_path):
     """Analyze complexity of functions in a file with our enhanced metrics."""
-    print(f"Analyzing complexity in {file_path}...")
+    print(f"{Fore.CYAN}Analyzing complexity in {file_path}...{Style.RESET_ALL}")
     
     # Decompose the file
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"Error: {result['error']}")
+        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
         return
     
     atoms = result["metta_atoms"]
@@ -801,7 +832,7 @@ def analyze_function_complexity(file_path):
     )
     
     # Print complexity ranking
-    print("\n=== Function Complexity Analysis ===")
+    print(f"\n{Fore.GREEN}=== Function Complexity Analysis ==={Style.RESET_ALL}")
     print("Function complexity ranking:")
     for i, (func_name, func_info) in enumerate(sorted_functions):
         print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
@@ -820,7 +851,7 @@ def analyze_function_complexity(file_path):
     # Sort complex functions by score
     complex_funcs.sort(key=lambda x: x[1]["score"], reverse=True)
     
-    print("\n=== Complex Functions Detected ===")
+    print(f"\n{Fore.GREEN}=== Complex Functions Detected ==={Style.RESET_ALL}")
     if complex_funcs:
         for i, (func_name, func_info) in enumerate(complex_funcs):
             print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
@@ -892,13 +923,13 @@ def analyze_domain_concepts():
 
 def analyze_function_call_relationships(file_path):
     """Analyze function call relationships with proper handling of class methods."""
-    print(f"Analyzing function call relationships in {file_path}...")
+    print(f"{Fore.CYAN}Analyzing function call relationships in {file_path}...{Style.RESET_ALL}")
     
     # Decompose the file
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"Error: {result['error']}")
+        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
         return
     
     atoms = result["metta_atoms"]
@@ -1004,9 +1035,9 @@ def analyze_function_call_relationships(file_path):
                     call_relationships[qname].append(callee_qualified)
     
     # Print function call relationships
-    print("\n=== Function Call Relationships ===")
-    print(f"Found {len(call_relationships)} function call relationships")
-    print("Function call relationships:")
+    print(f"\n{Fore.GREEN}=== Function Call Relationships ==={Style.RESET_ALL}")
+    print(f"{Fore.GREEN}Found {len(call_relationships)} function call relationships{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}Function call relationships:{Style.RESET_ALL}")
     
     for caller, callees in sorted(call_relationships.items()):
         # Remove duplicates while preserving order
@@ -1018,7 +1049,7 @@ def analyze_function_call_relationships(file_path):
         print(f"- {caller} calls: {', '.join(unique_callees)}")
     
     # Print debugging information
-    print("Debugging information:")
+    print(f"{Fore.YELLOW}Debugging information:{Style.RESET_ALL}")
     print(f"Total function definitions: {len(function_defs)}")
     for qname, info in sorted(function_defs.items()):
         print(f"  ({info['name']} {info['scope']} {info['line_start']} {info['line_end']})")
@@ -1026,10 +1057,10 @@ def analyze_function_call_relationships(file_path):
     print(f"Total function calls: {len(function_calls)}")
     
     # Identify potential call chains
-    print("\n=== Function Call Chains ===")
+    print(f"\n{Fore.GREEN}=== Function Call Chains ==={Style.RESET_ALL}")
     call_chains = find_call_chains(call_relationships)
     if call_chains:
-        print(f"Found {len(call_chains)} significant call chains:")
+        print(f"{Fore.GREEN}Found {len(call_chains)} significant call chains:{Style.RESET_ALL}")
         for i, chain in enumerate(call_chains[:10], 1):  # Show top 10
             print(f"{i}. {' → '.join(chain)}")
     else:

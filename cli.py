@@ -3,6 +3,28 @@ import os
 import sys
 import logging
 from typing import Union
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init()
+
+# Custom formatter for colorful logging
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter that adds colors to different log levels"""
+    
+    COLORS = {
+        'DEBUG': Fore.BLUE,
+        'INFO': Fore.GREEN,
+        'WARNING': Fore.YELLOW,
+        'ERROR': Fore.RED,
+        'CRITICAL': Fore.RED + Style.BRIGHT
+    }
+
+    def format(self, record):
+        # Add color to the level name
+        if record.levelname in self.COLORS:
+            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
+        return super().format(record)
 
 # --- Path Setup ---
 _WORKSPACE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -16,10 +38,21 @@ from executors import complexity as complexity_analyzer_module
 from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 
+def setup_colored_logging():
+    """Setup colored logging configuration"""
+    handler = logging.StreamHandler()
+    formatter = ColoredFormatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    return logger
+
 # --- Command Functions ---
 
 def run_summary_command(target_path: str):
-    print(f"Running summary for: {target_path}")
+    print(f"{Fore.CYAN}Running summary for: {target_path}{Style.RESET_ALL}")
     
     local_monitor = DynamicMonitor()
     
@@ -27,7 +60,7 @@ def run_summary_command(target_path: str):
     # exec.full_analyzer.ONTOLOGY_PATH is like "metta/code_ontology.metta"
     ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
     if not os.path.exists(ontology_file_path):
-        print(f"Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.")
+        print(f"{Fore.YELLOW}Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.{Style.RESET_ALL}")
     else:
         local_monitor.load_metta_rules(ontology_file_path)
 
@@ -37,42 +70,42 @@ def run_summary_command(target_path: str):
     
     try:
         # Replicate the __main__ execution flow of full_analyzer.py
-        print(f"Analyzing codebase structure with full_analyzer.analyze_codebase...")
+        print(f"{Fore.GREEN}Analyzing codebase structure with full_analyzer.analyze_codebase...{Style.RESET_ALL}")
         full_analyzer.analyze_codebase(target_path)
         
-        print("Analyzing type safety...")
+        print(f"{Fore.GREEN}Analyzing type safety...{Style.RESET_ALL}")
         full_analyzer.analyze_type_safety() # Uses global full_analyzer.monitor
         
-        print(f"Analyzing temporal evolution...")
+        print(f"{Fore.GREEN}Analyzing temporal evolution...{Style.RESET_ALL}")
         # analyze_temporal_evolution in full_analyzer.py can take monitor explicitly
         full_analyzer.analyze_temporal_evolution(target_path, local_monitor)
         
-        print(f"Analyzing function complexity (static)...")
+        print(f"{Fore.GREEN}Analyzing function complexity (static)...{Style.RESET_ALL}")
         full_analyzer.analyze_function_complexity(target_path) # Uses global full_analyzer.monitor
         
         # find_function_relationships was commented out in original full_analyzer.py __main__
         # print("Finding function relationships...")
         # full_analyzer.find_function_relationships() 
 
-        print(f"Analyzing function call relationships (detailed)...")
+        print(f"{Fore.GREEN}Analyzing function call relationships (detailed)...{Style.RESET_ALL}")
         full_analyzer.analyze_function_call_relationships(target_path) # Uses global full_analyzer.monitor indirectly via decompose_file
         
-        print("Finding type relationships...")
+        print(f"{Fore.GREEN}Finding type relationships...{Style.RESET_ALL}")
         full_analyzer.find_type_relationships() # Uses global full_analyzer.monitor
         
-        print("Finding class relationships...")
+        print(f"{Fore.GREEN}Finding class relationships...{Style.RESET_ALL}")
         full_analyzer.find_class_relationships() # Uses global full_analyzer.monitor
         
-        print("Finding module relationships...")
+        print(f"{Fore.GREEN}Finding module relationships...{Style.RESET_ALL}")
         full_analyzer.find_module_relationships() # Uses global full_analyzer.monitor
         
-        print("Finding operation patterns...")
+        print(f"{Fore.GREEN}Finding operation patterns...{Style.RESET_ALL}")
         full_analyzer.find_operation_patterns() # Uses global full_analyzer.monitor
         
-        print("Analyzing structural patterns...")
+        print(f"{Fore.GREEN}Analyzing structural patterns...{Style.RESET_ALL}")
         full_analyzer.analyze_structural_patterns() # Uses global full_analyzer.monitor
         
-        print("Analyzing domain concepts...")
+        print(f"{Fore.GREEN}Analyzing domain concepts...{Style.RESET_ALL}")
         full_analyzer.analyze_domain_concepts() # Uses global full_analyzer.monitor
 
     except Exception as e:
@@ -85,10 +118,10 @@ def run_summary_command(target_path: str):
         elif hasattr(full_analyzer, 'monitor'):
             delattr(full_analyzer, 'monitor')
 
-    print(f"Summary analysis for {target_path} complete.")
+    print(f"{Fore.CYAN}Summary analysis for {target_path} complete.{Style.RESET_ALL}")
 
 def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
-    print(f"Running 'analyze' command for: {target_path} (API key: {'Provided' if api_key else 'Not provided'})")
+    print(f"{Fore.CYAN}Running 'analyze' command for: {target_path} (API key: {'Provided' if api_key else 'Not provided'}){Style.RESET_ALL}")
     
     local_monitor = DynamicMonitor()
 
@@ -96,7 +129,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     # exec.complexity_analyzer_module.ONTOLOGY_PATH is like "metta/code_ontology.metta"
     ontology_file_path = os.path.join(_WORKSPACE_ROOT, complexity_analyzer_module.ONTOLOGY_PATH)
     if not os.path.exists(ontology_file_path):
-        print(f"Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.")
+        print(f"{Fore.YELLOW}Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.{Style.RESET_ALL}")
     else:
         local_monitor.load_metta_rules(ontology_file_path)
 
@@ -107,13 +140,17 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     # Setup logger for complexity_analyzer_module if it's not already configured by its import
     # This ensures its internal logging works as expected.
     if not any(handler for handler in complexity_analyzer_module.logger.handlers):
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler = logging.StreamHandler()
+        formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        complexity_analyzer_module.logger.addHandler(handler)
+        complexity_analyzer_module.logger.setLevel(logging.INFO)
         complexity_analyzer_module.logger.info("CLI re-initialized logger for complexity_analyzer_module.")
 
     analyzer_instance_for_complexity = None
     if api_key:
         # === DIAGNOSTIC PRINT START ===
-        print(f"[DEBUG] API key provided, attempting to initialize ImmuneSystemProofAnalyzer...")
+        print(f"{Fore.BLUE}[DEBUG] API key provided, attempting to initialize ImmuneSystemProofAnalyzer...{Style.RESET_ALL}")
         # === DIAGNOSTIC PRINT END ===
         try:
             complexity_analyzer_module.logger.info("Initializing proof-guided implementation generator via CLI...")
@@ -125,23 +162,23 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         except Exception as e:
             complexity_analyzer_module.logger.error(f"Error initializing ImmuneSystemProofAnalyzer via CLI: {e}")
             complexity_analyzer_module.logger.exception("Full traceback for analyzer initialization error:")
-            print("Could not initialize proof-guided implementation generator. Proceeding with complexity analysis only.")
+            print(f"{Fore.YELLOW}Could not initialize proof-guided implementation generator. Proceeding with complexity analysis only.{Style.RESET_ALL}")
             # Ensure analyzer_instance_for_complexity remains None if initialization fails
             analyzer_instance_for_complexity = None 
     else:
-        print("No API key provided. Proceeding with complexity analysis only (no alternative generation).")
+        print(f"{Fore.YELLOW}No API key provided. Proceeding with complexity analysis only (no alternative generation).{Style.RESET_ALL}")
 
     # === DIAGNOSTIC PRINT START ===
-    print(f"[DEBUG] Analyzer instance before calling analyze_function_complexity_and_optimize: {type(analyzer_instance_for_complexity)}")
+    print(f"{Fore.BLUE}[DEBUG] Analyzer instance before calling analyze_function_complexity_and_optimize: {type(analyzer_instance_for_complexity)}{Style.RESET_ALL}")
     # === DIAGNOSTIC PRINT END ===
 
     try:
         # Replicate the __main__ execution flow of complexity.py
-        print(f"Analyzing codebase with complexity_analyzer_module.analyze_codebase...")
+        print(f"{Fore.GREEN}Analyzing codebase with complexity_analyzer_module.analyze_codebase...{Style.RESET_ALL}")
         # complexity_analyzer_module.analyze_codebase calls analyze_file, which uses global monitor
         complexity_analyzer_module.analyze_codebase(target_path) # analyzer_instance_for_complexity is not used by this specific analyze_codebase
 
-        print(f"Analyzing function complexity and optimizing for {target_path}...")
+        print(f"{Fore.GREEN}Analyzing function complexity and optimizing for {target_path}...{Style.RESET_ALL}")
         if os.path.isfile(target_path) and target_path.endswith('.py'):
             complexity_analyzer_module.analyze_function_complexity_and_optimize(target_path, analyzer_instance_for_complexity)
         elif os.path.isdir(target_path):
@@ -149,10 +186,10 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                 for f_name in files_in_dir:
                     if f_name.endswith('.py'):
                         file_path_to_analyze = os.path.join(root, f_name)
-                        print(f"Analyzing and optimizing: {file_path_to_analyze}")
+                        print(f"{Fore.GREEN}Analyzing and optimizing: {file_path_to_analyze}{Style.RESET_ALL}")
                         complexity_analyzer_module.analyze_function_complexity_and_optimize(file_path_to_analyze, analyzer_instance_for_complexity)
         else:
-            print(f"Path is not a valid Python file or directory: {target_path}")
+            print(f"{Fore.RED}Path is not a valid Python file or directory: {target_path}{Style.RESET_ALL}")
             
     except Exception as e:
         logging.error(f"An error occurred during 'analyze' command execution: {e}")
@@ -164,29 +201,30 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         elif hasattr(complexity_analyzer_module, 'monitor'):
             delattr(complexity_analyzer_module, 'monitor')
             
-    print(f"'Analyze' command for {target_path} complete.")
+    print(f"{Fore.CYAN}'Analyze' command for {target_path} complete.{Style.RESET_ALL}")
 
 # --- Main CLI Logic ---
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - CLI - %(message)s')
+    # Setup colored logging
+    logger = setup_colored_logging()
 
     parser = argparse.ArgumentParser(
-        description="Chimera Indexer: A CLI tool for analyzing Python codebases.",
-        epilog="Example usage:\\n"
-               "  python cli.py summary /path/to/your/code\\n"
-               "  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\\n"
-               "  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY",
+        description=f"{Fore.CYAN}Chimera Indexer: A CLI tool for analyzing Python codebases.{Style.RESET_ALL}",
+        epilog=f"Example usage:\n"
+               f"  {Fore.GREEN}python cli.py summary /path/to/your/code{Style.RESET_ALL}\n"
+               f"  {Fore.GREEN}python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY{Style.RESET_ALL}\n"
+               f"  {Fore.GREEN}python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY{Style.RESET_ALL}",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "command", 
         choices=["summary", "analyze"], 
-        help="The analysis command to execute:\\n"
-             "  summary: Performs a comprehensive static analysis of the codebase structure,\\n"
-             "           relationships, patterns, and concepts (using exec/full_analyzer.py).\\n"
-             "  analyze: Focuses on function complexity analysis and offers potential\\n"
-             "           AI-driven optimization suggestions if an API key is provided\\n"
+        help="The analysis command to execute:\n"
+             "  summary: Performs a comprehensive static analysis of the codebase structure,\n"
+             "           relationships, patterns, and concepts (using exec/full_analyzer.py).\n"
+             "  analyze: Focuses on function complexity analysis and offers potential\n"
+             "           AI-driven optimization suggestions if an API key is provided\n"
              "           (using exec/complexity.py)."
     )
     parser.add_argument(
@@ -196,9 +234,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--api_key", 
         metavar='API_KEY',
-        help="[Optional] OpenAI API key required by the 'analyze' command for generating\\n"
-             "alternative code implementations. If omitted, the tool checks the\\n"
-             "OPENAI_API_KEY environment variable. If neither is provided, 'analyze'\\n"
+        help="[Optional] OpenAI API key required by the 'analyze' command for generating\n"
+             "alternative code implementations. If omitted, the tool checks the\n"
+             "OPENAI_API_KEY environment variable. If neither is provided, 'analyze'\n"
              "runs only the complexity analysis without suggesting alternatives.",
         default=None
     )
