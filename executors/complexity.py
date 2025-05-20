@@ -142,8 +142,8 @@ def load_metta_proof_ontology(monitor):
     """
     # Check if ontology files exist
     ontology_files = [
-        os.path.join(os.path.dirname(__file__), "metta", "proof_ontology.metta"),
-        os.path.join(os.path.dirname(__file__), "metta", "proof_verification.metta")
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "metta", "proof_ontology.metta"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "metta", "proof_verification.metta")
     ]
     
     success = True

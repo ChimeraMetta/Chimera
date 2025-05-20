@@ -1,6 +1,5 @@
 import json
 import logging
-import requests
 from typing import Dict, List, Any, Optional
 
 from hyperon import *
