@@ -2,6 +2,10 @@ import os
 import logging
 import sys
 import re
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init()
 
 # Import existing components
 from hyperon import *
@@ -11,10 +15,31 @@ from executors.impl_generator import ProofGuidedImplementationGenerator
 from proofs.verifier import MeTTaPropertyVerifier
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 
+# Custom formatter for colorful logging
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter that adds colors to different log levels"""
+    
+    COLORS = {
+        'DEBUG': Fore.BLUE,
+        'INFO': Fore.GREEN,
+        'WARNING': Fore.YELLOW,
+        'ERROR': Fore.RED,
+        'CRITICAL': Fore.RED + Style.BRIGHT
+    }
+
+    def format(self, record):
+        # Add color to the level name
+        if record.levelname in self.COLORS:
+            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
+        return super().format(record)
+
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler = logging.StreamHandler()
+formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
 logger = logging.getLogger("proof_system")
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 ONTOLOGY_PATH = "metta/code_ontology.metta"
 COMPLEXITY_THRESHOLD = 15  # Threshold for considering a function complex
@@ -171,11 +196,11 @@ def analyze_codebase(path, analyzer=None):
                 if file.endswith('.py'):
                     analyze_file(os.path.join(root, file), analyzer)
     else:
-        print(f"Invalid path or not a Python file: {path}")
+        print(f"{Fore.RED}Invalid path or not a Python file: {path}{Style.RESET_ALL}")
 
 def analyze_file(file_path, analyzer=None):
     """Analyze a single Python file and add to the ontology."""
-    print(f"Analyzing {file_path}...")
+    print(f"{Fore.CYAN}Analyzing {file_path}...{Style.RESET_ALL}")
     
     # Run static analysis
     analysis_result = decompose_file(file_path)
@@ -188,25 +213,25 @@ def analyze_file(file_path, analyzer=None):
                 monitor.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
-                print(f"Error adding atom {atom_str}: {e}")
+                print(f"{Fore.RED}Error adding atom {atom_str}: {e}{Style.RESET_ALL}")
                 pass
                 
-        print(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
+        print(f"{Fore.GREEN}Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}{Style.RESET_ALL}")
     else:
-        print(f"No MeTTa atoms generated for {file_path}")
+        print(f"{Fore.YELLOW}No MeTTa atoms generated for {file_path}{Style.RESET_ALL}")
 
 def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     """
     Analyze complexity of functions in a file and generate optimized alternatives
     for complex functions.
     """
-    print(f"Analyzing complexity in {file_path} and generating optimized alternatives...")
+    print(f"{Fore.CYAN}Analyzing complexity in {file_path} and generating optimized alternatives...{Style.RESET_ALL}")
     
     # Decompose the file
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"Error: {result['error']}")
+        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
         return
     
     atoms = result["metta_atoms"]
@@ -312,12 +337,12 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     )
     
     # Print complexity ranking
-    print("\n=== Function Complexity Analysis ===")
-    print("Function complexity ranking:")
+    print(f"\n{Fore.CYAN}=== Function Complexity Analysis ==={Style.RESET_ALL}")
+    print(f"{Fore.GREEN}Function complexity ranking:{Style.RESET_ALL}")
     for i, (func_name, func_info) in enumerate(sorted_functions):
         print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
         if i > 20:  # Only show top 20 functions
-            print("(... and more functions)")
+            print(f"{Fore.YELLOW}(... and more functions){Style.RESET_ALL}")
             break
     
     # Identify complex functions based on criteria
@@ -331,19 +356,19 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     # Sort complex functions by score
     complex_funcs.sort(key=lambda x: x[1]["score"], reverse=True)
     
-    print("\n=== Complex Functions Detected ===")
+    print(f"\n{Fore.CYAN}=== Complex Functions Detected ==={Style.RESET_ALL}")
     if complex_funcs:
         for i, (func_name, func_info) in enumerate(complex_funcs):
             print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
     else:
-        print("No complex functions detected")
+        print(f"{Fore.GREEN}No complex functions detected{Style.RESET_ALL}")
     
     # Generate alternative implementations for complex functions
     if analyzer and complex_funcs:
-        print("\n=== Generating Optimized Alternatives ===")
+        print(f"\n{Fore.CYAN}=== Generating Optimized Alternatives ==={Style.RESET_ALL}")
         
         for i, (func_name, func_info) in enumerate(complex_funcs[:5]):  # Limit to top 5 most complex functions
-            print(f"\nGenerating alternatives for function: {func_name}")
+            print(f"{Fore.GREEN}\nGenerating alternatives for function: {func_name}{Style.RESET_ALL}")
             
             # Get function source code
             func_source = None
@@ -366,7 +391,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     logger.error(f"Error extracting source for {func_name}: {e}")
             
             if not func_source:
-                print(f"Could not extract source code for {func_name}. Skipping...")
+                print(f"{Fore.RED}Could not extract source code for {func_name}. Skipping...{Style.RESET_ALL}")
                 continue
             
             # Generate alternatives
@@ -378,7 +403,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                 )
                 
                 # Analyze complexity of alternatives
-                print("\nAnalyzing complexity of alternative implementations...")
+                print(f"{Fore.GREEN}\nAnalyzing complexity of alternative implementations...{Style.RESET_ALL}")
                 
                 for j, alt in enumerate(alternatives):
                     if not alt.get("success", False) or not alt.get("alternative_function"):
@@ -458,19 +483,19 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                 
                 # Print results with complexity analysis
                 for j, alt in enumerate(alternatives):
-                    print(f"\n--- Alternative {j+1} ({alt.get('strategy', 'unknown')}) ---")
-                    print(f"Success: {alt.get('success', False)}")
-                    print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+                    print(f"{Fore.GREEN}\n--- Alternative {j+1} ({alt.get('strategy', 'unknown')}) ---{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}Success: {alt.get('success', False)}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}{Style.RESET_ALL}")
                     
                     # Print complexity metrics if available
                     if "complexity" in alt:
                         complexity = alt["complexity"]
-                        print(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
+                        print(f"{Fore.GREEN}Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls){Style.RESET_ALL}")
                         
                         if "complexity_reduction" in alt:
-                            print(f"Complexity reduction: {alt['complexity_reduction']:.1f}%")
+                            print(f"{Fore.GREEN}Complexity reduction: {alt['complexity_reduction']:.1f}%{Style.RESET_ALL}")
                     
-                    print("\nCode:")
+                    print(f"{Fore.GREEN}\nCode:{Style.RESET_ALL}")
                     print(alt.get("alternative_function", "No code generated"))
                 
                 # Sort alternatives by complexity reduction if available
@@ -501,23 +526,23 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                                          key=lambda x: x.get("complexity_reduction", 0))
                 
                 if best_alt:
-                    print("\n--- Best Alternative ---")
-                    print(f"Strategy: {best_alt.get('strategy', 'unknown')}")
+                    print(f"{Fore.GREEN}\n--- Best Alternative ---{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}Strategy: {best_alt.get('strategy', 'unknown')}{Style.RESET_ALL}")
                     
                     # Print complexity metrics
                     if "complexity" in best_alt:
                         complexity = best_alt["complexity"]
-                        print(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
+                        print(f"{Fore.GREEN}Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls){Style.RESET_ALL}")
                         
                         # Compare with original
                         old_score = func_info["score"]
-                        print(f"Original complexity score: {old_score:.1f}")
+                        print(f"{Fore.GREEN}Original complexity score: {old_score:.1f}{Style.RESET_ALL}")
                         
                         if "complexity_reduction" in best_alt:
                             reduction = best_alt["complexity_reduction"]
-                            print(f"Actual complexity reduction: {reduction:.1f}%")
+                            print(f"{Fore.GREEN}Actual complexity reduction: {reduction:.1f}%{Style.RESET_ALL}")
                     
-                    print("\nCode:")
+                    print(f"{Fore.GREEN}\nCode:{Style.RESET_ALL}")
                     print(best_alt.get("alternative_function", "No code selected"))
                     
                     # Add suggestions for where to save optimized version
@@ -525,10 +550,10 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     optimized_dir = os.path.join(os.path.dirname(original_path), "optimized")
                     optimized_path = os.path.join(optimized_dir, os.path.basename(original_path))
                     
-                    print("\nTo use this optimized implementation:")
-                    print(f"1. Create directory: {optimized_dir}")
-                    print(f"2. Save to: {optimized_path}")
-                    print("3. Replace the original function with this optimized version")
+                    print(f"{Fore.GREEN}\nTo use this optimized implementation:{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}1. Create directory: {optimized_dir}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}2. Save to: {optimized_path}{Style.RESET_ALL}")
+                    print(f"{Fore.GREEN}3. Replace the original function with this optimized version{Style.RESET_ALL}")
                     
             except Exception as e:
                 logger.error(f"Error generating alternatives for {func_name}: {e}")
