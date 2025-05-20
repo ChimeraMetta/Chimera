@@ -308,12 +308,45 @@ class DynamicMonitor:
         Add a MeTTa atom to the space.
         """
         try:
+            print(f"\nProcessing atom: {atom_str[:100]}...")  # Log first 100 chars
+            
+            # Handle function code atoms specially
+            if "= (" in atom_str and ")" in atom_str:
+                print("Found function code atom")
+                # Extract the code part
+                code_start = atom_str.find('"') + 1
+                code_end = atom_str.rfind('"')
+                if code_start < code_end:
+                    code = atom_str[code_start:code_end]
+                    print(f"Extracted code: {code[:100]}...")  # Log first 100 chars
+                    
+                    # Escape backslashes and quotes
+                    escaped_code = code.replace('\\', '\\\\').replace('"', '\\"')
+                    print(f"After escaping backslashes and quotes: {escaped_code[:100]}...")
+                    
+                    # Preserve newlines
+                    escaped_code = escaped_code.replace('\n', '\\n')
+                    print(f"After preserving newlines: {escaped_code[:100]}...")
+                    
+                    # Reconstruct the atom string
+                    atom_str = atom_str[:code_start] + escaped_code + atom_str[code_end:]
+                    print(f"Reconstructed atom: {atom_str[:100]}...")
+            
+            print("Attempting to parse atom...")
             parsed_atom = self.metta.parse_single(atom_str)
+            print("Successfully parsed atom")
+            
+            print("Adding atom to space...")
             self.metta_space.add_atom(parsed_atom)
+            print("Successfully added atom to space")
             return True
+            
         except Exception as e:
-            print(f"Error adding atom: {atom_str}")
-            print(f"  Error details: {e}")
+            print(f"Error adding atom: {atom_str[:100]}...")  # Log first 100 chars
+            print(f"Error type: {type(e)}")
+            print(f"Error details: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return False
     
     def load_metta_rules(self, rules_file: str) -> bool:
