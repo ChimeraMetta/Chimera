@@ -6,24 +6,26 @@
   <h2 align="center">Chimera</h2> <div style="height:30px"></div>
 
   <p align="center">
-Chimera is an agent designed to operate on its own, without human intervention required
+Autonomous code evolution through symbolic reasoning and LLM inference
     <br />
     <br />
   </p>
 </div>
 
-It's an evolutionary system that combines the symbolic reasoning of MeTTa with statistical LLM inference, producing a 
-high performance, knowledgeable agent capable of providing deeper insights and more accurate changes to your context. The driving force 
-of this project is to create this agent in such a way that it requires no human intervention and can make these changes completely autonomously.
+Chimera is a research-driven software agent that autonomously evolves codebases using a hybrid reasoning engine combining symbolic logic and statistical language models. Inspired by human-level programming workflows, Chimera can read, reason about, modify, and test software—learning and adapting iteratively.
 
-This is *not* an agent that needs you to click "Accept" or approve changes.
+This project aims to answer a bold question:
 
-## Phase 1
+> Can a machine reason about and improve its own source code, autonomously, without predefined goals or human intervention?
 
-The first phase for Chimera is an ontology and proof system for codebases. This means it's able to read through your codebase and convert all Python 
-code into a symbolic representation, including the relationships between your functions, classes and dependencies and how they interact. This allows it 
-to achieve a compressed context of your code that goes beyond what an LLM is capable of on its own. 
+Chimera bridges the gap between symbolic systems (using [MeTTa](https://metta-lang.dev/docs/learn/learn.html), theorem provers, and AST reasoning) and generative AI (e.g., GPT, Claude) to create a closed feedback loop for code understanding, editing, and validation.
 
-It is also able to generate proofs for your functions, including pre-conditions, loop invariants and post-conditions. Chimera can read your function, 
-understand the intent completely, and then make improvements, fixes and optimizations autonomously, ensuring that the changes constantly conform to what 
-you intended as the developer
+## Key Features
+
+Chimera intends to implement the following features:
+
+- 🔄 Autonomous Evolution Loop: Reads code, hypothesizes changes, tests outcomes, and learns from failure.
+- 🧩 Symbolic Reasoning Layer: Uses logic and pattern-matching to identify structure, invariants, and design flaws.
+- 📚 LLM-Augmented Inference: Leverages language models to generate new code, fix errors, and explain intentions.
+- 🧪 Test-Aware Mutation: Integrates with unit and integration tests to validate hypotheses and regressions.
+- 🧠 Memory and Self-Reflection: Tracks past decisions and adapts future iterations accordingly.
