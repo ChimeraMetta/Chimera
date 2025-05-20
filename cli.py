@@ -25,7 +25,7 @@ def run_summary_command(target_path: str):
     
     # Construct absolute path to the ontology file relative to the exec directory
     # exec.full_analyzer.ONTOLOGY_PATH is like "metta/code_ontology.metta"
-    ontology_file_path = os.path.join(_EXEC_DIR, full_analyzer.ONTOLOGY_PATH)
+    ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
     if not os.path.exists(ontology_file_path):
         print(f"Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.")
     else:
@@ -94,7 +94,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
 
     # Construct absolute path to the ontology file relative to the exec directory
     # exec.complexity_analyzer_module.ONTOLOGY_PATH is like "metta/code_ontology.metta"
-    ontology_file_path = os.path.join(_EXEC_DIR, complexity_analyzer_module.ONTOLOGY_PATH)
+    ontology_file_path = os.path.join(_WORKSPACE_ROOT, complexity_analyzer_module.ONTOLOGY_PATH)
     if not os.path.exists(ontology_file_path):
         print(f"Warning: Ontology file not found at {ontology_file_path}. Analysis might be incomplete.")
     else:
