@@ -51,21 +51,16 @@ FROM base AS builder
 WORKDIR /app
 
 # Copy requirements file first for Docker layer caching
-# IMPORTANT: Make sure you have a 'requirements.txt' file in your project root!
 COPY requirements.txt .
 
 # Install project dependencies using PyPy's pip
-# Add any build-time dependencies if needed by your packages (e.g., build-essential for C extensions)
-# RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the image
 COPY . .
 
-# Create a directory inside the container to mount the user's local code
-# We set this as the working directory so relative paths work easily
-RUN mkdir /workspace
-WORKDIR /workspace
+# Set the working directory to where our code is
+WORKDIR /app
 
 # Set the entrypoint to execute the CLI script using the installed PyPy
 ENTRYPOINT ["python", "cli.py"]
