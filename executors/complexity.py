@@ -230,7 +230,7 @@ def analyze_codebase(path, analyzer=None):
         analyze_file(path, analyzer)
     elif os.path.isdir(path):
         # Analyze all Python files in directory
-        for root, dirs, files in os.walk(path):
+        for root, _dirs, files in os.walk(path):
             for file in files:
                 if file.endswith('.py'):
                     analyze_file(os.path.join(root, file), analyzer)
