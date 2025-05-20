@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi7 \
     libssl1.1 \
     zlib1g \
+    git \
     # Clean up APT caches to reduce image size
     && rm -rf /var/lib/apt/lists/*
 
