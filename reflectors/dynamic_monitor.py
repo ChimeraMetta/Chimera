@@ -1,12 +1,11 @@
 import functools
 import inspect
-import os
 import traceback
 import time
-from typing import Any, Dict, List, Callable, Optional, Union, Tuple
+from typing import Any, Dict, List, Callable, Optional
 
 # Import the static analyzer and type conversion function
-from reflectors.static_analyzer import decompose_function, decompose_source, convert_python_type_to_metta
+from reflectors.static_analyzer import decompose_function, convert_python_type_to_metta
 
 # MeTTa integration through hyperon
 from hyperon import *
@@ -308,8 +307,6 @@ class DynamicMonitor:
         Add a MeTTa atom to the space.
         """
         try:
-            print(f"\nProcessing atom: {atom_str[:100]}...")  # Log first 100 chars
-            
             # Handle function code atoms specially
             if "= (" in atom_str and ")" in atom_str:
                 print("Found function code atom")
@@ -318,27 +315,20 @@ class DynamicMonitor:
                 code_end = atom_str.rfind('"')
                 if code_start < code_end:
                     code = atom_str[code_start:code_end]
-                    print(f"Extracted code: {code[:100]}...")  # Log first 100 chars
                     
                     # Escape backslashes and quotes
                     escaped_code = code.replace('\\', '\\\\').replace('"', '\\"')
-                    print(f"After escaping backslashes and quotes: {escaped_code[:100]}...")
                     
                     # Preserve newlines
                     escaped_code = escaped_code.replace('\n', '\\n')
-                    print(f"After preserving newlines: {escaped_code[:100]}...")
                     
                     # Reconstruct the atom string
                     atom_str = atom_str[:code_start] + escaped_code + atom_str[code_end:]
                     print(f"Reconstructed atom: {atom_str[:100]}...")
             
-            print("Attempting to parse atom...")
             parsed_atom = self.metta.parse_single(atom_str)
-            print("Successfully parsed atom")
             
-            print("Adding atom to space...")
             self.metta_space.add_atom(parsed_atom)
-            print("Successfully added atom to space")
             return True
             
         except Exception as e:
