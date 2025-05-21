@@ -34,6 +34,39 @@ Chimera intends to implement the following features:
 
 --
 
+## How to Run
+
+Currently, due to the need for `pypy3.8` for `hyperon` and MeTTa, Chimera will only run on Linux distros. You'll need to clone this repo down:  
+
+```bash
+git clone https://github.com/ChimeraMetta/Chimera.git
+```
+
+You then have 2 options:
+
+1. Run from Docker container
+2. Build from source
+
+If you don't want to go through the headache of dependency management, use the Docker container, for which you can just run the following 
+script from the repo root:
+
+```bash
+sudo ./install.sh
+```
+
+You can now run the following commands:
+
+```bash
+chimera --help                                    # a help command
+chimera summary file.py                           # analyzes and then provides a MeTTa summary of your file
+chimera analyze file.py --api_key=OPENAI_API_KEY  # will perform complexity analysis and guide you through generating improved alternatives to your functions
+```
+
+The last of these functions takes an `--api_key` parameter that is technically optional. If you don't include it, Chimera will be unable to 
+generate new candidates for your code and will simply provide standard complexity analysis.
+
+--
+
 ## Current Features
 
 For its current phase, Chimera is able to statically analyze your code symbolically. It can be invoked through 
