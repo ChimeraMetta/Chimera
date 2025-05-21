@@ -31,3 +31,34 @@ Chimera intends to implement the following features:
 - 📚 **LLM-Augmented Inference:** Leverages language models to generate new code, fix errors, and explain intentions.
 - 🧪 **Test-Aware Mutation:** Integrates with unit and integration tests to validate hypotheses and regressions.
 - 🧠 **Memory and Self-Reflection:** Tracks past decisions and adapts future iterations accordingly.
+
+--
+
+## Current Features
+
+For its current phase, Chimera is able to statically analyze your code symbolically. It can be invoked through 
+
+```sh
+chimera summary file_to_summarize.py
+```
+
+which will provide a full summary of the relational ontology of your files and folders
+
+// insert image
+
+You can also ask Chimera to improve your code by looking for complexity in the ontology and generate alternative 
+candidates that simplify and improve its structure using
+
+```sh
+chimera analyze file_to_analyze.py --api_key=OPENAI_API_KEY
+```
+
+This feature uses an LLM to generate alternative candidates that preserve the structure of your functions and their intent.
+
+// insert next image
+
+-- 
+
+## Next Phase
+
+The next phase will be the implementation of the current features in an autonomous way to improve and heal code autonomously, in a live environment!

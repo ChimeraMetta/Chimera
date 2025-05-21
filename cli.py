@@ -4,6 +4,8 @@ import sys
 import logging
 from typing import Union
 from colorama import init, Fore, Style
+import inquirer
+from inquirer import themes
 from io import StringIO
 
 # Initialize colorama
@@ -26,6 +28,17 @@ class ColoredFormatter(logging.Formatter):
         if record.levelname in self.COLORS:
             record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
         return super().format(record)
+
+# Custom theme for inquirer that matches our color scheme
+class ChimeraTheme(themes.GreenPassion):
+    def __init__(self):
+        super().__init__()
+        self.Checkbox.selected_icon = f"{Fore.GREEN}✓{Style.RESET_ALL}"
+        self.Checkbox.unselected_icon = " "
+        self.Checkbox.selected = f"{Fore.GREEN}●{Style.RESET_ALL}"
+        self.Checkbox.unselected = "○"
+        self.Checkbox.selection_color = "green"
+        self.Checkbox.selection_cursor = f"{Fore.GREEN}❯{Style.RESET_ALL}"
 
 # --- Path Setup ---
 _WORKSPACE_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -249,38 +262,86 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         # If we have complex functions and an API key, offer to generate alternatives
         if complex_functions and analyzer_instance_for_complexity:
             print(f"\n{Fore.CYAN}Found {len(complex_functions)} complex functions that could be optimized:{Style.RESET_ALL}")
-            for i, (func_name, info) in enumerate(complex_functions.items(), 1):
-                print(f"{i}. {func_name} (Complexity: {info['complexity']}, File: {info['file']})")
             
-            while True:
-                choice = input(f"\n{Fore.YELLOW}Would you like to see alternative implementations? (yes/no): {Style.RESET_ALL}").lower()
-                if choice in ['yes', 'y']:
-                    while True:
-                        try:
-                            func_num = int(input(f"\n{Fore.YELLOW}Enter the number of the function to optimize (1-{len(complex_functions)}): {Style.RESET_ALL}"))
-                            if 1 <= func_num <= len(complex_functions):
-                                selected_func = list(complex_functions.keys())[func_num - 1]
-                                func_info = complex_functions[selected_func]
-                                print(f"\n{Fore.GREEN}Generating alternative implementation for {selected_func}...{Style.RESET_ALL}")
-                                
-                                # Run the analysis on the file containing the selected function
-                                complexity_analyzer_module.analyze_function_complexity_and_optimize(
-                                    func_info['file'],
-                                    analyzer_instance_for_complexity
-                                )
-                                break
-                            else:
-                                print(f"{Fore.RED}Invalid number. Please enter a number between 1 and {len(complex_functions)}.{Style.RESET_ALL}")
-                        except ValueError:
-                            print(f"{Fore.RED}Please enter a valid number.{Style.RESET_ALL}")
+            # Create checkbox choices
+            choices = [
+                (f"{func_name} (Complexity: {info['complexity']}, File: {info['file']})", func_name)
+                for func_name, info in complex_functions.items()
+            ]
+            
+            # Ask user to select functions
+            questions = [
+                inquirer.Checkbox('selected_functions',
+                                message="Select functions to optimize (use space to select, enter to confirm)",
+                                choices=choices,
+                                theme=ChimeraTheme())
+            ]
+            
+            answers = inquirer.prompt(questions)
+            
+            if answers and answers['selected_functions']:
+                for selected_func in answers['selected_functions']:
+                    func_info = complex_functions[selected_func]
+                    print(f"\n{Fore.GREEN}Generating alternative implementation for {selected_func}...{Style.RESET_ALL}")
                     
-                    another = input(f"\n{Fore.YELLOW}Would you like to optimize another function? (yes/no): {Style.RESET_ALL}").lower()
-                    if another not in ['yes', 'y']:
-                        break
-                elif choice in ['no', 'n']:
-                    break
-                else:
-                    print(f"{Fore.RED}Please enter 'yes' or 'no'.{Style.RESET_ALL}")
+                    # Extract the function source code
+                    try:
+                        with open(func_info['file'], 'r') as f:
+                            file_content = f.read()
+                            
+                        # Find the function definition
+                        import ast
+                        tree = ast.parse(file_content)
+                        func_source = None
+                        
+                        for node in ast.walk(tree):
+                            if isinstance(node, ast.FunctionDef) and node.name == selected_func:
+                                # Get the function's source code
+                                func_source = ast.get_source_segment(file_content, node)
+                                break
+                        
+                        if func_source:
+                            # Generate alternatives for just this function
+                            alternatives = analyzer_instance_for_complexity.generate_verified_alternatives(
+                                func_source,
+                                selected_func,
+                                count=2  # Generate 2 alternatives to keep processing time reasonable
+                            )
+                            
+                            # Print results
+                            print(f"\n{Fore.CYAN}=== Alternative Implementations for {selected_func} ==={Style.RESET_ALL}")
+                            for i, alt in enumerate(alternatives, 1):
+                                print(f"\n{Fore.GREEN}--- Alternative {i} ---{Style.RESET_ALL}")
+                                print(f"Success: {alt.get('success', False)}")
+                                print(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+                                print(f"Strategy: {alt.get('strategy', 'unknown')}")
+                                print(f"\nCode:\n{alt.get('alternative_function', 'No code generated')}")
+                            
+                            # Select best alternative
+                            best_alt = analyzer_instance_for_complexity.select_best_alternative(alternatives)
+                            if best_alt:
+                                print(f"\n{Fore.GREEN}=== Best Alternative ==={Style.RESET_ALL}")
+                                print(f"Strategy: {best_alt.get('strategy', 'unknown')}")
+                                print(f"Properties preserved: {best_alt.get('verification_result', {}).get('properties_preserved', False)}")
+                                print(f"\nCode:\n{best_alt.get('alternative_function', 'No code selected')}")
+                                
+                                # Add suggestions for where to save optimized version
+                                original_path = func_info['file']
+                                optimized_dir = os.path.join(os.path.dirname(original_path), "optimized")
+                                optimized_path = os.path.join(optimized_dir, os.path.basename(original_path))
+                                
+                                print(f"\n{Fore.GREEN}To use this optimized implementation:{Style.RESET_ALL}")
+                                print(f"{Fore.GREEN}1. Create directory: {optimized_dir}{Style.RESET_ALL}")
+                                print(f"{Fore.GREEN}2. Save to: {optimized_path}{Style.RESET_ALL}")
+                                print(f"{Fore.GREEN}3. Replace the original function with this optimized version{Style.RESET_ALL}")
+                        else:
+                            print(f"{Fore.RED}Could not extract source code for {selected_func}. Skipping...{Style.RESET_ALL}")
+                            
+                    except Exception as e:
+                        print(f"{Fore.RED}Error generating alternatives for {selected_func}: {e}{Style.RESET_ALL}")
+                        logging.exception("Full traceback for alternative generation error:")
+            else:
+                print(f"{Fore.YELLOW}No functions selected. Skipping optimization.{Style.RESET_ALL}")
             
     except Exception as e:
         logging.error(f"An error occurred during 'analyze' command execution: {e}")
