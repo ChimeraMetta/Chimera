@@ -20,7 +20,7 @@ This project aims to answer a bold question:
 
 Chimera bridges the gap between symbolic systems (using [MeTTa](https://metta-lang.dev/docs/learn/learn.html), theorem provers, and AST reasoning) and generative AI (e.g., GPT, Claude) to create a closed feedback loop for code understanding, editing, and validation.
 
---
+**If you'd like to know more about how Chimera has been designed and how it pushes the goal of AGI forward, you can [read this](./DESIGN.md)**
 
 ## Key Features
 
