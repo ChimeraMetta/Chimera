@@ -51,6 +51,24 @@ def setup_colored_logging():
 
 # --- Command Functions ---
 
+def analyze_file_and_collect_complex_functions(file_path: str, complex_functions: dict) -> None:
+    """
+    Analyzes a Python file for function complexity and collects complex functions.
+    
+    Args:
+        file_path (str): Path to the Python file to analyze
+        complex_functions (dict): Dictionary to store complex functions found
+    """
+    # Get the complexity analysis results
+    results = complexity_analyzer_module.analyze_function_complexity_and_optimize(file_path, None)  # Pass None to skip optimization
+    if results:
+        for func_name, complexity in results.items():
+            if complexity > 10:  # Consider functions with complexity > 10 as complex
+                complex_functions[func_name] = {
+                    'file': file_path,
+                    'complexity': complexity
+                }
+
 def run_summary_command(target_path: str):
     print(f"{Fore.CYAN}Running summary for: {target_path}{Style.RESET_ALL}")
     
@@ -179,17 +197,57 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         complexity_analyzer_module.analyze_codebase(target_path) # analyzer_instance_for_complexity is not used by this specific analyze_codebase
 
         print(f"{Fore.GREEN}Analyzing function complexity and optimizing for {target_path}...{Style.RESET_ALL}")
+        
+        # Dictionary to store complex functions found during analysis
+        complex_functions = {}
+        
         if os.path.isfile(target_path) and target_path.endswith('.py'):
-            complexity_analyzer_module.analyze_function_complexity_and_optimize(target_path, analyzer_instance_for_complexity)
+            analyze_file_and_collect_complex_functions(target_path, complex_functions)
         elif os.path.isdir(target_path):
             for root, _, files_in_dir in os.walk(target_path):
                 for f_name in files_in_dir:
                     if f_name.endswith('.py'):
                         file_path_to_analyze = os.path.join(root, f_name)
-                        print(f"{Fore.GREEN}Analyzing and optimizing: {file_path_to_analyze}{Style.RESET_ALL}")
-                        complexity_analyzer_module.analyze_function_complexity_and_optimize(file_path_to_analyze, analyzer_instance_for_complexity)
+                        print(f"{Fore.GREEN}Analyzing: {file_path_to_analyze}{Style.RESET_ALL}")
+                        analyze_file_and_collect_complex_functions(file_path_to_analyze, complex_functions)
         else:
             print(f"{Fore.RED}Path is not a valid Python file or directory: {target_path}{Style.RESET_ALL}")
+            return
+
+        # If we have complex functions and an API key, offer to generate alternatives
+        if complex_functions and analyzer_instance_for_complexity:
+            print(f"\n{Fore.CYAN}Found {len(complex_functions)} complex functions that could be optimized:{Style.RESET_ALL}")
+            for i, (func_name, info) in enumerate(complex_functions.items(), 1):
+                print(f"{i}. {func_name} (Complexity: {info['complexity']}, File: {info['file']})")
+            
+            while True:
+                choice = input(f"\n{Fore.YELLOW}Would you like to see alternative implementations? (yes/no): {Style.RESET_ALL}").lower()
+                if choice in ['yes', 'y']:
+                    while True:
+                        try:
+                            func_num = int(input(f"\n{Fore.YELLOW}Enter the number of the function to optimize (1-{len(complex_functions)}): {Style.RESET_ALL}"))
+                            if 1 <= func_num <= len(complex_functions):
+                                selected_func = list(complex_functions.keys())[func_num - 1]
+                                func_info = complex_functions[selected_func]
+                                print(f"\n{Fore.GREEN}Generating alternative implementation for {selected_func}...{Style.RESET_ALL}")
+                                complexity_analyzer_module.analyze_function_complexity_and_optimize(
+                                    func_info['file'],
+                                    analyzer_instance_for_complexity,
+                                    target_function=selected_func
+                                )
+                                break
+                            else:
+                                print(f"{Fore.RED}Invalid number. Please enter a number between 1 and {len(complex_functions)}.{Style.RESET_ALL}")
+                        except ValueError:
+                            print(f"{Fore.RED}Please enter a valid number.{Style.RESET_ALL}")
+                    
+                    another = input(f"\n{Fore.YELLOW}Would you like to optimize another function? (yes/no): {Style.RESET_ALL}").lower()
+                    if another not in ['yes', 'y']:
+                        break
+                elif choice in ['no', 'n']:
+                    break
+                else:
+                    print(f"{Fore.RED}Please enter 'yes' or 'no'.{Style.RESET_ALL}")
             
     except Exception as e:
         logging.error(f"An error occurred during 'analyze' command execution: {e}")
