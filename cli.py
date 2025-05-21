@@ -4,6 +4,7 @@ import sys
 import logging
 from typing import Union
 from colorama import init, Fore, Style
+from io import StringIO
 
 # Initialize colorama
 init()
@@ -61,13 +62,44 @@ def analyze_file_and_collect_complex_functions(file_path: str, complex_functions
     """
     # Get the complexity analysis results
     results = complexity_analyzer_module.analyze_function_complexity_and_optimize(file_path, None)  # Pass None to skip optimization
-    if results:
-        for func_name, complexity in results.items():
-            if complexity > 10:  # Consider functions with complexity > 10 as complex
-                complex_functions[func_name] = {
-                    'file': file_path,
-                    'complexity': complexity
-                }
+    
+    # The results are printed to stdout by the analyzer, we need to parse them
+    # Look for the "=== Complex Functions Detected ===" section in the output
+    # Capture stdout
+    old_stdout = sys.stdout
+    captured_output = StringIO()
+    sys.stdout = captured_output
+    
+    try:
+        # Run the analysis again to capture the output
+        complexity_analyzer_module.analyze_function_complexity_and_optimize(file_path, None)
+        output = captured_output.getvalue()
+        
+        # Parse the output to find complex functions
+        in_complex_section = False
+        for line in output.split('\n'):
+            if "=== Complex Functions Detected ===" in line:
+                in_complex_section = True
+                continue
+            elif in_complex_section and line.strip() and not line.startswith('==='):
+                # Parse lines like: "1. analyze_text: score 89.0 (29 operations, 15 loops, 30 calls)"
+                try:
+                    parts = line.split(':')
+                    if len(parts) >= 2:
+                        func_name = parts[0].split('.')[-1].strip()
+                        score_part = parts[1].split('(')[0].strip()
+                        score = float(score_part.split()[-1])
+                        complex_functions[func_name] = {
+                            'file': file_path,
+                            'complexity': score
+                        }
+                except (ValueError, IndexError):
+                    continue
+            elif in_complex_section and line.startswith('==='):
+                in_complex_section = False
+    finally:
+        # Restore stdout
+        sys.stdout = old_stdout
 
 def run_summary_command(target_path: str):
     print(f"{Fore.CYAN}Running summary for: {target_path}{Style.RESET_ALL}")
