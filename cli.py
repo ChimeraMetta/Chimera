@@ -273,9 +273,11 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             questions = [
                 inquirer.Checkbox('selected_functions',
                                 message="Select functions to optimize (use space to select, enter to confirm)",
-                                choices=choices,
-                                theme=ChimeraTheme())
+                                choices=choices)
             ]
+            
+            # Set the theme globally
+            inquirer.theme = ChimeraTheme()
             
             answers = inquirer.prompt(questions)
             
