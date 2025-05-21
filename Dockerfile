@@ -63,6 +63,8 @@ COPY . .
 # Set the working directory to where our code is
 WORKDIR /app
 
+LABEL org.opencontainers.image.source=https://github.com/ChimeraMetta/Chimera
+
 # Set the entrypoint to execute the CLI script using the installed PyPy
 ENTRYPOINT ["python", "cli.py"]
 
