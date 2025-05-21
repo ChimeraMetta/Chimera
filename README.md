@@ -44,7 +44,7 @@ chimera summary file_to_summarize.py
 
 which will provide a full summary of the relational ontology of your files and folders
 
-[![Summary](./summary.png)](./summary.png)
+[![Summary](./assets/summary.png)](./assets/summary.png)
 
 You can also ask Chimera to improve your code by looking for complexity in the ontology and generate alternative 
 candidates that simplify and improve its structure using
@@ -53,13 +53,13 @@ candidates that simplify and improve its structure using
 chimera analyze file_to_analyze.py --api_key=OPENAI_API_KEY
 ```
 
-[![Complexity](./complexity.png)](./complexity.png)
+[![Complexity](./assets/complexity.png)](./assets/complexity.png)
 
 
 This feature uses an LLM to generate alternative candidates that preserve the structure of your functions and their intent.
 
 
-[![Alternative](./alternative.png)](./alternative.png)
+[![Alternative](./assets/alternative.png)](./assets/alternative.png)
 
 -- 
 
