@@ -262,10 +262,11 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                 selected_func = list(complex_functions.keys())[func_num - 1]
                                 func_info = complex_functions[selected_func]
                                 print(f"\n{Fore.GREEN}Generating alternative implementation for {selected_func}...{Style.RESET_ALL}")
+                                
+                                # Run the analysis on the file containing the selected function
                                 complexity_analyzer_module.analyze_function_complexity_and_optimize(
                                     func_info['file'],
-                                    analyzer_instance_for_complexity,
-                                    target_function=selected_func
+                                    analyzer_instance_for_complexity
                                 )
                                 break
                             else:
