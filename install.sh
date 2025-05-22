@@ -32,23 +32,23 @@ NC='\033[0m' # No Color
 
 # Logging functions
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "${BLUE}[INFO]${NC} $1"
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "${GREEN}[SUCCESS]${NC} $1"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "${YELLOW}[WARNING]${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo "${RED}[ERROR]${NC} $1"
 }
 
 log_step() {
-    echo -e "\n${MAGENTA}[STEP]${NC} $1"
+    echo "\n${MAGENTA}[STEP]${NC} $1"
 }
 
 # Check if running with sudo
@@ -122,5 +122,5 @@ else
     log_warning "Docker image pull test failed - this is normal if you don't have access to the image yet"
 fi
 
-echo -e "\n${CYAN}Installation complete!${NC}"
-echo -e "Try running: ${GREEN}chimera --help${NC} to get started"
+echo "\n${CYAN}Installation complete!${NC}"
+echo "Try running: ${GREEN}chimera --help${NC} to get started"

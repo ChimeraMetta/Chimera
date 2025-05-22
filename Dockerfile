@@ -55,7 +55,8 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install project dependencies using PyPy's pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir inquirer blessed
 
 # Copy the rest of the application code into the image
 COPY . .
