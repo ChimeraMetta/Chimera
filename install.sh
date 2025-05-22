@@ -21,20 +21,106 @@
 #   - Sudo privileges for installation
 # =============================================================================
 
-sudo bash -c 'cat > /usr/local/bin/chimera <<EOF
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_step() {
+    echo -e "\n${MAGENTA}[STEP]${NC} $1"
+}
+
+# Check if running with sudo
+if [ "$EUID" -ne 0 ]; then
+    log_error "Please run this script with sudo"
+    exit 1
+fi
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    log_error "Docker is not installed. Please install Docker first."
+    exit 1
+fi
+
+# Check if Docker daemon is running
+if ! docker info &> /dev/null; then
+    log_error "Docker daemon is not running. Please start Docker first."
+    exit 1
+fi
+
+log_step "Starting Chimera CLI installation..."
+
+log_info "Creating executable wrapper in /usr/local/bin/chimera"
+sudo bash -c 'cat > /usr/local/bin/chimera << "EOF"
+#!/bin/bash
 
 IMAGE="ghcr.io/chimerametta/chimera:latest"
-MOUNT_DIR="\$(pwd)"
+MOUNT_DIR="$(pwd)"
 CONTAINER_DIR="/data"
 
 # Pull the image if it's not already present
-if ! docker image inspect "\$IMAGE" > /dev/null 2>&1; then
-  echo "Pulling \$IMAGE..."
-  docker pull "\$IMAGE"
+if ! docker image inspect "${IMAGE}" > /dev/null 2>&1; then
+  echo "Pulling ${IMAGE}..."
+  docker pull "${IMAGE}"
 fi
 
 # Run the container with arguments and volume mount
-docker run --rm -it -v "\$MOUNT_DIR":"\$CONTAINER_DIR" "\$IMAGE" "\$@"
-EOF
+docker run --rm -it -v "${MOUNT_DIR}":"${CONTAINER_DIR}" "${IMAGE}" "$@"
+EOF'
 
-chmod +x /usr/local/bin/chimera'
+if [ $? -eq 0 ]; then
+    log_success "Wrapper script created successfully"
+else
+    log_error "Failed to create wrapper script"
+    exit 1
+fi
+
+log_info "Setting executable permissions"
+chmod +x /usr/local/bin/chimera
+
+if [ $? -eq 0 ]; then
+    log_success "Permissions set successfully"
+else
+    log_error "Failed to set permissions"
+    exit 1
+fi
+
+log_step "Verifying installation..."
+if command -v chimera &> /dev/null; then
+    log_success "Chimera CLI installed successfully!"
+    log_info "You can now use the 'chimera' command from any directory"
+else
+    log_error "Installation verification failed"
+    exit 1
+fi
+
+log_info "Testing Docker image pull..."
+if docker pull ghcr.io/chimerametta/chimera:latest &> /dev/null; then
+    log_success "Docker image pull test successful"
+else
+    log_warning "Docker image pull test failed - this is normal if you don't have access to the image yet"
+fi
+
+echo -e "\n${CYAN}Installation complete!${NC}"
+echo -e "Try running: ${GREEN}chimera --help${NC} to get started"
