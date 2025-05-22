@@ -52,19 +52,19 @@ log_step() {
 }
 
 # Check if running with sudo
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" != "0" ]; then
     log_error "Please run this script with sudo"
     exit 1
 fi
 
 # Check if Docker is installed
-if ! command -v docker &> /dev/null; then
+if ! which docker >/dev/null 2>&1; then
     log_error "Docker is not installed. Please install Docker first."
     exit 1
 fi
 
 # Check if Docker daemon is running
-if ! docker info &> /dev/null; then
+if ! docker info >/dev/null 2>&1; then
     log_error "Docker daemon is not running. Please start Docker first."
     exit 1
 fi
@@ -72,7 +72,7 @@ fi
 log_step "Starting Chimera CLI installation..."
 
 log_info "Creating executable wrapper in /usr/local/bin/chimera"
-sudo bash -c 'cat > /usr/local/bin/chimera << "EOF"
+cat > /usr/local/bin/chimera << "EOF"
 #!/bin/bash
 
 IMAGE="ghcr.io/chimerametta/chimera:latest"
@@ -87,7 +87,7 @@ fi
 
 # Run the container with arguments and volume mount
 docker run --rm -it -v "${MOUNT_DIR}":"${CONTAINER_DIR}" "${IMAGE}" "$@"
-EOF'
+EOF
 
 if [ $? -eq 0 ]; then
     log_success "Wrapper script created successfully"
@@ -107,7 +107,7 @@ else
 fi
 
 log_step "Verifying installation..."
-if command -v chimera &> /dev/null; then
+if command -v chimera >/dev/null 2>&1; then
     log_success "Chimera CLI installed successfully!"
     log_info "You can now use the 'chimera' command from any directory"
 else
@@ -116,7 +116,7 @@ else
 fi
 
 log_info "Testing Docker image pull..."
-if docker pull ghcr.io/chimerametta/chimera:latest &> /dev/null; then
+if docker pull ghcr.io/chimerametta/chimera:latest >/dev/null 2>&1; then
     log_success "Docker image pull test successful"
 else
     log_warning "Docker image pull test failed - this is normal if you don't have access to the image yet"
