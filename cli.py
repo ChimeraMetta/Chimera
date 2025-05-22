@@ -414,3 +414,4 @@ if __name__ == "__main__":
         run_analyze_command(args.path, api_key=effective_api_key)
     
     print("CLI execution finished.") 
+    sys.exit(0)
