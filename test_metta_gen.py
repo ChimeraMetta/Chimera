@@ -73,60 +73,198 @@ def test_static_analysis():
 
 def test_metta_integration():
     """Test MeTTa space integration."""
-    print("\n TESTING METTA INTEGRATION")
+    print("\nTESTING METTA INTEGRATION")
     print("=" * 50)
     
-    func = find_max_in_range
+    func = test_function()
     
     try:
-        # Test MeTTa atom loading
+        # FIRST: Debug the monitor itself
+        print("0. Debugging monitor state...")
+        print("   Monitor type: {}".format(type(monitor)))
+        print("   Monitor id: {}".format(id(monitor)))
+        print("   Monitor metta_space type: {}".format(type(monitor.metta_space)))
+        print("   Monitor metta_space id: {}".format(id(monitor.metta_space)))
+        
+        # Check if monitor has the expected attributes
+        monitor_attrs = [attr for attr in dir(monitor) if not attr.startswith('_')]
+        print("   Monitor attributes: {}".format(monitor_attrs))
+        
+        # Check MeTTa space attributes
+        space_attrs = [attr for attr in dir(monitor.metta_space) if not attr.startswith('_')]
+        print("   MeTTa space attributes: {}".format(space_attrs[:10]))
+        
+        # Test basic monitor functionality
+        test_atom = "(test-atom simple)"
+        add_result = monitor.add_atom(test_atom)
+        print("   Test atom add result: {}".format(add_result))
+        
+        # Test MeTTa space integration
         print("1. Testing MeTTa atom loading...")
         
         # Get analysis result
         result = decompose_function(func)
         atoms = result.get('metta_atoms', [])
         
-        print(f" Loading {len(atoms)} atoms into MeTTa space...")
+        print("   LOADING: Loading {} atoms into MeTTa space...".format(len(atoms)))
         
-        # Load atoms
+        # DEBUG: Show the first few atoms being loaded
+        print("\n   DEBUG: First 5 atoms being loaded:")
+        for i, atom in enumerate(atoms[:5]):
+            print("     {}: {}".format(i+1, atom))
+        
+        # Load atoms and track what happens
         loaded_count = 0
         failed_count = 0
+        failed_atoms = []
         
-        for atom in atoms:
-            if monitor.add_atom(atom):
-                loaded_count += 1
-            else:
+        for i, atom in enumerate(atoms):
+            try:
+                result = monitor.add_atom(atom)
+                if result:
+                    loaded_count += 1
+                    if i < 3:  # Debug first few
+                        print("   DEBUG: Successfully loaded atom {}: {}".format(i+1, atom))
+                else:
+                    failed_count += 1
+                    failed_atoms.append(atom)
+                    if i < 3:  # Debug first few failures
+                        print("   DEBUG: Failed to load atom {}: {}".format(i+1, atom))
+            except Exception as e:
                 failed_count += 1
+                failed_atoms.append(atom)
+                print("   DEBUG: Exception loading atom {}: {} - Error: {}".format(i+1, atom, e))
         
-        print(f"    Loaded {loaded_count}/{len(atoms)} atoms successfully")
+        print("\n   SUCCESS: Loaded {}/{} atoms successfully".format(loaded_count, len(atoms)))
         if failed_count > 0:
-            print(f"     {failed_count} atoms failed to load")
+            print("   WARNING: {} atoms failed to load".format(failed_count))
+            print("   FAILED ATOMS (first 3):")
+            for atom in failed_atoms[:3]:
+                print("     - {}".format(atom))
         
-        # Test querying
-        print("\n2. Testing MeTTa querying...")
+        # Test querying with detailed space inspection
+        print("\n2. Testing MeTTa space inspection...")
         
-        # Try some basic queries
+        # Method 1: String representation
+        try:
+            metta_space_str = str(monitor.metta_space)
+            print("   MeTTa space string length: {}".format(len(metta_space_str)))
+            print("   MeTTa space string (first 200 chars): '{}'".format(metta_space_str[:200]))
+            
+            if metta_space_str.strip():
+                # If not empty, look for our patterns
+                contains_function_def = "function-def" in metta_space_str
+                contains_bin_op = "bin-op" in metta_space_str
+                contains_loop = "loop-pattern" in metta_space_str
+                
+                print("   String search results:")
+                print("     function-def: {}".format(contains_function_def))
+                print("     bin-op: {}".format(contains_bin_op))
+                print("     loop-pattern: {}".format(contains_loop))
+            else:
+                print("   WARNING: MeTTa space string is empty!")
+                
+        except Exception as e:
+            print("   ERROR: Could not get MeTTa space string: {}".format(e))
+        
+        # Method 2: Try different space access methods
+        try:
+            if hasattr(monitor.metta_space, 'get_atoms'):
+                space_atoms = monitor.metta_space.get_atoms()
+                print("   get_atoms() returned: {} items".format(len(space_atoms) if space_atoms else 0))
+            elif hasattr(monitor.metta_space, 'atoms'):
+                space_atoms = monitor.metta_space.atoms
+                print("   .atoms attribute: {} items".format(len(space_atoms) if space_atoms else 0))
+            else:
+                print("   No obvious way to get atoms from space")
+                
+        except Exception as e:
+            print("   ERROR: Could not access space atoms: {}".format(e))
+        
+        # Test querying with proper MeTTa queries
+        print("\n2. Testing MeTTa querying with proper query syntax...")
+        
+        # Test queries using the monitor.query() method
         test_queries = [
-            "function-def",
-            "bin-op",
-            "loop-pattern",
-            "function-return"
+            ("function-def", "(match &self (function-def $name $scope $start $end) $name)"),
+            ("bin-op", "(match &self (bin-op $op $left $right $scope $line) $op)"),
+            ("loop-pattern", "(match &self (loop-pattern $id $type $scope $line) $type)"),
+            ("function-return", "(match &self (function-return $func $type $line) $func)"),
+            ("variable-assign", "(match &self (variable-assign $name $scope $line) $name)"),
+            ("function-call", "(match &self (function-call $name $args $scope $line) $name)")
         ]
         
-        for query_type in test_queries:
+        for query_name, query_pattern in test_queries:
             try:
-                # Simple existence check
-                atoms_str = str(monitor.metta_space)
-                has_evidence = query_type in atoms_str
-                print(f"     {query_type}: {' Found' if has_evidence else ' Not found'}")
+                print("   Testing query: {}".format(query_name))
+                print("     Pattern: {}".format(query_pattern))
+                
+                # Use the proper monitor.query() method
+                results = monitor.query(query_pattern)
+                
+                if results and len(results) > 0:
+                    print("     RESULT: FOUND {} matches".format(len(results)))
+                    # Show first few results
+                    for i, result in enumerate(results[:3]):
+                        print("       {}: {}".format(i+1, result))
+                    if len(results) > 3:
+                        print("       ... and {} more".format(len(results) - 3))
+                else:
+                    print("     RESULT: NOT FOUND (empty results)")
+                    
             except Exception as e:
-                print(f"     Query for {query_type} failed: {e}")
+                print("     ERROR: Query failed - {}".format(e))
+        
+        # Also test some simpler existence queries
+        print("\n   Testing simple existence queries...")
+        simple_queries = [
+            ("any-function-def", "(match &self (function-def $x $y $z $w) True)"),
+            ("any-bin-op", "(match &self (bin-op $x $y $z $w $v) True)"),
+            ("any-loop", "(match &self (loop-pattern $x $y $z $w) True)")
+        ]
+        
+        for query_name, query_pattern in simple_queries:
+            try:
+                results = monitor.query(query_pattern)
+                found = results and len(results) > 0
+                print("   {}: {}".format(query_name, "FOUND" if found else "NOT FOUND"))
+                
+            except Exception as e:
+                print("   {}: ERROR - {}".format(query_name, e))
+        
+        # Test the basic space string method for comparison
+        print("\n3. String-based search for comparison...")
+        try:
+            metta_space_str = str(monitor.metta_space)
+            print("   MeTTa space string length: {}".format(len(metta_space_str)))
+            
+            if metta_space_str.strip():
+                string_results = {
+                    "function-def": "function-def" in metta_space_str,
+                    "bin-op": "bin-op" in metta_space_str,
+                    "loop-pattern": "loop-pattern" in metta_space_str,
+                    "variable-assign": "variable-assign" in metta_space_str
+                }
+                
+                print("   String search results:")
+                for key, found in string_results.items():
+                    count = metta_space_str.count(key)
+                    print("     {}: {} (count: {})".format(key, "FOUND" if found else "NOT FOUND", count))
+                
+                # Show a sample of the space content
+                print("   Space content sample (first 300 chars):")
+                print("   '{}'".format(metta_space_str[:300]))
+            else:
+                print("   WARNING: MeTTa space string representation is empty!")
+                
+        except Exception as e:
+            print("   ERROR: String-based search failed - {}".format(e))
         
         return True
         
     except Exception as e:
-        print(f" MeTTa integration failed: {e}")
-        print(f"   Traceback: {traceback.format_exc()}")
+        print("ERROR: MeTTa integration failed: {}".format(e))
+        print("   Traceback: {}".format(traceback.format_exc()))
         return False
 
 def test_pattern_detection():
