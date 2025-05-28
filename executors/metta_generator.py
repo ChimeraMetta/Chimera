@@ -16,6 +16,8 @@ from enum import Enum
 from reflectors.static_analyzer import decompose_function
 from reflectors.dynamic_monitor import monitor
 
+DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
+
 class GenerationStrategy(Enum):
     """Different strategies for generating donor candidates."""
     OPERATION_SUBSTITUTION = "operation_substitution"
@@ -55,22 +57,23 @@ class MettaDonorGenerator:
         self.function_name = None
         self.original_code = None
         self.analysis_result = None  # Store the full analysis result
+        self.load_donor_ontology()
         
         print("  Initializing MeTTa-powered donor generator...")
         
-    def load_donor_ontology(self, ontology_file: str = "metta/donor_generation_ontology.metta"):
+    def load_donor_ontology(self):
         """Load MeTTa ontology rules for donor generation."""
         print(" Loading donor generation ontology...")
         
-        if os.path.exists(ontology_file):
-            if monitor.load_metta_rules(ontology_file):
+        if os.path.exists(DONOR_GENERATION_ONTOLOGY):
+            if monitor.load_metta_rules(DONOR_GENERATION_ONTOLOGY):
                 print("  Donor generation ontology loaded successfully")
                 return True
             else:
                 print(" Failed to load donor generation ontology")
                 return False
         else:
-            print(f"   Ontology file not found: {ontology_file}")
+            print(f"   Ontology file not found: {DONOR_GENERATION_ONTOLOGY}")
             print("   Please ensure the ontology file exists before running generation")
             return False
     
