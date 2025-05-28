@@ -76,7 +76,7 @@ def test_metta_integration():
     print("\n TESTING METTA INTEGRATION")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         # Test MeTTa atom loading
@@ -134,7 +134,7 @@ def test_pattern_detection():
     print("\n  TESTING PATTERN DETECTION")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         # Create generator and load function
@@ -185,7 +185,7 @@ def test_donor_generation():
     print("\nTESTING DONOR GENERATION")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         print("1. Running complete donor generation pipeline...")
@@ -244,7 +244,7 @@ def test_code_execution():
     print("\n  TESTING CODE EXECUTION")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         # Generate candidates
@@ -390,7 +390,7 @@ def quick_demo():
     print("\nQUICK DEMO")
     print("=" * 30)
     
-    func = test_function()
+    func = find_max_in_range
     print(f"Input: {func.__name__}")
     
     try:
