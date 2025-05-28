@@ -8,15 +8,13 @@ import ast
 import inspect
 import re
 import os
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass
 from enum import Enum
 
 # Import your existing components
-from reflectors.static_analyzer import decompose_function
+from reflectors.static_analyzer import decompose_function, convert_to_metta_atoms, CodeDecomposer
 from reflectors.dynamic_monitor import monitor
-
-DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 
 class GenerationStrategy(Enum):
     """Different strategies for generating donor candidates."""
@@ -57,23 +55,22 @@ class MettaDonorGenerator:
         self.function_name = None
         self.original_code = None
         self.analysis_result = None  # Store the full analysis result
-        self.load_donor_ontology()
         
         print("  Initializing MeTTa-powered donor generator...")
         
-    def load_donor_ontology(self):
+    def load_donor_ontology(self, ontology_file: str = "metta/donor_generation_ontology.metta"):
         """Load MeTTa ontology rules for donor generation."""
         print(" Loading donor generation ontology...")
         
-        if os.path.exists(DONOR_GENERATION_ONTOLOGY):
-            if monitor.load_metta_rules(DONOR_GENERATION_ONTOLOGY):
+        if os.path.exists(ontology_file):
+            if monitor.load_metta_rules(ontology_file):
                 print("  Donor generation ontology loaded successfully")
                 return True
             else:
-                print(" Failed to load donor generation ontology")
+                print("  Failed to load donor generation ontology")
                 return False
         else:
-            print(f"   Ontology file not found: {DONOR_GENERATION_ONTOLOGY}")
+            print(f"   Ontology file not found: {ontology_file}")
             print("   Please ensure the ontology file exists before running generation")
             return False
     
@@ -81,6 +78,7 @@ class MettaDonorGenerator:
                                     strategies: Optional[List[GenerationStrategy]] = None) -> List[Dict[str, Any]]:
         """
         Generate donor candidates directly from a Python function using proper analysis pipeline.
+        Now uses convert_to_metta_atoms more directly for better control.
         
         Args:
             func: Python function object or source code string
@@ -100,29 +98,50 @@ class MettaDonorGenerator:
                 self.original_code = inspect.getsource(func)
                 self.function_name = func.__name__
             except Exception as e:
-                print(f" Failed to extract source code: {e}")
+                print(f"  Failed to extract source code: {e}")
                 return []
         
         print(f"  Analyzing function: {self.function_name}")
         
-        # 2. Use the proper static analysis pipeline
+        # 2. Use the static analysis pipeline with more direct control
         print("  Running static analysis...")
-        self.analysis_result = decompose_function(self.original_code)
         
-        if "error" in self.analysis_result:
-            print(f" Static analysis failed: {self.analysis_result['error']}")
+        try:
+            # Parse the source code
+            tree = ast.parse(self.original_code)
+            
+            # Create and run the decomposer
+            decomposer = CodeDecomposer()
+            decomposer.visit(tree)
+            
+            # Store the decomposer for richer access to structural info
+            self.decomposer = decomposer
+            
+            # Convert to MeTTa atoms using the converter
+            metta_atoms = convert_to_metta_atoms(decomposer)
+            
+            # Create the analysis result structure
+            self.analysis_result = {
+                "metta_atoms": metta_atoms,
+                "structure": decomposer.atoms,
+                "function_calls": decomposer.function_calls,
+                "variables": decomposer.variables,
+                "module_relationships": decomposer.module_relationships,
+                "class_hierarchies": decomposer.class_hierarchies,
+                "function_dependencies": decomposer.function_dependencies,
+                "line_mapping": decomposer.line_mapping
+            }
+            
+        except Exception as e:
+            print(f"  Static analysis failed: {e}")
             return []
         
-        print(f"  Static analysis complete - found {len(self.analysis_result.get('metta_atoms', []))} atoms")
+        print(f"  Static analysis complete - found {len(metta_atoms)} atoms")
+        print(f"  Structural atoms: {len(decomposer.atoms)}")
+        print(f"  Function calls: {len(decomposer.function_calls)}")
+        print(f"  Variables: {sum(len(v) for v in decomposer.variables.values())}")
         
-        # 3. Get MeTTa atoms from the analysis
-        metta_atoms = self.analysis_result.get("metta_atoms", [])
-        
-        if not metta_atoms:
-            print("   No MeTTa atoms generated from static analysis")
-            return []
-        
-        # 4. Continue with the existing generation pipeline
+        # 3. Continue with the existing generation pipeline
         return self.generate_donors(metta_atoms, self.original_code, strategies)
     
     def generate_donors(self, metta_atoms: List[str], original_code: str, 
@@ -192,19 +211,22 @@ class MettaDonorGenerator:
         loaded_count = 0
         failed_count = 0
         
+        # Store the atoms for later reference
+        self.metta_atoms = metta_atoms
+        
         for atom in metta_atoms:
             if monitor.add_atom(atom):
                 loaded_count += 1
             else:
                 failed_count += 1
         
-        print(f"     Loaded {loaded_count}/{len(metta_atoms)} atoms ({failed_count} failed)")
+        print(f"   LOADING: Loaded {loaded_count}/{len(metta_atoms)} atoms ({failed_count} failed)")
         
         # Also add the original function information
         monitor.add_atom(f"(original-function {self.function_name})")
         
         # Add analysis metadata if available
-        if self.analysis_result:
+        if hasattr(self, 'analysis_result') and self.analysis_result:
             # Add function call information
             for func_name, call_patterns in self.analysis_result.get("function_calls", {}).items():
                 monitor.add_atom(f"(calls-function {self.function_name} {func_name})")
@@ -293,40 +315,133 @@ class MettaDonorGenerator:
         """Get a summary of what types of atoms we have."""
         summary = {}
         
-        # This is a simplified approach - in practice, you'd want better MeTTa space introspection
-        atoms_str = str(self.metta_space)
+        # Method 1: Try to use the stored metta_atoms directly
+        if hasattr(self, 'metta_atoms') and self.metta_atoms:
+            print(f"   DEBUG: Analyzing {len(self.metta_atoms)} stored atoms...")
+            
+            for atom in self.metta_atoms:
+                atom_str = str(atom)
+                print(f"   DEBUG: Checking atom: {atom_str}")
+                
+                # Count different types of atoms - check if the pattern appears anywhere in the atom
+                if "function-def" in atom_str:
+                    summary["function-def"] = summary.get("function-def", 0) + 1
+                    print(f"   DEBUG: Found function-def in: {atom_str}")
+                if "function-call" in atom_str:
+                    summary["function-call"] = summary.get("function-call", 0) + 1
+                    print(f"   DEBUG: Found function-call in: {atom_str}")
+                if "bin-op" in atom_str:
+                    summary["bin-op"] = summary.get("bin-op", 0) + 1
+                    print(f"   DEBUG: Found bin-op in: {atom_str}")
+                if "loop-pattern" in atom_str:
+                    summary["loop-pattern"] = summary.get("loop-pattern", 0) + 1
+                    print(f"   DEBUG: Found loop-pattern in: {atom_str}")
+                if "variable-assign" in atom_str:
+                    summary["variable-assign"] = summary.get("variable-assign", 0) + 1
+                    print(f"   DEBUG: Found variable-assign in: {atom_str}")
+                if "function-return" in atom_str:
+                    summary["function-return"] = summary.get("function-return", 0) + 1
+                    print(f"   DEBUG: Found function-return in: {atom_str}")
         
-        # Count different types of atoms
-        atom_patterns = [
-            "function-def", "function-call", "bin-op", "loop-pattern", 
-            "variable-assign", "function-return", "import", "class-def"
-        ]
+        # Method 2: If that doesn't work, try the MeTTa space string approach
+        if not summary:
+            try:
+                atoms_str = str(self.metta_space)
+                print(f"   DEBUG: MeTTa space string (first 200 chars): {atoms_str[:200]}")
+                
+                # Count different types of atoms
+                atom_patterns = [
+                    "function-def", "function-call", "bin-op", "loop-pattern", 
+                    "variable-assign", "function-return", "import", "class-def"
+                ]
+                
+                for pattern in atom_patterns:
+                    count = atoms_str.count(pattern)
+                    if count > 0:
+                        summary[pattern] = count
+            except Exception as e:
+                print(f"   DEBUG: Error getting MeTTa space string: {e}")
         
-        for pattern in atom_patterns:
-            count = atoms_str.count(pattern)
-            if count > 0:
-                summary[pattern] = count
+        # Method 3: Fallback - check if we have analysis result
+        if not summary and hasattr(self, 'analysis_result') and self.analysis_result:
+            atoms = self.analysis_result.get('metta_atoms', [])
+            print(f"   DEBUG: Found {len(atoms)} atoms in analysis_result")
+            
+            for atom in atoms:
+                atom_str = str(atom)
+                if "function-def" in atom_str:
+                    summary["function-def"] = summary.get("function-def", 0) + 1
+                elif "function-call" in atom_str:
+                    summary["function-call"] = summary.get("function-call", 0) + 1
+                elif "bin-op" in atom_str:
+                    summary["bin-op"] = summary.get("bin-op", 0) + 1
+                elif "loop-pattern" in atom_str:
+                    summary["loop-pattern"] = summary.get("loop-pattern", 0) + 1
+                elif "variable-assign" in atom_str:
+                    summary["variable-assign"] = summary.get("variable-assign", 0) + 1
         
+        print(f"   DEBUG: Final atom summary: {summary}")
         return summary
     
     def _has_evidence_in_metta(self, evidence_type: str) -> bool:
         """Check if we have evidence of a certain type in MeTTa space."""
-        atoms_str = str(self.metta_space)
-        return evidence_type in atoms_str
+        
+        # Method 1: Check stored atoms directly
+        if hasattr(self, 'metta_atoms'):
+            for atom in self.metta_atoms:
+                if evidence_type in str(atom):
+                    return True
+        
+        # Method 2: Check analysis result
+        if hasattr(self, 'analysis_result') and self.analysis_result:
+            atoms = self.analysis_result.get('metta_atoms', [])
+            for atom in atoms:
+                if evidence_type in str(atom):
+                    return True
+        
+        # Method 3: Fallback to string approach
+        try:
+            atoms_str = str(self.metta_space)
+            return evidence_type in atoms_str
+        except:
+            return False
     
     def _has_bounds_checking_evidence(self) -> bool:
         """Check for bounds checking evidence (multiple comparison operations)."""
-        atoms_str = str(self.metta_space)
         
-        # Look for multiple comparison operations which suggest bounds checking
-        lt_count = atoms_str.count("bin-op Lt")
-        gt_count = atoms_str.count("bin-op Gt") 
-        ge_count = atoms_str.count("bin-op GtE")
-        le_count = atoms_str.count("bin-op LtE")
+        # Method 1: Check stored atoms directly  
+        if hasattr(self, 'metta_atoms'):
+            lt_count = gt_count = ge_count = le_count = 0
+            for atom in self.metta_atoms:
+                atom_str = str(atom)
+                if "bin-op Lt" in atom_str:
+                    lt_count += 1
+                elif "bin-op Gt" in atom_str:
+                    gt_count += 1
+                elif "bin-op GtE" in atom_str:
+                    ge_count += 1
+                elif "bin-op LtE" in atom_str:
+                    le_count += 1
+            
+            total_comparisons = lt_count + gt_count + ge_count + le_count
+            print(f"   DEBUG: Bounds checking evidence - Lt:{lt_count}, Gt:{gt_count}, GtE:{ge_count}, LtE:{le_count}, Total:{total_comparisons}")
+            return total_comparisons >= 2
         
-        # Bounds checking typically has at least 2 comparison operations
-        total_comparisons = lt_count + gt_count + ge_count + le_count
-        return total_comparisons >= 2
+        # Method 2: Fallback to string approach
+        try:
+            atoms_str = str(self.metta_space)
+            
+            # Look for multiple comparison operations which suggest bounds checking
+            lt_count = atoms_str.count("bin-op Lt")
+            gt_count = atoms_str.count("bin-op Gt") 
+            ge_count = atoms_str.count("bin-op GtE")
+            le_count = atoms_str.count("bin-op LtE")
+            
+            # Bounds checking typically has at least 2 comparison operations
+            total_comparisons = lt_count + gt_count + ge_count + le_count
+            return total_comparisons >= 2
+        except:
+            return False
     
     def _get_function_properties_from_evidence(self) -> List[str]:
         """Get function properties based on evidence in MeTTa atoms."""
@@ -364,37 +479,46 @@ class MettaDonorGenerator:
                 applicable.append(strategy_name)
                 print(f"     Strategy {strategy_name} applicable")
             else:
-                print(f"    Strategy {strategy_name} not applicable")
+                print(f"     Strategy {strategy_name} not applicable")
         
         return applicable
     
     def _check_strategy_applicability(self, strategy: str) -> bool:
         """Check if a strategy is applicable based on MeTTa evidence."""
-        atoms_str = str(self.metta_space)
+        
+        # Get evidence from multiple sources
+        has_bin_op = self._has_evidence_in_metta("bin-op")
+        has_loop = self._has_evidence_in_metta("loop-pattern") 
+        has_function_def = self._has_evidence_in_metta("function-def")
+        has_bounds_check = self._has_bounds_checking_evidence()
+        
+        print(f"   DEBUG: Strategy {strategy} evidence - bin-op:{has_bin_op}, loop:{has_loop}, func-def:{has_function_def}, bounds:{has_bounds_check}")
         
         if strategy == "operation_substitution":
             # Needs comparison operations to substitute
-            return "bin-op Gt" in atoms_str or "bin-op Lt" in atoms_str
+            has_gt = self._has_evidence_in_metta("bin-op Gt")
+            has_lt = self._has_evidence_in_metta("bin-op Lt")
+            return has_gt or has_lt
         
         elif strategy == "accumulator_variation":
             # Needs loop + accumulation pattern
-            return "loop-pattern" in atoms_str and ("bin-op Gt" in atoms_str or "bin-op Lt" in atoms_str)
+            return has_loop and has_bin_op
         
         elif strategy == "structure_preservation":
             # Always applicable - preserves the basic structure
-            return "function-def" in atoms_str
+            return has_function_def
         
         elif strategy == "condition_variation":
             # Needs conditional operations
-            return "bin-op" in atoms_str
+            return has_bin_op
         
         elif strategy == "property_guided":
             # Applicable if we have bounds checking
-            return self._has_bounds_checking_evidence()
+            return has_bounds_check
         
         elif strategy == "pattern_expansion":
             # Applicable if we have loop patterns
-            return "loop-pattern" in atoms_str
+            return has_loop
         
         return False
     
@@ -1102,7 +1226,7 @@ def demonstrate_metta_generation():
         print(f"     {candidate['description']}")
         print(f"     Strategy: {candidate['strategy']}")
         print(f"     Final Score: {candidate['final_score']:.2f}")
-        print(f"   🏷️  Properties: {', '.join(candidate['properties'])}")
+        print(f"     Properties: {', '.join(candidate['properties'])}")
         print(f"     MeTTa Derivation: {candidate['metta_derivation'][0]}")
         
         # Show a snippet of the generated code
