@@ -76,7 +76,7 @@ def test_metta_integration():
     print("\nTESTING METTA INTEGRATION")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         # FIRST: Debug the monitor itself
