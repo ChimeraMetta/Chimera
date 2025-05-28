@@ -56,21 +56,21 @@ class MettaDonorGenerator:
         self.original_code = None
         self.analysis_result = None  # Store the full analysis result
         
-        print("🧠 Initializing MeTTa-powered donor generator...")
+        print("  Initializing MeTTa-powered donor generator...")
         
     def load_donor_ontology(self, ontology_file: str = "metta/donor_generation_ontology.metta"):
         """Load MeTTa ontology rules for donor generation."""
-        print("🔄 Loading donor generation ontology...")
+        print(" Loading donor generation ontology...")
         
         if os.path.exists(ontology_file):
             if monitor.load_metta_rules(ontology_file):
-                print("✅ Donor generation ontology loaded successfully")
+                print("  Donor generation ontology loaded successfully")
                 return True
             else:
-                print("❌ Failed to load donor generation ontology")
+                print(" Failed to load donor generation ontology")
                 return False
         else:
-            print(f"⚠️  Ontology file not found: {ontology_file}")
+            print(f"   Ontology file not found: {ontology_file}")
             print("   Please ensure the ontology file exists before running generation")
             return False
     
@@ -86,7 +86,7 @@ class MettaDonorGenerator:
         Returns:
             List of generated donor candidates
         """
-        print("🧠 Starting MeTTa-powered donor generation from function...")
+        print("  Starting MeTTa-powered donor generation from function...")
         
         # 1. Extract source code
         if isinstance(func, str):
@@ -97,26 +97,26 @@ class MettaDonorGenerator:
                 self.original_code = inspect.getsource(func)
                 self.function_name = func.__name__
             except Exception as e:
-                print(f"❌ Failed to extract source code: {e}")
+                print(f" Failed to extract source code: {e}")
                 return []
         
-        print(f"📝 Analyzing function: {self.function_name}")
+        print(f"  Analyzing function: {self.function_name}")
         
         # 2. Use the proper static analysis pipeline
-        print("🔍 Running static analysis...")
+        print("  Running static analysis...")
         self.analysis_result = decompose_function(self.original_code)
         
         if "error" in self.analysis_result:
-            print(f"❌ Static analysis failed: {self.analysis_result['error']}")
+            print(f" Static analysis failed: {self.analysis_result['error']}")
             return []
         
-        print(f"✅ Static analysis complete - found {len(self.analysis_result.get('metta_atoms', []))} atoms")
+        print(f"  Static analysis complete - found {len(self.analysis_result.get('metta_atoms', []))} atoms")
         
         # 3. Get MeTTa atoms from the analysis
         metta_atoms = self.analysis_result.get("metta_atoms", [])
         
         if not metta_atoms:
-            print("⚠️  No MeTTa atoms generated from static analysis")
+            print("   No MeTTa atoms generated from static analysis")
             return []
         
         # 4. Continue with the existing generation pipeline
@@ -135,48 +135,48 @@ class MettaDonorGenerator:
         Returns:
             List of generated donor candidates
         """
-        print("🧠 Starting MeTTa-powered donor generation...")
+        print("  Starting MeTTa-powered donor generation...")
         
         # Extract function name if not already set
         if not self.function_name:
             self.original_code = original_code
             self.function_name = self._extract_function_name(original_code)
         
-        print(f"🎯 Generating donors for function: {self.function_name}")
-        print(f"📊 Working with {len(metta_atoms)} MeTTa atoms")
+        print(f"  Generating donors for function: {self.function_name}")
+        print(f"  Working with {len(metta_atoms)} MeTTa atoms")
         
         # Display some atoms for debugging
-        print("📄 Sample MeTTa atoms:")
+        print("  Sample MeTTa atoms:")
         for i, atom in enumerate(metta_atoms[:5]):
             print(f"   {i+1}. {atom}")
         if len(metta_atoms) > 5:
             print(f"   ... and {len(metta_atoms) - 5} more atoms")
         
         # 1. Load all atoms into MeTTa space
-        print("📥 Loading atoms into MeTTa space...")
+        print("  Loading atoms into MeTTa space...")
         self._load_atoms_to_metta(metta_atoms)
         
         # 2. Use MeTTa reasoning to detect patterns
-        print("🔍 Using MeTTa reasoning to detect patterns...")
+        print("  Using MeTTa reasoning to detect patterns...")
         patterns = self._detect_patterns_with_metta()
         
         # 3. Use MeTTa reasoning to determine applicable strategies
-        print("🎯 Determining applicable strategies with MeTTa...")
+        print("  Determining applicable strategies with MeTTa...")
         applicable_strategies = self._get_applicable_strategies_from_metta(strategies)
         
         # 4. Generate candidates using MeTTa rules
-        print("⚙️  Generating candidates using MeTTa rules...")
+        print("   Generating candidates using MeTTa rules...")
         candidates = self._generate_candidates_with_metta(applicable_strategies)
         
         if not candidates:
-            print("⚠️  No candidates generated, using fallback generation...")
+            print("   No candidates generated, using fallback generation...")
             candidates = self._fallback_candidate_generation(applicable_strategies)
         
         # 5. Rank candidates using MeTTa scoring
-        print("📊 Ranking candidates using MeTTa scoring...")
+        print("  Ranking candidates using MeTTa scoring...")
         ranked_candidates = self._rank_candidates_with_metta(candidates)
         
-        print(f"✅ Generated {len(ranked_candidates)} candidates using MeTTa reasoning")
+        print(f"  Generated {len(ranked_candidates)} candidates using MeTTa reasoning")
         return ranked_candidates
     
     def _extract_function_name(self, code: str) -> str:
@@ -195,7 +195,7 @@ class MettaDonorGenerator:
             else:
                 failed_count += 1
         
-        print(f"   📥 Loaded {loaded_count}/{len(metta_atoms)} atoms ({failed_count} failed)")
+        print(f"     Loaded {loaded_count}/{len(metta_atoms)} atoms ({failed_count} failed)")
         
         # Also add the original function information
         monitor.add_atom(f"(original-function {self.function_name})")
@@ -215,11 +215,11 @@ class MettaDonorGenerator:
         """Use MeTTa reasoning to detect code patterns using actual atoms."""
         patterns = []
         
-        print("   🔍 Analyzing patterns from MeTTa atoms...")
+        print("     Analyzing patterns from MeTTa atoms...")
         
         # Get all atoms to inspect what we actually have
         atoms_info = self._get_atoms_summary()
-        print(f"   📊 Atom summary: {atoms_info}")
+        print(f"     Atom summary: {atoms_info}")
         
         # Pattern 1: Iterate-accumulate pattern (loops + comparisons + bounds checking)
         try:
@@ -239,9 +239,9 @@ class MettaDonorGenerator:
                     confidence=confidence,
                     properties=self._get_function_properties_from_evidence()
                 ))
-                print(f"   ✅ Detected iterate-accumulate pattern (confidence: {confidence})")
+                print(f"     Detected iterate-accumulate pattern (confidence: {confidence})")
         except Exception as e:
-            print(f"   ⚠️  Error detecting iterate-accumulate pattern: {e}")
+            print(f"      Error detecting iterate-accumulate pattern: {e}")
         
         # Pattern 2: Search pattern (comparison + return)
         try:
@@ -257,9 +257,9 @@ class MettaDonorGenerator:
                     confidence=0.8,
                     properties=["search", "conditional-return"]
                 ))
-                print(f"   ✅ Detected search pattern")
+                print(f"     Detected search pattern")
         except Exception as e:
-            print(f"   ⚠️  Error detecting search pattern: {e}")
+            print(f"      Error detecting search pattern: {e}")
         
         # Pattern 3: Bounds checking pattern
         try:
@@ -270,12 +270,12 @@ class MettaDonorGenerator:
                     confidence=0.85,
                     properties=["bounds-checked", "error-handling"]
                 ))
-                print(f"   ✅ Detected bounds-checking pattern")
+                print(f"     Detected bounds-checking pattern")
         except Exception as e:
-            print(f"   ⚠️  Error detecting bounds-checking pattern: {e}")
+            print(f"      Error detecting bounds-checking pattern: {e}")
         
         if not patterns:
-            print("   ⚠️  No patterns detected via MeTTa analysis")
+            print("      No patterns detected via MeTTa analysis")
             # Create a basic pattern so generation can proceed
             patterns.append(CodePattern(
                 pattern_type="basic_function",
@@ -359,9 +359,9 @@ class MettaDonorGenerator:
             # Check if strategy applies based on MeTTa evidence
             if self._check_strategy_applicability(strategy_name):
                 applicable.append(strategy_name)
-                print(f"   ✅ Strategy {strategy_name} applicable")
+                print(f"     Strategy {strategy_name} applicable")
             else:
-                print(f"   ❌ Strategy {strategy_name} not applicable")
+                print(f"    Strategy {strategy_name} not applicable")
         
         return applicable
     
@@ -400,10 +400,10 @@ class MettaDonorGenerator:
         candidates = []
         
         for strategy in strategies:
-            print(f"   🔄 Generating candidates for strategy: {strategy}")
+            print(f"    Generating candidates for strategy: {strategy}")
             strategy_candidates = self._generate_strategy_candidates(strategy)
             candidates.extend(strategy_candidates)
-            print(f"   ✅ Generated {len(strategy_candidates)} candidates for {strategy}")
+            print(f"     Generated {len(strategy_candidates)} candidates for {strategy}")
         
         return candidates
     
@@ -461,7 +461,7 @@ class MettaDonorGenerator:
     
     def _fallback_candidate_generation(self, strategies: List[str]) -> List[DonorCandidate]:
         """Generate basic candidates when MeTTa reasoning fails."""
-        print("   🔄 Using fallback candidate generation...")
+        print("    Using fallback candidate generation...")
         
         candidates = []
         
@@ -536,7 +536,7 @@ class MettaDonorGenerator:
             )
             
         except Exception as e:
-            print(f"     ⚠️  Failed to create candidate for {strategy}/{transformation}: {e}")
+            print(f"        Failed to create candidate for {strategy}/{transformation}: {e}")
             return None
     
     def _rank_candidates_with_metta(self, candidates: List[DonorCandidate]) -> List[Dict[str, Any]]:
@@ -1065,7 +1065,7 @@ def integrate_metta_generation(func, strategies: Optional[List[GenerationStrateg
 def demonstrate_metta_generation():
     """Demonstrate the MeTTa-based donor generation system with proper integration."""
     
-    print("🧠 METTA DONOR GENERATION DEMO - FIXED VERSION")
+    print("  METTA DONOR GENERATION DEMO - FIXED VERSION")
     print("=" * 60)
     
     # Example function
@@ -1081,30 +1081,30 @@ def demonstrate_metta_generation():
         
         return max_val
     
-    print(f"📝 Original function: {find_max_in_range.__name__}")
+    print(f"  Original function: {find_max_in_range.__name__}")
     
     # Generate donors using the PROPER integration
-    print("\n🔄 Generating donors using PROPER MeTTa analysis pipeline...")
+    print("\n Generating donors using PROPER MeTTa analysis pipeline...")
     
     candidates = integrate_metta_generation(find_max_in_range)
     
-    print(f"\n✅ Generated {len(candidates)} donor candidates using REAL MeTTa reasoning!")
+    print(f"\n  Generated {len(candidates)} donor candidates using REAL MeTTa reasoning!")
     
     # Show the results
-    print("\n📊 Generated Candidates:")
+    print("\n  Generated Candidates:")
     print("-" * 40)
     
     for i, candidate in enumerate(candidates[:3], 1):  # Show top 3
         print(f"\n{i}. {candidate['name']}")
-        print(f"   📝 {candidate['description']}")
-        print(f"   🎯 Strategy: {candidate['strategy']}")
-        print(f"   📊 Final Score: {candidate['final_score']:.2f}")
+        print(f"     {candidate['description']}")
+        print(f"     Strategy: {candidate['strategy']}")
+        print(f"     Final Score: {candidate['final_score']:.2f}")
         print(f"   🏷️  Properties: {', '.join(candidate['properties'])}")
-        print(f"   🧠 MeTTa Derivation: {candidate['metta_derivation'][0]}")
+        print(f"     MeTTa Derivation: {candidate['metta_derivation'][0]}")
         
         # Show a snippet of the generated code
         code_lines = candidate['code'].split('\n')
-        print(f"   📄 Code preview:")
+        print(f"     Code preview:")
         for line in code_lines[:6]:
             print(f"      {line}")
         if len(code_lines) > 6:
@@ -1116,7 +1116,7 @@ def demonstrate_metta_generation():
 def demonstrate_with_string_function():
     """Demonstrate with a string-based function definition."""
     
-    print("\n🧠 DEMO WITH STRING FUNCTION")
+    print("\n  DEMO WITH STRING FUNCTION")
     print("=" * 40)
     
     # Function as string
@@ -1131,21 +1131,21 @@ def demonstrate_with_string_function():
     
     return total'''
     
-    print("📝 Function provided as string")
+    print("  Function provided as string")
     
     # Generate using the proper pipeline
     candidates = integrate_metta_generation(string_function)
     
-    print(f"\n✅ Generated {len(candidates)} candidates from string function!")
+    print(f"\n  Generated {len(candidates)} candidates from string function!")
     
     # Show first candidate
     if candidates:
         candidate = candidates[0]
         print(f"\n🏆 Top candidate: {candidate['name']}")
-        print(f"   📝 {candidate['description']}")
-        print(f"   📊 Score: {candidate['final_score']:.2f}")
+        print(f"     {candidate['description']}")
+        print(f"     Score: {candidate['final_score']:.2f}")
         
-        print(f"\n   📄 Generated code:")
+        print(f"\n     Generated code:")
         for line in candidate['code'].split('\n')[:8]:
             print(f"      {line}")
     
@@ -1157,8 +1157,8 @@ if __name__ == "__main__":
     candidates1 = demonstrate_metta_generation()
     candidates2 = demonstrate_with_string_function()
     
-    print(f"\n🎯 SUMMARY:")
+    print(f"\n  SUMMARY:")
     print(f"   Function object demo: {len(candidates1)} candidates")
     print(f"   String function demo: {len(candidates2)} candidates")
     print(f"   Total candidates generated: {len(candidates1) + len(candidates2)}")
-    print("\n✅ Fixed MeTTa generator now properly integrates with static analysis!")
+    print("\n  Fixed MeTTa generator now properly integrates with static analysis!")
