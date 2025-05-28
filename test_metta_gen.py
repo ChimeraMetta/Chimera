@@ -269,14 +269,19 @@ def test_metta_integration():
 
 def test_pattern_detection():
     """Test pattern detection capabilities."""
-    print("\n  TESTING PATTERN DETECTION")
+    print("\nTESTING PATTERN DETECTION")
     print("=" * 50)
     
     func = find_max_in_range
     
     try:
-        # Create generator and load function
-        generator = MettaDonorGenerator()
+        # Create generator but use the global monitor's space (same as integration test)
+        generator = MettaDonorGenerator(metta_space=monitor.metta_space)
+        
+        print("1. Setting up generator with existing MeTTa space...")
+        print("   Generator metta_space id: {}".format(id(generator.metta_space)))
+        print("   Global monitor space id: {}".format(id(monitor.metta_space)))
+        print("   Spaces are same: {}".format(generator.metta_space is monitor.metta_space))
         
         # Extract source and analyze
         import inspect
@@ -288,34 +293,71 @@ def test_pattern_detection():
         decomposer = CodeDecomposer()
         decomposer.visit(tree)
         
-        # Load atoms
+        # Get atoms from analysis
         atoms = convert_to_metta_atoms(decomposer)
-        generator._load_atoms_to_metta(atoms)
+        print("   Generated {} atoms from analysis".format(len(atoms)))
+        
+        # Set up the generator state
         generator.function_name = func.__name__
         generator.original_code = source_code
+        generator.metta_atoms = atoms  # Store atoms for reference
+        
+        # Since we're using the same space as integration test, atoms should already be loaded
+        # But let's verify by loading them again (this should be safe)
+        print("\n2. Loading atoms into generator's MeTTa space...")
+        generator._load_atoms_to_metta(atoms)
+        
+        # Test the atom summary method specifically
+        print("\n3. Testing atom summary generation...")
+        summary = generator._get_atoms_summary()
+        print("   Atom summary result: {}".format(summary))
+        
+        if not summary:
+            print("   DEBUG: Empty summary - investigating...")
+            
+            # Check if generator has stored atoms
+            if hasattr(generator, 'metta_atoms'):
+                print("   Generator has stored atoms: {} items".format(len(generator.metta_atoms)))
+                for i, atom in enumerate(generator.metta_atoms[:3]):
+                    print("     {}: {}".format(i+1, atom))
+            else:
+                print("   Generator has no stored atoms")
+            
+            # Check if space has content using queries
+            try:
+                func_def_query = "(match &self (function-def $name $scope $start $end) $name)"
+                func_results = monitor.query(func_def_query)
+                print("   Query for function-def: {} results".format(len(func_results) if func_results else 0))
+                
+                bin_op_query = "(match &self (bin-op $op $left $right $scope $line) $op)"
+                bin_results = monitor.query(bin_op_query)
+                print("   Query for bin-op: {} results".format(len(bin_results) if bin_results else 0))
+                
+            except Exception as e:
+                print("   Query test failed: {}".format(e))
         
         # Test pattern detection
-        print("1. Testing pattern detection...")
+        print("\n4. Testing pattern detection...")
         patterns = generator._detect_patterns_with_metta()
         
-        print(f"     Detected {len(patterns)} patterns:")
+        print("   PATTERNS: Detected {} patterns:".format(len(patterns)))
         for i, pattern in enumerate(patterns, 1):
-            print(f"     {i}. {pattern.pattern_type} (confidence: {pattern.confidence:.2f})")
-            print(f"        Properties: {', '.join(pattern.properties)}")
+            print("     {}. {} (confidence: {:.2f})".format(i, pattern.pattern_type, pattern.confidence))
+            print("        Properties: {}".format(', '.join(pattern.properties)))
         
         # Test strategy applicability
-        print("\n2. Testing strategy applicability...")
+        print("\n5. Testing strategy applicability...")
         strategies = generator._get_applicable_strategies_from_metta(None)
         
-        print(f"     Found {len(strategies)} applicable strategies:")
+        print("   STRATEGIES: Found {} applicable strategies:".format(len(strategies)))
         for i, strategy in enumerate(strategies, 1):
-            print(f"     {i}. {strategy}")
+            print("     {}. {}".format(i, strategy))
         
         return True
         
     except Exception as e:
-        print(f" Pattern detection failed: {e}")
-        print(f"   Traceback: {traceback.format_exc()}")
+        print("ERROR: Pattern detection failed: {}".format(e))
+        print("   Traceback: {}".format(traceback.format_exc()))
         return False
 
 def test_donor_generation():
