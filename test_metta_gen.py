@@ -21,28 +21,24 @@ from reflectors.dynamic_monitor import monitor
 from executors.metta_generator import MettaDonorGenerator, integrate_metta_generation
 
 
-def test_function():
-    """Our test function for donor generation."""
-    def find_max_in_range(numbers, start_idx, end_idx):
-        """Find the maximum value in a list within a specific range."""
-        if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
-            return None
+def find_max_in_range(numbers, start_idx, end_idx):
+    """Find the maximum value in a list within a specific range."""
+    if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+        return None
         
-        max_val = numbers[start_idx]
-        for i in range(start_idx + 1, end_idx):
-            if numbers[i] > max_val:
-                max_val = numbers[i]
+    max_val = numbers[start_idx]
+    for i in range(start_idx + 1, end_idx):
+        if numbers[i] > max_val:
+            max_val = numbers[i]
         
-        return max_val
-    
-    return find_max_in_range
+    return max_val
 
 def test_static_analysis():
     """Test the static analysis pipeline."""
     print("  TESTING STATIC ANALYSIS PIPELINE")
     print("=" * 50)
     
-    func = test_function()
+    func = find_max_in_range
     
     try:
         # Test decompose_function
