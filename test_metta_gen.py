@@ -336,17 +336,8 @@ def test_pattern_detection():
             except Exception as e:
                 print("   Query test failed: {}".format(e))
         
-        # Test pattern detection
-        print("\n4. Testing pattern detection...")
-        patterns = generator._detect_patterns_with_metta()
-        
-        print("   PATTERNS: Detected {} patterns:".format(len(patterns)))
-        for i, pattern in enumerate(patterns, 1):
-            print("     {}. {} (confidence: {:.2f})".format(i, pattern.pattern_type, pattern.confidence))
-            print("        Properties: {}".format(', '.join(pattern.properties)))
-        
         # Test strategy applicability
-        print("\n5. Testing strategy applicability...")
+        print("\n4. Testing strategy applicability...")
         strategies = generator._get_applicable_strategies_from_metta(None)
         
         print("   STRATEGIES: Found {} applicable strategies:".format(len(strategies)))
