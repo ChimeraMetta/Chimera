@@ -2,48 +2,28 @@ import os
 import logging
 import sys
 import re
-from colorama import init, Fore, Style
 from typing import Any
 
-# Initialize colorama
-init()
+# Add sys.path modification to find common.logging_utils
+_COMMON_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'common')
+if _COMMON_DIR not in sys.path:
+    sys.path.insert(0, _COMMON_DIR)
+
+from logging_utils import get_logger # Import the new logger
 
 # Import existing components
 from hyperon import *
-from reflectors.dynamic_monitor import DynamicMonitor
 from reflectors.static_analyzer import decompose_file, decompose_function
 from executors.impl_generator import ProofGuidedImplementationGenerator
-from proofs.verifier import MeTTaPropertyVerifier
+from reflectors.dynamic_analyzer import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
+from proofs.verifier import MeTTaPropertyVerifier
 
-# Custom formatter for colorful logging
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter that adds colors to different log levels"""
-    
-    COLORS = {
-        'DEBUG': Fore.BLUE,
-        'INFO': Fore.GREEN,
-        'WARNING': Fore.YELLOW,
-        'ERROR': Fore.RED,
-        'CRITICAL': Fore.RED + Style.BRIGHT
-    }
-
-    def format(self, record):
-        # Add color to the level name
-        if record.levelname in self.COLORS:
-            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
-        return super().format(record)
-
-# Configure logging
-handler = logging.StreamHandler()
-formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger = logging.getLogger("proof_system")
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
+# Setup logger for this module, replacing the old one
+logger = get_logger(__name__) # Use __name__ (executors.complexity)
 
 ONTOLOGY_PATH = "metta/code_ontology.metta"
-COMPLEXITY_THRESHOLD = 15  # Threshold for considering a function complex
+COMPLEXITY_THRESHOLD = 15
 
 def integrate_with_immune_system(analyzer):
     """
@@ -55,20 +35,18 @@ def integrate_with_immune_system(analyzer):
     Returns:
         Enhanced analyzer
     """
-    # Add property verifier
+    if not hasattr(analyzer, 'monitor'):
+        logger.error("Analyzer object in integrate_with_immune_system is missing 'monitor' attribute.")
+        return analyzer
+
     analyzer.property_verifier = MeTTaPropertyVerifier(analyzer.monitor)
-    
-    # Add implementation generator
     analyzer.implementation_generator = ProofGuidedImplementationGenerator(
         analyzer, 
         model_name=analyzer.model_name, 
         api_key=analyzer.api_key
     )
-    
-    # Load MeTTa ontology rules if not already loaded
     load_metta_proof_ontology(analyzer.monitor)
-    
-    # Add method to generate verified alternatives
+
     def generate_verified_alternatives(self, function_code, function_name, count=3):
         """
         Generate and verify alternative implementations of a function.
@@ -85,7 +63,6 @@ def integrate_with_immune_system(analyzer):
             function_code, function_name, count
         )
     
-    # Add method to select the best alternative based on criteria
     def select_best_alternative(self, alternatives, criteria="property_preservation"):
         """
         Select the best alternative implementation based on criteria.
@@ -98,11 +75,11 @@ def integrate_with_immune_system(analyzer):
             Best alternative implementation
         """
         if not alternatives:
+            logger.warning("select_best_alternative called with no alternatives.")
             return None
-        
-        # Filter successful alternatives
         successful = [alt for alt in alternatives if alt.get("success", False)]
         if not successful:
+            logger.info("No successful alternatives to select from.")
             return None
         
         # Select based on criteria
@@ -128,10 +105,9 @@ def integrate_with_immune_system(analyzer):
     # Add methods to analyzer
     setattr(analyzer.__class__, "generate_verified_alternatives", generate_verified_alternatives)
     setattr(analyzer.__class__, "select_best_alternative", select_best_alternative)
-    
     return analyzer
 
-def load_metta_proof_ontology(monitor):
+def load_metta_proof_ontology(monitor_instance):
     """
     Load MeTTa ontology rules for proof verification.
     
@@ -141,43 +117,33 @@ def load_metta_proof_ontology(monitor):
     Returns:
         True if loaded successfully, False otherwise
     """
-    # Check if ontology files exist
+    if not hasattr(monitor_instance, 'metta') or not hasattr(monitor_instance.metta, 'parse_all') or not hasattr(monitor_instance, 'metta_space'):
+        logger.error("monitor_instance in load_metta_proof_ontology is not correctly initialized or lacks MeTTa components.")
+        return False
+
     ontology_files = [
         os.path.join(os.path.dirname(os.path.dirname(__file__)), "metta", "proof_ontology.metta"),
         os.path.join(os.path.dirname(os.path.dirname(__file__)), "metta", "proof_verification.metta")
     ]
-    
     success = True
-    
     for ontology_file in ontology_files:
         if os.path.exists(ontology_file):
-            # Load ontology rules
             try:
-                # Use monitor's load_metta_rules if available
-                if hasattr(monitor, "load_metta_rules"):
-                    file_success = monitor.load_metta_rules(ontology_file)
-                else:
-                    # Fallback to manual loading
-                    with open(ontology_file, 'r') as f:
-                        content = f.read()
-                        
-                    # Parse the atoms
-                    atoms = monitor.metta.parse_all(content)
-                    
-                    # Add each atom to the space
-                    for atom in atoms:
-                        monitor.metta_space.add_atom(atom)
-                    
+                logger.info(f"Attempting to load ontology from {ontology_file}")
+                if hasattr(monitor_instance, "load_metta_rules"):
+                    file_success = monitor_instance.load_metta_rules(ontology_file)
+                else: # Fallback
+                    with open(ontology_file, 'r') as f: content = f.read()
+                    atoms = monitor_instance.metta.parse_all(content)
+                    for atom in atoms: monitor_instance.metta_space.add_atom(atom)
                     file_success = True
                 
-                if file_success:
-                    logger.info(f"Successfully loaded ontology from {ontology_file}")
-                else:
-                    logger.warning(f"Failed to load ontology from {ontology_file}")
+                if file_success: logger.info(f"Successfully loaded ontology from {ontology_file}")
+                else: 
+                    logger.warning(f"Failed to load ontology from {ontology_file} (monitor.load_metta_rules returned false)")
                     success = False
-                    
             except Exception as e:
-                logger.error(f"Error loading ontology {ontology_file}: {e}")
+                logger.error(f"Error loading ontology {ontology_file}: {e}", exc_info=True)
                 success = False
         else:
             logger.warning(f"Ontology file not found: {ontology_file}")
@@ -198,48 +164,28 @@ def _escape_code_for_metta(code: str) -> str:
     """
     # First escape backslashes
     code = code.replace('\\', '\\\\')
-    # Then escape quotes
     code = code.replace('"', '\\"')
-    # Preserve newlines
     code = code.replace('\n', '\\n')
     return code
 
-def _create_metta_atom(atom_str: str) -> Any:
-    """
-    Create a MeTTa atom from a string representation.
-    
-    Args:
-        atom_str: String representation of the atom
-        
-    Returns:
-        MeTTa atom object
-    """
-    try:
-        # Parse the atom string
-        parsed = monitor.metta.parse_single(atom_str)
-        return parsed
-    except Exception as e:
-        logger.error(f"Error parsing atom: {atom_str}")
-        logger.error(f"Error details: {e}")
-        return None
-
 def analyze_codebase(path, analyzer=None):
     """Analyze a Python file or directory of Python files."""
+    logger.info(f"Starting codebase analysis for path: {path}")
     if os.path.isfile(path) and path.endswith('.py'):
-        # Analyze a single file
         analyze_file(path, analyzer)
     elif os.path.isdir(path):
-        # Analyze all Python files in directory
+        logger.info(f"Traversing directory: {path}")
         for root, _dirs, files in os.walk(path):
-            for file in files:
-                if file.endswith('.py'):
-                    analyze_file(os.path.join(root, file), analyzer)
+            for file_name in files:
+                if file_name.endswith('.py'):
+                    file_path_to_analyze = os.path.join(root, file_name)
+                    analyze_file(file_path_to_analyze, analyzer)
     else:
-        print(f"{Fore.RED}Invalid path or not a Python file: {path}{Style.RESET_ALL}")
+        logger.error(f"Invalid path or not a Python file/directory: {path}")
 
 def analyze_file(file_path, analyzer=None):
     """Analyze a single Python file and add to the ontology."""
-    print(f"{Fore.CYAN}Analyzing {file_path}...{Style.RESET_ALL}")
+    logger.info(f"Analyzing {file_path}...")
     
     # Run static analysis
     analysis_result = decompose_file(file_path)
@@ -279,28 +225,41 @@ def analyze_file(file_path, analyzer=None):
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 pass
                 
-        print(f"{Fore.GREEN}Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}{Style.RESET_ALL}")
+        logger.info(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
     else:
-        print(f"{Fore.YELLOW}No MeTTa atoms generated for {file_path}{Style.RESET_ALL}")
+        logger.warning(f"No MeTTa atoms generated for {file_path}")
 
 def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     """
     Analyze complexity of functions in a file and generate optimized alternatives
     for complex functions.
+
+    `analyzer` is an optional ImmuneSystemProofAnalyzer instance.
+    If provided and an API key is available, it enables alternative generation.
+    Otherwise, only complexity analysis is performed.
+
+    Args:
+        file_path: Path to the Python file to analyze
+        analyzer: Optional ImmuneSystemProofAnalyzer instance
+        
+    Returns:
+        Dictionary containing analysis results
     """
-    print(f"{Fore.CYAN}Analyzing complexity in {file_path} and generating optimized alternatives...{Style.RESET_ALL}")
-    
-    # Decompose the file
+    logger.info(f"Analyzing complexity in {file_path}...")
+    if analyzer:
+        logger.info("Analyzer instance provided, alternative generation may be available.")
+    else:
+        logger.info("No analyzer instance provided, running complexity analysis only.")
+
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
+        logger.error(f"Error during file decomposition for {file_path}: {result['error']}")
         return
     
     atoms = result["metta_atoms"]
     logger.debug(f"Found {len(atoms)} atoms in file")
     
-    # Extract function definitions
     function_defs = {}
     function_source = {}
     
@@ -354,8 +313,6 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
         if atom.startswith("(loop-pattern ") or atom.startswith("(implicit-loop "):
             parts = atom.strip("()").split()
             if len(parts) >= 5:
-                loop_id = parts[1]
-                loop_type = parts[2]
                 scope = " ".join(parts[3:-1])
                 line = int(parts[-1])
                 
@@ -373,8 +330,6 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
         if atom.startswith("(function-call "):
             parts = atom.strip("()").split()
             if len(parts) >= 5:
-                callee = parts[1]
-                args = parts[2]
                 scope = " ".join(parts[3:-1])
                 line = int(parts[-1])
                 
@@ -404,12 +359,12 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     )
     
     # Print complexity ranking
-    print(f"\n{Fore.CYAN}=== Function Complexity Analysis ==={Style.RESET_ALL}")
-    print(f"{Fore.GREEN}Function complexity ranking:{Style.RESET_ALL}")
+    logger.debug(f"\n=== Function Complexity Analysis ===")
+    logger.info(f"Function complexity ranking:")
     for i, (func_name, func_info) in enumerate(sorted_functions):
         print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
         if i > 20:  # Only show top 20 functions
-            print(f"{Fore.YELLOW}(... and more functions){Style.RESET_ALL}")
+            logger.warning(f"(... and more functions)")
             break
     
     # Identify complex functions based on criteria
@@ -423,19 +378,19 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
     # Sort complex functions by score
     complex_funcs.sort(key=lambda x: x[1]["score"], reverse=True)
     
-    print(f"\n{Fore.CYAN}=== Complex Functions Detected ==={Style.RESET_ALL}")
+    logger.debug(f"\n=== Complex Functions Detected ===")
     if complex_funcs:
         for i, (func_name, func_info) in enumerate(complex_funcs):
-            print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
+            logger.info(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
     else:
-        print(f"{Fore.GREEN}No complex functions detected{Style.RESET_ALL}")
+        logger.info("No complex functions detected")
     
     # Generate alternative implementations for complex functions
     if analyzer and complex_funcs:
-        print(f"\n{Fore.CYAN}=== Generating Optimized Alternatives ==={Style.RESET_ALL}")
+        logger.debug(f"\n=== Generating Optimized Alternatives ===")
         
         for i, (func_name, func_info) in enumerate(complex_funcs[:5]):  # Limit to top 5 most complex functions
-            print(f"{Fore.GREEN}\nGenerating alternatives for function: {func_name}{Style.RESET_ALL}")
+            logger.info(f"\nGenerating alternatives for function: {func_name}")
             
             # Get function source code
             func_source = None
@@ -458,7 +413,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     logger.error(f"Error extracting source for {func_name}: {e}")
             
             if not func_source:
-                print(f"{Fore.RED}Could not extract source code for {func_name}. Skipping...{Style.RESET_ALL}")
+                logger.error(f"Could not extract source code for {func_name}. Skipping...")
                 continue
             
             # Generate alternatives
@@ -470,7 +425,7 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                 )
                 
                 # Analyze complexity of alternatives
-                print(f"{Fore.GREEN}\nAnalyzing complexity of alternative implementations...{Style.RESET_ALL}")
+                logger.info(f"\nAnalyzing complexity of alternative implementations...")
                 
                 for j, alt in enumerate(alternatives):
                     if not alt.get("success", False) or not alt.get("alternative_function"):
@@ -544,19 +499,19 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                 
                 # Print results with complexity analysis
                 for j, alt in enumerate(alternatives):
-                    print(f"{Fore.GREEN}\n--- Alternative {j+1} ({alt.get('strategy', 'unknown')}) ---{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}Success: {alt.get('success', False)}{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}{Style.RESET_ALL}")
+                    logger.info(f"\n--- Alternative {j+1} ({alt.get('strategy', 'unknown')}) ---")
+                    logger.info(f"Success: {alt.get('success', False)}")
+                    logger.info(f"Properties preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
                     
                     # Print complexity metrics if available
                     if "complexity" in alt:
                         complexity = alt["complexity"]
-                        print(f"{Fore.GREEN}Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls){Style.RESET_ALL}")
+                        logger.info(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
                         
                         if "complexity_reduction" in alt:
-                            print(f"{Fore.GREEN}Complexity reduction: {alt['complexity_reduction']:.1f}%{Style.RESET_ALL}")
+                            logger.info(f"Complexity reduction: {alt['complexity_reduction']:.1f}%")
                     
-                    print(f"{Fore.GREEN}\nCode:{Style.RESET_ALL}")
+                    logger.info(f"\nCode:")
                     print(alt.get("alternative_function", "No code generated"))
                 
                 # Sort alternatives by complexity reduction if available
@@ -587,23 +542,23 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                                          key=lambda x: x.get("complexity_reduction", 0))
                 
                 if best_alt:
-                    print(f"{Fore.GREEN}\n--- Best Alternative ---{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}Strategy: {best_alt.get('strategy', 'unknown')}{Style.RESET_ALL}")
+                    logger.info(f"\n--- Best Alternative ---")
+                    logger.info(f"Strategy: {best_alt.get('strategy', 'unknown')}")
                     
                     # Print complexity metrics
                     if "complexity" in best_alt:
                         complexity = best_alt["complexity"]
-                        print(f"{Fore.GREEN}Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls){Style.RESET_ALL}")
+                        logger.info(f"Complexity score: {complexity['score']:.1f} ({complexity['operations']} operations, {complexity['loops']} loops, {complexity['calls']} calls)")
                         
                         # Compare with original
                         old_score = func_info["score"]
-                        print(f"{Fore.GREEN}Original complexity score: {old_score:.1f}{Style.RESET_ALL}")
+                        logger.info(f"Original complexity score: {old_score:.1f}")
                         
                         if "complexity_reduction" in best_alt:
                             reduction = best_alt["complexity_reduction"]
-                            print(f"{Fore.GREEN}Actual complexity reduction: {reduction:.1f}%{Style.RESET_ALL}")
+                            logger.info(f"Actual complexity reduction: {reduction:.1f}%")
                     
-                    print(f"{Fore.GREEN}\nCode:{Style.RESET_ALL}")
+                    logger.info(f"\nCode:")
                     print(best_alt.get("alternative_function", "No code selected"))
                     
                     # Add suggestions for where to save optimized version
@@ -611,10 +566,10 @@ def analyze_function_complexity_and_optimize(file_path, analyzer=None):
                     optimized_dir = os.path.join(os.path.dirname(original_path), "optimized")
                     optimized_path = os.path.join(optimized_dir, os.path.basename(original_path))
                     
-                    print(f"{Fore.GREEN}\nTo use this optimized implementation:{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}1. Create directory: {optimized_dir}{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}2. Save to: {optimized_path}{Style.RESET_ALL}")
-                    print(f"{Fore.GREEN}3. Replace the original function with this optimized version{Style.RESET_ALL}")
+                    logger.info(f"\nTo use this optimized implementation:")
+                    logger.info(f"1. Create directory: {optimized_dir}")
+                    logger.info(f"2. Save to: {optimized_path}")
+                    logger.info(f"3. Replace the original function with this optimized version")
                     
             except Exception as e:
                 logger.error(f"Error generating alternatives for {func_name}: {e}")
