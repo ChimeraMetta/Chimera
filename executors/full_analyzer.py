@@ -134,22 +134,22 @@ def find_function_relationships():
         if high_fan_out:
             logger.info(f"\nFunctions calling many others (high fan-out):")
             for func, count in high_fan_out[:10]:  # Show top 10
-                print(f"- {func}: calls {count} functions")
+                logger.info(f"- {func}: calls {count} functions")
         
         # Additional debugging to show all function definitions and calls
         logger.warning(f"\nDebugging information:")
         
         func_defs = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
-        print(f"Total function definitions: {len(func_defs)}")
+        logger.info(f"Total function definitions: {len(func_defs)}")
         if len(func_defs) > 0 and len(func_defs) < 10:
             for f in func_defs:
-                print(f"  {f}")
+                logger.info(f"  {f}")
         
         func_calls = monitor.query("(match &self (function-call $name $args $scope $line) ($name $scope $line))")
-        print(f"Total function calls: {len(func_calls)}")
+        logger.info(f"Total function calls: {len(func_calls)}")
         if len(func_calls) > 0 and len(func_calls) < 10:
             for c in func_calls:
-                print(f"  {c}")
+                logger.info(f"  {c}")
     else:
         logger.warning(f"No function call relationships found. Adding diagnostic information:")
         
@@ -158,9 +158,9 @@ def find_function_relationships():
         func_calls = monitor.query("(match &self (function-call $name $args $scope $line) $name)")
         deps = monitor.query("(match &self (function-depends $caller $callee) ($caller $callee))")
         
-        print(f"Function definitions found: {len(func_defs)}")
-        print(f"Function calls found: {len(func_calls)}")
-        print(f"Function dependencies found: {len(deps)}")
+        logger.info(f"Function definitions found: {len(func_defs)}")
+        logger.info(f"Function calls found: {len(func_calls)}")
+        logger.info(f"Function dependencies found: {len(deps)}")
         
         # Show sample function definitions and calls for debugging
         if func_defs:
@@ -171,11 +171,11 @@ def find_function_relationships():
         if func_calls:
             logger.warning(f"\nSample function calls:")
             for i, call in enumerate(func_calls[:5]):
-                print(f"  {call}")
+                logger.info(f"  {call}")
 
 def find_type_relationships():
     """Find and analyze type relationships between functions."""
-    print("\n=== Type Flow Relationships ===")
+    logger.info("\n=== Type Flow Relationships ===")
     
     # Get function return types
     return_types = monitor.query("(match &self (: $func (-> $params $return)) ($func $return))")
@@ -212,12 +212,12 @@ def find_type_relationships():
                             type_flows.append((source_func, target_func, ret_type))
         
         if type_flows:
-            print(f"Found {len(type_flows)} potential type flows between functions")
-            print("\nPotential data flow paths:")
+            logger.info(f"Found {len(type_flows)} potential type flows between functions")
+            logger.info("\nPotential data flow paths:")
             for source, target, type_name in type_flows:
-                print(f"- {source} -> {target} (type: {type_name})")
+                logger.info(f"- {source} -> {target} (type: {type_name})")
         else:
-            print("No type flow relationships found")
+            logger.info("No type flow relationships found")
         
         # Analyze type usage
         type_usage = {}
@@ -232,24 +232,24 @@ def find_type_relationships():
                 type_usage[ret_type] = 0
             type_usage[ret_type] += 1
         
-        print("\nType usage frequency:")
+        logger.info("\nType usage frequency:")
         for type_name, count in sorted(type_usage.items(), key=lambda x: x[1], reverse=True):
-            print(f"- {type_name}: used {count} times")
+            logger.info(f"- {type_name}: used {count} times")
     else:
-        print("Insufficient type information found")
+        logger.info("Insufficient type information found")
 
 def find_class_relationships():
     """Find and analyze class inheritance relationships."""
-    print("\n=== Class Relationships ===")
+    logger.info("\n=== Class Relationships ===")
     
     # Get class inheritance relationships
     inheritance = monitor.query("(match &self (class-inherits $derived $base) ($derived $base))")
     
     if inheritance:
-        print(f"Found {len(inheritance)} class inheritance relationships")
-        print("\nClass inheritance:")
+        logger.info(f"Found {len(inheritance)} class inheritance relationships")
+        logger.info("\nClass inheritance:")
         for rel in inheritance:
-            print(f"- {rel}")
+            logger.info(f"- {rel}")
         
         # Build inheritance graph
         inheritance_graph = {}
@@ -262,21 +262,21 @@ def find_class_relationships():
                 inheritance_graph[base].add(derived)
         
         # Show hierarchy
-        print("\nClass hierarchy:")
+        logger.info("\nClass hierarchy:")
         for base, derived_classes in inheritance_graph.items():
-            print(f"- {base} is extended by: {', '.join(derived_classes)}")
+            logger.info(f"- {base} is extended by: {', '.join(derived_classes)}")
     else:
-        print("No class inheritance relationships found")
+        logger.info("No class inheritance relationships found")
 
 def find_module_relationships():
     """Find and analyze module import relationships."""
-    print("\n=== Module Relationships ===")
+    logger.info("\n=== Module Relationships ===")
     
     # Get import relationships
     imports = monitor.query("(match &self (import $module $scope $line) ($scope $module))")
     
     if imports:
-        print(f"Found {len(imports)} direct module imports")
+        logger.info(f"Found {len(imports)} direct module imports")
         
         # Build scope -> imports map
         scope_imports = {}
@@ -288,17 +288,17 @@ def find_module_relationships():
                     scope_imports[scope] = set()
                 scope_imports[scope].add(module)
         
-        print("\nModule dependencies by scope:")
+        logger.info("\nModule dependencies by scope:")
         for scope, modules in scope_imports.items():
-            print(f"- {scope} imports: {', '.join(modules)}")
+            logger.info(f"- {scope} imports: {', '.join(modules)}")
     else:
-        print("No direct module imports found")
+        logger.info("No direct module imports found")
     
     # Get from-import relationships
     from_imports = monitor.query("(match &self (import-from $module $name $scope $line) ($scope $module $name))")
     
     if from_imports:
-        print(f"\nFound {len(from_imports)} from-type imports")
+        logger.info(f"\nFound {len(from_imports)} from-type imports")
         
         # Build scope -> (module, name) map
         scope_from_imports = {}
@@ -310,23 +310,23 @@ def find_module_relationships():
                     scope_from_imports[scope] = []
                 scope_from_imports[scope].append((module, name))
         
-        print("\nModule component imports by scope:")
+        logger.info("\nModule component imports by scope:")
         for scope, imports in scope_from_imports.items():
-            print(f"- {scope} imports:")
+            logger.info(f"- {scope} imports:")
             for module, name in imports:
-                print(f"  - {name} from {module}")
+                logger.info(f"  - {name} from {module}")
     else:
-        print("No from-type imports found")
+        logger.info("No from-type imports found")
 
 def find_operation_patterns():
     """Find and analyze operation patterns in the code."""
-    print("\n=== Operation Patterns ===")
+    logger.info("\n=== Operation Patterns ===")
     
     # Get binary operations
     bin_ops = monitor.query("(match &self (bin-op $op $left $right $scope $line) ($op $left $right))")
     
     if bin_ops:
-        print(f"Found {len(bin_ops)} binary operations")
+        logger.info(f"Found {len(bin_ops)} binary operations")
         
         # Count operations by type
         op_counts = {}
@@ -338,9 +338,9 @@ def find_operation_patterns():
                     op_counts[op_type] = 0
                 op_counts[op_type] += 1
         
-        print("\nOperation frequency:")
+        logger.info("\nOperation frequency:")
         for op_type, count in sorted(op_counts.items(), key=lambda x: x[1], reverse=True):
-            print(f"- {op_type}: {count} times")
+            logger.info(f"- {op_type}: {count} times")
         
         # Find common type patterns in operations
         type_patterns = {}
@@ -353,15 +353,15 @@ def find_operation_patterns():
                     type_patterns[key] = 0
                 type_patterns[key] += 1
         
-        print("\nCommon operation patterns:")
+        logger.info("\nCommon operation patterns:")
         for pattern, count in sorted(type_patterns.items(), key=lambda x: x[1], reverse=True)[:10]:  # Top 10
-            print(f"- {pattern}: {count} times")
+            logger.info(f"- {pattern}: {count} times")
     else:
-        print("No binary operations found")
+        logger.info("No binary operations found")
 
 def analyze_type_safety():
     """Analyze code for potential type safety issues."""
-    print("\n=== Type Safety Analysis ===")
+    logger.info("\n=== Type Safety Analysis ===")
     
     # Check for binary operation type mismatches
     bin_op_mismatches = monitor.query("""
@@ -376,7 +376,7 @@ def analyze_type_safety():
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 5:
                 op, left, right, scope, line = parts[:5]
-                print(f"- Line {line}: {op} operation between {left} and {right} in {scope}")
+                logger.warning(f"- Line {line}: {op} operation between {left} and {right} in {scope}")
     
     # Check for function parameter type mismatches
     param_mismatches = monitor.query("""
@@ -391,7 +391,7 @@ def analyze_type_safety():
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 6:
                 func, idx, expected, actual, scope, line = parts[:6]
-                print(f"- Line {line}: Function {func} parameter {idx} expects {expected} but got {actual}")
+                logger.warning(f"- Line {line}: Function {func} parameter {idx} expects {expected} but got {actual}")
     
     # Check for potential division by zero
     div_zero = monitor.query("""
@@ -406,7 +406,7 @@ def analyze_type_safety():
             parts = str(div).strip('()').split()
             if len(parts) >= 2:
                 scope, line = parts[:2]
-                print(f"- Line {line}: Division operation with potential zero divisor in {scope}")
+                logger.warning(f"- Line {line}: Division operation with potential zero divisor in {scope}")
     
     # Check for return type mismatches
     return_mismatches = monitor.query("""
@@ -421,7 +421,7 @@ def analyze_type_safety():
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 4:
                 func, expected, actual, line = parts[:4]
-                print(f"- Line {line}: Function {func} declares return type {expected} but returns {actual}")
+                logger.warning(f"- Line {line}: Function {func} declares return type {expected} but returns {actual}")
     
     # Check for potential null dereferences
     null_derefs = monitor.query("""
@@ -436,15 +436,15 @@ def analyze_type_safety():
             parts = str(deref).strip('()').split()
             if len(parts) >= 2:
                 scope, line = parts[:2]
-                print(f"- Line {line}: Potential None/null value used in function call in {scope}")
+                logger.warning(f"- Line {line}: Potential None/null value used in function call in {scope}")
     
     if not (bin_op_mismatches or param_mismatches or div_zero or return_mismatches or null_derefs):
-        print("No type safety issues detected.")
+        logger.info("No type safety issues detected.")
 
 
 def analyze_structural_patterns():
     """Analyze structural patterns in the codebase."""
-    print("\n=== Structural Patterns ===")
+    logger.info("\n=== Structural Patterns ===")
     
     # Get counts for key elements
     functions = monitor.query("(match &self (function-def $name $scope $start $end) $name)")
@@ -472,35 +472,35 @@ def analyze_structural_patterns():
             scopes[scope] = {"functions": 0, "classes": 0, "variables": 0}
         scopes[scope]["variables"] += 1
     
-    print(f"\nCodebase structure summary:")
-    print(f"- Functions: {len(functions)}")
-    print(f"- Classes: {len(classes)}")
-    print(f"- Variables: {len(variables)}")
-    print(f"- Loops: {len(loops)}")
-    print(f"- Scopes: {len(scopes)}")
+    logger.info(f"\nCodebase structure summary:")
+    logger.info(f"- Functions: {len(functions)}")
+    logger.info(f"- Classes: {len(classes)}")
+    logger.info(f"- Variables: {len(variables)}")
+    logger.info(f"- Loops: {len(loops)}")
+    logger.info(f"- Scopes: {len(scopes)}")
     
     # Determine overall architecture
     if len(classes) == 0 and len(functions) > 0:
-        print("\nArchitectural pattern: Primarily Functional")
+        logger.info("\nArchitectural pattern: Primarily Functional")
     elif len(classes) > 0 and len(functions) / max(1, len(classes)) < 2:
-        print("\nArchitectural pattern: Primarily Object-Oriented")
+        logger.info("\nArchitectural pattern: Primarily Object-Oriented")
     else:
-        print("\nArchitectural pattern: Mixed (OO and Functional)")
+        logger.info("\nArchitectural pattern: Mixed (OO and Functional)")
     
     # Analyze module structure
     if len(scopes) > 1:
-        print("\nModule structure:")
+        logger.info("\nModule structure:")
         for scope, counts in scopes.items():
             total = counts["functions"] + counts["classes"] + counts["variables"]
             if total > 0:
-                print(f"- {scope}: {counts['functions']} functions, {counts['classes']} classes, {counts['variables']} variables")
+                logger.info(f"- {scope}: {counts['functions']} functions, {counts['classes']} classes, {counts['variables']} variables")
 
 # Function to analyze temporal code evolution
 # This is a direct replacement for the analyze_temporal_evolution function in full_analyzer.py
 
 def analyze_temporal_evolution(repo_path, monitor=None):
     """Analyze temporal code evolution using Git history."""
-    print("\n=== Temporal Code Evolution Analysis ===")
+    logger.info("\n=== Temporal Code Evolution Analysis ===")
     
     if not monitor:
         # Create monitor if not provided
@@ -519,7 +519,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
     
     try:
         # === Find functions with frequent changes ===
-        print("\nFunctions with frequent changes:")
+        logger.info("\nFunctions with frequent changes:")
         
         # Use a more direct query to find function names first
         func_names = monitor.query("""(match &self (function-signature-at $func $commit $_) $func)""")
@@ -552,14 +552,14 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         
         # Display results
         if frequent_changes:
-            print(f"Found {len(frequent_changes)} functions with frequent changes:")
+            logger.info(f"Found {len(frequent_changes)} functions with frequent changes:")
             for func, count in frequent_changes[:10]:  # Show top 10
-                print(f"- {func}: changed {count} times")
+                logger.info(f"- {func}: changed {count} times")
         else:
-            print("No functions with frequent changes found.")
+            logger.info("No functions with frequent changes found.")
             
         # === Find functions with complexity growth ===
-        print("\nFunctions with complexity growth:")
+        logger.info("\nFunctions with complexity growth:")
         
         complexity_growth = []
         for func_name in unique_funcs:
@@ -610,14 +610,14 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         
         # Display results
         if complexity_growth:
-            print(f"Found {len(complexity_growth)} functions that grew in complexity:")
+            logger.info(f"Found {len(complexity_growth)} functions that grew in complexity:")
             for func, growth in complexity_growth[:10]:  # Show top 10
-                print(f"- {func}: complexity increased by {growth}")
+                logger.info(f"- {func}: complexity increased by {growth}")
         else:
-            print("No functions with complexity growth found.")
+            logger.info("No functions with complexity growth found.")
             
         # === Find co-evolving functions ===
-        print("\nCo-evolving function pairs:")
+        logger.info("\nCo-evolving function pairs:")
         
         # This is computationally expensive, so limit to most frequently changing functions
         top_funcs = [f for f, _ in frequent_changes[:20]]
@@ -657,14 +657,14 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         
         # Display results
         if co_evolving:
-            print(f"Found {len(co_evolving)} co-evolving function pairs:")
+            logger.info(f"Found {len(co_evolving)} co-evolving function pairs:")
             for func1, func2, ratio in co_evolving[:10]:  # Show top 10
-                print(f"- {func1} and {func2}: co-change ratio {ratio:.2f}")
+                logger.info(f"- {func1} and {func2}: co-change ratio {ratio:.2f}")
         else:
-            print("No co-evolving function pairs found.")
+            logger.info("No co-evolving function pairs found.")
             
         # === Identify potential hotspots ===
-        print("\nPotential code hotspots:")
+        logger.info("\nPotential code hotspots:")
         
         # Combine frequency and complexity to find hotspots
         hotspots = []
@@ -689,11 +689,11 @@ def analyze_temporal_evolution(repo_path, monitor=None):
         
         # Display results
         if hotspots:
-            print(f"Found {len(hotspots)} potential code hotspots:")
+            logger.info(f"Found {len(hotspots)} potential code hotspots:")
             for func, score, confidence in hotspots[:10]:  # Show top 10
-                print(f"- {func}: score {score:.2f} ({confidence} confidence)")
+                logger.info(f"- {func}: score {score:.2f} ({confidence} confidence)")
         else:
-            print("No potential code hotspots detected.")
+            logger.info("No potential code hotspots detected.")
         
     except Exception as e:
         logger.error(f"Error in temporal analysis: {e}")
@@ -808,9 +808,9 @@ def analyze_function_complexity(file_path):
     logger.info(f"\n=== Function Complexity Analysis ===")
     logger.info("Function complexity ranking:")
     for i, (func_name, func_info) in enumerate(sorted_functions):
-        print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
+        logger.info(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
         if i > 20:  # Only show top 20 functions
-            print("(... and more functions)")
+            logger.info("(... and more functions)")
             break
     
     # Identify complex functions based on criteria
@@ -827,13 +827,13 @@ def analyze_function_complexity(file_path):
     logger.info(f"\n=== Complex Functions Detected ===")
     if complex_funcs:
         for i, (func_name, func_info) in enumerate(complex_funcs):
-            print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
+            logger.info(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
     else:
-        print("No complex functions detected")
+        logger.info("No complex functions detected")
 
 def analyze_domain_concepts():
     """Analyze potential domain concepts in the codebase."""
-    print("\n=== Domain Concept Analysis ===")
+    logger.info("\n=== Domain Concept Analysis ===")
     
     # Find non-standard types (potential domain types)
     standard_types = {"String", "Number", "Bool", "List", "Dict", "Tuple", "Set", "Any", "None"}
@@ -850,22 +850,22 @@ def analyze_domain_concepts():
     domain_types = [t for t in unique_types if t not in standard_types and t and t[0] not in "$" and "(" not in t]
     
     if domain_types:
-        print(f"Found {len(domain_types)} potential domain types:")
+        logger.info(f"Found {len(domain_types)} potential domain types:")
         for dtype in sorted(domain_types):
-            print(f"- {dtype}")
+            logger.info(f"- {dtype}")
         
         # Try to find functions operating on these types
-        print("\nFunctions working with domain types:")
+        logger.info("\nFunctions working with domain types:")
         for dtype in domain_types:
             try:
                 query = f"(match &self (function-param $func $idx $name {dtype}) $func)"
                 funcs = monitor.query(query)
                 if funcs:
-                    print(f"- {dtype} is used by: {', '.join(str(f) for f in funcs)}")
+                    logger.info(f"- {dtype} is used by: {', '.join(str(f) for f in funcs)}")
             except Exception as e:
-                print(f"Error querying functions for type {dtype}: {e}")
+                logger.info(f"Error querying functions for type {dtype}: {e}")
     else:
-        print("No domain-specific types found")
+        logger.info("No domain-specific types found")
     
     # Look for potential domain concepts in naming
     domain_concepts = set()
@@ -888,11 +888,11 @@ def analyze_domain_concepts():
                     domain_concepts.add(part)
     
     if domain_concepts:
-        print(f"\nPotential domain concepts from naming patterns:")
+        logger.info(f"\nPotential domain concepts from naming patterns:")
         for concept in sorted(domain_concepts):
-            print(f"- {concept}")
+            logger.info(f"- {concept}")
     else:
-        print("\nNo clear domain concepts found in naming patterns")
+        logger.info("\nNo clear domain concepts found in naming patterns")
 
 def analyze_function_call_relationships(file_path):
     """Analyze function call relationships with proper handling of class methods."""
@@ -1019,7 +1019,7 @@ def analyze_function_call_relationships(file_path):
             if callee not in unique_callees:
                 unique_callees.append(callee)
         
-        print(f"- {caller} calls: {', '.join(unique_callees)}")
+        logger.info(f"- {caller} calls: {', '.join(unique_callees)}")
     
     # Print debugging information
     logger.warning(f"Debugging information:")
@@ -1035,9 +1035,9 @@ def analyze_function_call_relationships(file_path):
     if call_chains:
         logger.info(f"Found {len(call_chains)} significant call chains:")
         for i, chain in enumerate(call_chains[:10], 1):  # Show top 10
-            print(f"{i}. {' → '.join(chain)}")
+            logger.info(f"{i}. {' → '.join(chain)}")
     else:
-        print("No significant call chains found")
+        logger.info("No significant call chains found")
 
 def find_call_chains(call_relationships, min_length=3):
     """Find significant call chains in the codebase."""
@@ -1073,7 +1073,7 @@ if __name__ == "__main__":
     monitor.load_metta_rules(ONTOLOGY_PATH)
     
     if len(sys.argv) < 2:
-        print("Usage: python full_analyzer.py <path_to_file_or_directory>")
+        logger.info("Usage: python full_analyzer.py <path_to_file_or_directory>")
         sys.exit(1)
     
     # Path to analyze
