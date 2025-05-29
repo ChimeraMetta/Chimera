@@ -927,7 +927,7 @@ def run_donor_evolution_demo():
         visualizer.show_final_summary(successful_candidates)
         
         # Save data for analysis
-        visualizer.save_evolution_data_with_code(f"{visualizer.original_function.__name__}_evolution_data.json")
+        visualizer.save_evolution_data_with_code("general_evolution_data.json")
         
         # Keep the plot open
         print("\nVisualization complete - close the plot window to exit")
@@ -1009,7 +1009,7 @@ def run_comparative_evolution():
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "--compare":
+    if len(sys.argv) > 1 and sys.argv[2] == "--compare":
         run_comparative_evolution()
     else:
         run_donor_evolution_demo()
