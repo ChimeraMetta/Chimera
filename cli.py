@@ -13,8 +13,12 @@ from executors import complexity as complexity_analyzer_module
 from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 from common.logging_utils import get_logger, Fore, Style
+from executors.atomspace_manager import export_atomspace as export_atomspace_func, import_atomspace as import_atomspace_func
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
+_INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
+_SUMMARY_EXPORT_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "summary_export.metta")
+_ANALYZE_EXPORT_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "analyze_export.metta")
 
 # Setup logger for this module
 logger = get_logger(__name__)
@@ -80,6 +84,21 @@ def run_summary_command(target_path: str):
             full_analyzer.monitor = original_global_monitor_full
         elif hasattr(full_analyzer, 'monitor'): # If we set it and it wasn't there before
             delattr(full_analyzer, 'monitor')
+
+        # Automatically export the atomspace for this command
+        try:
+            if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
+                os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
+                logger.info(f"Created intermediate export directory: {_INTERMEDIATE_EXPORT_DIR}")
+            logger.info(f"Automatically exporting summary atomspace to: {_SUMMARY_EXPORT_FILE}")
+            export_success = export_atomspace_func(_SUMMARY_EXPORT_FILE, monitor=local_monitor)
+            if export_success:
+                logger.info(f"Summary atomspace automatically exported successfully.")
+            else:
+                logger.warning(f"Failed to automatically export summary atomspace.")
+        except Exception as e:
+            logger.error(f"Error during automatic summary atomspace export: {e}")
+
     logger.info(f"Summary analysis for {target_path} complete.")
 
 def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
@@ -147,6 +166,20 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             complexity_analyzer_module.monitor = original_global_monitor_complexity
         elif hasattr(complexity_analyzer_module, 'monitor'):
             delattr(complexity_analyzer_module, 'monitor')
+
+        # Automatically export the atomspace for this command
+        try:
+            if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
+                os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
+                logger.info(f"Created intermediate export directory: {_INTERMEDIATE_EXPORT_DIR}")
+            logger.info(f"Automatically exporting analyze atomspace to: {_ANALYZE_EXPORT_FILE}")
+            export_success = export_atomspace_func(_ANALYZE_EXPORT_FILE, monitor=local_monitor)
+            if export_success:
+                logger.info(f"Analyze atomspace automatically exported successfully.")
+            else:
+                logger.warning(f"Failed to automatically export analyze atomspace.")
+        except Exception as e:
+            logger.error(f"Error during automatic analyze atomspace export: {e}")
 
     if analyzer_instance_for_complexity and os.path.isfile(target_path):
         logger.info(f"Starting interactive function optimization for file: {target_path}")
@@ -230,30 +263,101 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             
     logger.info(f"'Analyze' command for {target_path} complete.")
 
+# --- New function for the export command ---
+def run_export_atomspace_command(output_metta_path: str):
+    logger.info(f"Running 'export' command. Output will be saved to: {output_metta_path}")
+
+    export_monitor = DynamicMonitor()
+    
+    # Load base ontology (e.g., from full_analyzer, assuming it's general enough)
+    try:
+        if not isinstance(getattr(full_analyzer, 'ONTOLOGY_PATH', None), str):
+            raise AttributeError("full_analyzer.ONTOLOGY_PATH is not defined or not a string.")
+
+        ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
+        logger.info(f"Attempting to load base ontology rules from: {ontology_file_path} into the main export monitor.")
+
+        if os.path.exists(ontology_file_path):
+            try:
+                export_monitor.load_metta_rules(ontology_file_path)
+                logger.info(f"Successfully loaded base ontology rules from {ontology_file_path}.")
+            except Exception as e:
+                logger.error(f"Failed to load base ontology rules from {ontology_file_path}: {e}")
+                logger.warning("Proceeding with export, but base atomspace may be incomplete.")
+        else:
+            logger.warning(f"Base ontology file not found at {ontology_file_path}. The exported atomspace will only contain imported data if available.")
+    except AttributeError as e:
+        logger.error(f"Error accessing ONTOLOGY_PATH for base ontology loading: {e}")
+        logger.warning("Cannot load base ontology. The exported atomspace will rely solely on imported data.")
+    except Exception as e:
+        logger.error(f"Unexpected error during base ontology setup for export: {e}")
+        logger.warning("Proceeding with export, but base atomspace may be incomplete.")
+
+    # Import atomspace from summary command if it exists
+    if os.path.exists(_SUMMARY_EXPORT_FILE):
+        logger.info(f"Importing atomspace from summary export: {_SUMMARY_EXPORT_FILE}")
+        import_result = import_atomspace_func(_SUMMARY_EXPORT_FILE, monitor=export_monitor, overwrite=True)
+        if import_result.get("success"):
+            logger.info(f"Successfully imported {import_result.get('imported',0) + import_result.get('overwritten',0)} atoms from summary export. Conflicts skipped: {import_result.get('skipped',0)}")
+        else:
+            logger.warning(f"Could not import from summary export: {import_result.get('error', 'Unknown error')}")
+    else:
+        logger.info(f"Summary export file not found: {_SUMMARY_EXPORT_FILE}. Skipping import.")
+
+    # Import atomspace from analyze command if it exists
+    if os.path.exists(_ANALYZE_EXPORT_FILE):
+        logger.info(f"Importing atomspace from analyze export: {_ANALYZE_EXPORT_FILE}")
+        import_result = import_atomspace_func(_ANALYZE_EXPORT_FILE, monitor=export_monitor, overwrite=True)
+        if import_result.get("success"):
+            logger.info(f"Successfully imported {import_result.get('imported',0) + import_result.get('overwritten',0)} atoms from analyze export. Conflicts skipped: {import_result.get('skipped',0)}")
+        else:
+            logger.warning(f"Could not import from analyze export: {import_result.get('error', 'Unknown error')}")
+    else:
+        logger.info(f"Analyze export file not found: {_ANALYZE_EXPORT_FILE}. Skipping import.")
+
+    logger.info(f"Exporting consolidated atomspace via atomspace_manager to: {output_metta_path}")
+    try:
+        success = export_atomspace_func(output_metta_path, monitor=export_monitor)
+        if success:
+            logger.info(f"Consolidated atomspace successfully exported to: {output_metta_path}")
+        else:
+            logger.error(f"Failed to export consolidated atomspace to: {output_metta_path}. Check logs for details.")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during consolidated atomspace export: {e}")
+        logger.exception("Full traceback for export_atomspace_command error:")
+
+    logger.info(f"'export' command for {output_metta_path} complete.")
+
+
 # --- Main CLI Logic ---
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Chimera Indexer: A CLI tool for analyzing Python codebases.",
+        description="Chimera Indexer: A CLI tool for analyzing Python codebases and managing MeTTa atomspaces.",
         epilog=f"Example usage:\n"
                f"  python cli.py summary /path/to/your/code\n"
                f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\n"
-               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY",
+               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\n"
+               f"  python cli.py export /path/to/output/atomspace.metta",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "command", 
-        choices=["summary", "analyze"], 
-        help="The analysis command to execute:\n"
+        choices=["summary", "analyze", "export"],
+        help="The command to execute:\n"
              "  summary: Performs a comprehensive static analysis of the codebase structure,\n"
              "           relationships, patterns, and concepts (using exec/full_analyzer.py).\n"
              "  analyze: Focuses on function complexity analysis and offers potential\n"
              "           AI-driven optimization suggestions if an API key is provided\n"
-             "           (using exec/complexity.py)."
+             "           (using exec/complexity.py).\n"
+             "  export: Exports a MeTTa atomspace (typically after loading a default\n"
+             "                    ontology like the one used by 'summary') to a specified .metta file."
     )
     parser.add_argument(
         "path", 
-        help="The path to the target Python file or directory to analyze."
+        help="The path argument, meaning depends on the command:\n"
+             "  For 'summary', 'analyze': Path to the target Python file or directory to analyze.\n"
+             "  For 'export': Path to the output .metta file where the atomspace will be saved."
     )
     parser.add_argument(
         "--api_key", 
@@ -267,9 +371,31 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.path):
-        logger.error(f"Error: The path '{args.path}' does not exist. Please provide a valid file or directory path.")
-        sys.exit(1)
+    # Path validation based on command
+    if args.command in ["summary", "analyze"]:
+        if not os.path.exists(args.path):
+            logger.error(f"Error: The input path '{args.path}' for command '{args.command}' does not exist. Please provide a valid file or directory path.")
+            sys.exit(1)
+    elif args.command == "export":
+        output_path_str = str(args.path) # Ensure it's a string
+        output_dir = os.path.dirname(output_path_str)
+        if not output_dir: # Handles cases like "filename.metta" where dirname is empty
+            output_dir = "." # Assume current directory
+
+        # Create output directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+                logger.info(f"Created output directory: {output_dir}")
+            except OSError as e:
+                logger.error(f"Error: Could not create output directory '{output_dir}': {e}")
+                sys.exit(1)
+        
+        # Check if the output path itself is a directory (which is not allowed for a file output)
+        if os.path.isdir(output_path_str):
+            logger.error(f"Error: The output path '{output_path_str}' for 'export' must be a file path, not a directory.")
+            sys.exit(1)
+    # No 'else' here, as other commands might be added in the future with different path handling.
 
     effective_api_key = args.api_key
     if not effective_api_key:
@@ -283,6 +409,8 @@ if __name__ == "__main__":
         if not effective_api_key:
             logger.info("No API key provided or found in environment. 'analyze' will run without AI optimization features.")
         run_analyze_command(args.path, effective_api_key)
+    elif args.command == "export":
+        run_export_atomspace_command(args.path)
     else:
         logger.error(f"Unknown command: {args.command}") 
         parser.print_help()
