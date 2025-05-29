@@ -134,6 +134,7 @@ class DonorGenerationVisualizer:
     
     def __init__(self, original_function):
         self.original_function = original_function
+        self.original_function_code = self._get_function_source(original_function)
         self.tester = ConstraintBasedTester(original_function)
         self.events: List[GenerationEvent] = []
         self.generation_start_time = time.time()
@@ -795,7 +796,7 @@ class DonorGenerationVisualizer:
         # Display original function code
         print("\nORIGINAL FUNCTION:")
         print("="*50)
-        print(self._format_code_for_display(self.original_function))
+        print(self._format_code_for_display(self.original_function_code))
         
         print(f"\nSuccessful Candidates Found: {len(successful_candidates)}")
         
