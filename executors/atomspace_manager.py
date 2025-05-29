@@ -205,9 +205,12 @@ class AtomspaceManager:
     def _get_all_atoms(self) -> List[str]:
         """Get all atoms from the current atomspace."""
         try:
+            print(f"Getting all atoms from atomspace: {self.monitor}")
             # Query all atoms
             query = "(match &self $atom $atom)"
             results = self.monitor.query(query)
+
+            print(f"Results: {results}")
             
             # Convert to strings and filter out empty results
             atoms = []
