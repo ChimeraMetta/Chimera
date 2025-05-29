@@ -8,7 +8,7 @@ class ColoredFormatter(logging.Formatter):
     """Custom formatter that adds colors to different log levels"""
 
     COLORS = {
-        'DEBUG': Fore.BLUE,
+        'DEBUG': Fore.CYAN,
         'INFO': Fore.GREEN,
         'WARNING': Fore.YELLOW,
         'ERROR': Fore.RED,
@@ -18,16 +18,25 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         # Add color to the level name
         log_level_color = self.COLORS.get(record.levelname)
+        
+        # Store original levelname for coloring the entire message
+        original_levelname = record.levelname
+        
         if log_level_color:
             record.levelname = f"{log_level_color}{record.levelname}{Style.RESET_ALL}"
         
-        # Color the entire message based on level for some cases if desired,
-        # or just keep it to the level name.
-        # For now, let's stick to coloring the level name primarily.
-        # Example: if record.levelname == 'ERROR':
-        #    return f"{Fore.RED}{super().format(record)}{Style.RESET_ALL}"
+        # Format the message first
+        formatted_message = super().format(record)
+
+        # Color the entire message based on the original levelname
+        message_color = self.COLORS.get(original_levelname)
+        if message_color:
+            # For CRITICAL, we want BRIGHT RED for the whole message
+            if original_levelname == 'CRITICAL':
+                 return f"{Fore.RED + Style.BRIGHT}{formatted_message}{Style.RESET_ALL}"
+            return f"{message_color}{formatted_message}{Style.RESET_ALL}"
             
-        return super().format(record)
+        return formatted_message
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     """
