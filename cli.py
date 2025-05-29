@@ -61,7 +61,7 @@ def run_summary_command(target_path: str):
         full_analyzer.analyze_codebase(target_path) # Corrected function call
         logger.info("Summary analysis completed successfully.")
         logger.info("Analyzing temporal aspects (git history)...")
-        full_analyzer.analyze_temporal_aspects(target_path)
+        full_analyzer.analyze_temporal_evolution(target_path, monitor=local_monitor) # Corrected function call
         logger.info("Analyzing structural patterns...")
         full_analyzer.analyze_structural_patterns()
         logger.info("Analyzing domain concepts...")
