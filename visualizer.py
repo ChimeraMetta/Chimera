@@ -16,6 +16,10 @@ from typing import List, Dict, Any, Tuple
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init(autoreset=True)
 
 # Try to import our components
 try:
@@ -179,7 +183,7 @@ class DonorGenerationVisualizer:
         """Create directory for saving plots if it doesn't exist."""
         if not os.path.exists(self.plot_save_dir):
             os.makedirs(self.plot_save_dir)
-            print(f"Created directory: {self.plot_save_dir}")
+            print(f"{Fore.YELLOW}Created directory: {self.plot_save_dir}")
     
     def _get_function_source(self, func):
         """Get the source code of a function."""
@@ -207,11 +211,11 @@ class DonorGenerationVisualizer:
         """
         Run the iterative evolution process until we find good solutions.
         """
-        print("STARTING CONSTRAINT-BASED DONOR EVOLUTION")
-        print("=" * 60)
-        print(f"Original function: {self.original_function.__name__}")
-        print(f"Test cases: {len(self.tester.test_cases)}")
-        print(f"Target success rate: {target_success_rate:.1%}")
+        print(f"{Fore.CYAN}STARTING CONSTRAINT-BASED DONOR EVOLUTION{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}{'=' * 60}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Original function: {self.original_function.__name__}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Test cases: {len(self.tester.test_cases)}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Target success rate: {target_success_rate:.1%}{Style.RESET_ALL}")
         
         successful_candidates = []
         iteration = 0
@@ -220,8 +224,8 @@ class DonorGenerationVisualizer:
             iteration += 1
             iteration_start = time.time()
             
-            print(f"\nITERATION {iteration}")
-            print("-" * 40)
+            print(f"\\n{Fore.MAGENTA}ITERATION {iteration}{Style.RESET_ALL}")
+            print(f"{Fore.MAGENTA}{'-' * 40}{Style.RESET_ALL}")
             
             # Generate candidates for this iteration
             candidates = self._generate_candidates_for_iteration(iteration)
@@ -235,7 +239,7 @@ class DonorGenerationVisualizer:
                 success_rate = event.success_rate
                 constraints_met = event.constraints_satisfied
                 
-                print(f"  {candidate['name']}: {constraints_met}/{event.total_constraints} constraints ({success_rate:.1%})")
+                print(f"  {candidate['name']}: {Fore.BLUE}{constraints_met}{Style.RESET_ALL}/{event.total_constraints} constraints ({Fore.BLUE}{success_rate:.1%}{Style.RESET_ALL})")
                 
                 if success_rate >= target_success_rate:
                     successful_candidates.append((candidate, event))
@@ -249,7 +253,7 @@ class DonorGenerationVisualizer:
                         'constraints_satisfied': constraints_met,
                         'total_constraints': event.total_constraints
                     })
-                    print(f"  SUCCESS: {candidate['name']} meets target!")
+                    print(f"  {Fore.GREEN}SUCCESS: {candidate['name']} meets target!{Style.RESET_ALL}")
                 
             # Update visualization
             self._update_plots()
@@ -257,21 +261,21 @@ class DonorGenerationVisualizer:
             # Check if we should continue
             best_success_rate = max([e.success_rate for e in self.events], default=0)
             
-            print(f"\nIteration {iteration} Summary:")
-            print(f"  Best success rate so far: {best_success_rate:.1%}")
-            print(f"  Successful candidates: {len(successful_candidates)}")
+            print(f"\\n{Fore.YELLOW}Iteration {iteration} Summary:{Style.RESET_ALL}")
+            print(f"  Best success rate so far: {Fore.YELLOW}{best_success_rate:.1%}{Style.RESET_ALL}")
+            print(f"  Successful candidates: {Fore.YELLOW}{len(successful_candidates)}{Style.RESET_ALL}")
             
             if len(successful_candidates) >= 2:
-                print(f"\nFound {len(successful_candidates)} successful candidates!")
+                print(f"\\n{Fore.GREEN}Found {len(successful_candidates)} successful candidates!{Style.RESET_ALL}")
                 break
                 
             # Brief pause for visualization
             plt.pause(1.0)
         
-        print(f"\nEVOLUTION COMPLETE")
-        print(f"Iterations: {iteration}")
-        print(f"Total candidates tested: {len(self.events)}")
-        print(f"Successful candidates: {len(successful_candidates)}")
+        print(f"\\n{Fore.CYAN}EVOLUTION COMPLETE{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Iterations: {iteration}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Total candidates tested: {len(self.events)}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Successful candidates: {len(successful_candidates)}{Style.RESET_ALL}")
         
         return successful_candidates
     
@@ -298,7 +302,7 @@ class DonorGenerationVisualizer:
                     if fixed_candidates:
                         return fixed_candidates
             except Exception as e:
-                print(f"  Real generation failed: {e}")
+                print(f"  {Fore.RED}Real generation failed: {e}{Style.RESET_ALL}")
         
         # Generate synthetic candidates with increasing sophistication
         return self._generate_synthetic_candidates(iteration)
@@ -795,49 +799,49 @@ class DonorGenerationVisualizer:
             iteration_num = max(iterations) if iterations else 0
             filename = f"{self.plot_save_dir}/evolution_iter_{iteration_num:02d}_{timestamp}.png"
             plt.savefig(filename, dpi=300, bbox_inches='tight')
-            print(f"    Plot saved: {filename}")
+            print(f"    {Fore.GREEN}Plot saved: {filename}{Style.RESET_ALL}")
 
         plt.draw()
         
     def show_final_summary(self, successful_candidates):
         """Show final summary with original function code and successful candidate codes."""
-        print("\n" + "="*80)
-        print("FINAL EVOLUTION SUMMARY WITH CODE")
-        print("="*80)
+        print("\\n" + Fore.CYAN + "="*80 + Style.RESET_ALL)
+        print(Fore.CYAN + "FINAL EVOLUTION SUMMARY WITH CODE" + Style.RESET_ALL)
+        print(Fore.CYAN + "="*80 + Style.RESET_ALL)
         
         # Display original function code
-        print("\nORIGINAL FUNCTION:")
-        print("="*50)
+        print("\\n" + Fore.YELLOW + "ORIGINAL FUNCTION:" + Style.RESET_ALL)
+        print(Fore.YELLOW + "="*50 + Style.RESET_ALL)
         print(self._format_code_for_display(self.original_function_code))
         
-        print(f"\nSuccessful Candidates Found: {len(successful_candidates)}")
+        print(f"\\n{Fore.YELLOW}Successful Candidates Found: {len(successful_candidates)}{Style.RESET_ALL}")
         
         # Display each successful candidate's code
         for i, candidate_info in enumerate(self.successful_candidate_codes, 1):
-            print(f"\n" + "="*80)
-            print(f"SUCCESSFUL CANDIDATE #{i}: {candidate_info['name']}")
-            print("="*80)
-            print(f"Strategy: {candidate_info['strategy']}")
-            print(f"Success Rate: {candidate_info['success_rate']:.1%}")
-            print(f"Constraints Satisfied: {candidate_info['constraints_satisfied']}/{candidate_info['total_constraints']}")
-            print(f"Generated in Iteration: {candidate_info['iteration']}")
-            print("\nCODE:")
-            print("-"*50)
+            print(f"\\n" + Fore.GREEN + "="*80 + Style.RESET_ALL)
+            print(f"{Fore.GREEN}SUCCESSFUL CANDIDATE #{i}: {candidate_info['name']}{Style.RESET_ALL}")
+            print(Fore.GREEN + "="*80 + Style.RESET_ALL)
+            print(f"{Fore.GREEN}Strategy: {candidate_info['strategy']}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Success Rate: {candidate_info['success_rate']:.1%}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Constraints Satisfied: {candidate_info['constraints_satisfied']}/{candidate_info['total_constraints']}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}Generated in Iteration: {candidate_info['iteration']}{Style.RESET_ALL}")
+            print("\\n" + Fore.GREEN + "CODE:" + Style.RESET_ALL)
+            print(Fore.GREEN + "-"*50 + Style.RESET_ALL)
             print(candidate_info['code'])
-            print("-"*50)
+            print(Fore.GREEN + "-"*50 + Style.RESET_ALL)
         
         # Show evolution statistics (existing code)
         if self.events:
             initial_success = self.events[0].success_rate
             final_success = max(e.success_rate for e in self.events)
             
-            print(f"\n" + "="*80)
-            print("EVOLUTION STATISTICS")
-            print("="*80)
-            print(f"Initial success rate: {initial_success:.1%}")
-            print(f"Final success rate: {final_success:.1%}")
-            print(f"Improvement: {final_success - initial_success:.1%}")
-            print(f"Total candidates tested: {len(self.events)}")
+            print(f"\\n" + Fore.BLUE + "="*80 + Style.RESET_ALL)
+            print(Fore.BLUE + "EVOLUTION STATISTICS" + Style.RESET_ALL)
+            print(Fore.BLUE + "="*80 + Style.RESET_ALL)
+            print(f"{Fore.BLUE}Initial success rate: {initial_success:.1%}{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}Final success rate: {final_success:.1%}{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}Improvement: {final_success - initial_success:.1%}{Style.RESET_ALL}")
+            print(f"{Fore.BLUE}Total candidates tested: {len(self.events)}{Style.RESET_ALL}")
             
             strategy_performance = {}
             for event in self.events:
@@ -845,16 +849,16 @@ class DonorGenerationVisualizer:
                     strategy_performance[event.strategy] = []
                 strategy_performance[event.strategy].append(event.success_rate)
             
-            print(f"\nStrategy Performance:")
+            print(f"\\n{Fore.BLUE}Strategy Performance:{Style.RESET_ALL}")
             for strategy, rates in strategy_performance.items():
                 avg_rate = np.mean(rates)
                 best_rate = max(rates)
                 count = len(rates)
-                print(f"  {strategy}: avg={avg_rate:.1%}, best={best_rate:.1%} ({count} candidates)")
+                print(f"  {Fore.BLUE}{strategy}: avg={avg_rate:.1%}, best={best_rate:.1%} ({count} candidates){Style.RESET_ALL}")
         
         # Show constraint analysis (existing code)
-        print(f"\nConstraint Analysis:")
-        print(f"  Total test cases: {len(self.tester.test_cases)}")
+        print(f"\\n{Fore.BLUE}Constraint Analysis:{Style.RESET_ALL}")
+        print(f"  {Fore.BLUE}Total test cases: {len(self.tester.test_cases)}{Style.RESET_ALL}")
         
         # Find most commonly failed constraints
         if self.events:
@@ -869,7 +873,7 @@ class DonorGenerationVisualizer:
                 print("  Most challenging constraints:")
                 sorted_failures = sorted(constraint_failures.items(), key=lambda x: x[1], reverse=True)
                 for constraint, failure_count in sorted_failures[:3]:
-                    print(f"    {constraint}: {failure_count} failures")
+                    print(f"    {Fore.RED}{constraint}: {failure_count} failures{Style.RESET_ALL}")
 
     def save_evolution_data_with_code(self, filename="evolution_data_with_code.json"):
         """Save evolution data including successful candidate codes."""
@@ -900,7 +904,7 @@ class DonorGenerationVisualizer:
         with open(filename, 'w') as f:
             json.dump(data, f, indent=2)
         
-        print(f"\nEvolution data with code saved to {filename}")
+        print(f"\\n{Fore.GREEN}Evolution data with code saved to {filename}{Style.RESET_ALL}")
 
     def save_final_plot(self, filename=None):
         """Save a final comprehensive plot with all evolution data."""
@@ -925,7 +929,7 @@ class DonorGenerationVisualizer:
         
         # Save high-quality version
         plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
-        print(f"Final comprehensive plot saved: {filename}")
+        print(f"{Fore.GREEN}Final comprehensive plot saved: {filename}{Style.RESET_ALL}")
         
         return filename
 
@@ -988,7 +992,7 @@ class DonorGenerationVisualizer:
             plt.savefig(filename, dpi=300, bbox_inches='tight')
             plt.close()  # Close to save memory
             
-            print(f"Strategy analysis plot saved: {filename}")
+            print(f"{Fore.GREEN}Strategy analysis plot saved: {filename}{Style.RESET_ALL}")
 
 # Demo function
 def run_donor_evolution_demo():
@@ -1010,12 +1014,12 @@ def run_donor_evolution_demo():
     # Create and run the visualizer
     visualizer = DonorGenerationVisualizer(find_max_in_range)
     
-    print("DONOR EVOLUTION VISUALIZATION DEMO")
-    print("="*50)
-    print("This demo shows how the system iteratively generates")
-    print("and tests donor candidates against the original function's")
-    print("constraints until it finds successful solutions.")
-    print("\nPress Ctrl+C to stop early if desired.")
+    print(f"{Fore.CYAN}DONOR EVOLUTION VISUALIZATION DEMO{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}This demo shows how the system iteratively generates{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}and tests donor candidates against the original function's{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}constraints until it finds successful solutions.{Style.RESET_ALL}")
+    print(f"\\n{Fore.YELLOW}Press Ctrl+C to stop early if desired.{Style.RESET_ALL}")
     
     try:
         # Run the evolution process
@@ -1035,13 +1039,13 @@ def run_donor_evolution_demo():
         visualizer.save_evolution_data_with_code("general_evolution_data.json")
         
         # Keep the plot open
-        print("\nVisualization complete - close the plot window to exit")
+        print(f"\\n{Fore.CYAN}Visualization complete - close the plot window to exit{Style.RESET_ALL}")
         plt.show()
         
         return successful_candidates
         
     except KeyboardInterrupt:
-        print("\n\nEvolution stopped by user")
+        print(f"\\n\\n{Fore.RED}Evolution stopped by user{Style.RESET_ALL}")
         visualizer.show_final_summary([])
         return []
 
@@ -1076,8 +1080,8 @@ def run_comparative_evolution():
     results = {}
     
     for func in functions:
-        print(f"\n{'='*60}")
-        print(f"EVOLVING DONORS FOR: {func.__name__}")
+        print(f"\\n{'='*60}")
+        print(f"{Fore.CYAN}EVOLVING DONORS FOR: {func.__name__}{Style.RESET_ALL}")
         print('='*60)
         
         visualizer = DonorGenerationVisualizer(func)
@@ -1103,15 +1107,15 @@ def run_comparative_evolution():
         }
     
     # Comparative summary
-    print(f"\n{'='*60}")
-    print("COMPARATIVE EVOLUTION RESULTS")
-    print('='*60)
+    print(f"\\n{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}COMPARATIVE EVOLUTION RESULTS{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
     
     for func_name, data in results.items():
-        print(f"{func_name}:")
-        print(f"  Successful candidates: {data['successful_count']}")
-        print(f"  Total candidates tested: {data['total_events']}")
-        print(f"  Best success rate: {data['best_success_rate']:.1%}")
+        print(f"{Fore.CYAN}{func_name}:{Style.RESET_ALL}")
+        print(f"  {Fore.CYAN}Successful candidates: {data['successful_count']}{Style.RESET_ALL}")
+        print(f"  {Fore.CYAN}Total candidates tested: {data['total_events']}{Style.RESET_ALL}")
+        print(f"  {Fore.CYAN}Best success rate: {data['best_success_rate']:.1%}{Style.RESET_ALL}")
     
     return results
 
