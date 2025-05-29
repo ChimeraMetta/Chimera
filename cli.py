@@ -35,16 +35,22 @@ class ChimeraTheme(themes.GreenPassion):
             self.List.selection_color = Fore.GREEN
 
 def run_summary_command(target_path: str):
+    logger.info(f"Running 'summary' command for: {target_path}")
+
+    # Initialize a local monitor for this command
     local_monitor = DynamicMonitor()
-    ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
+    ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH) # Use ONTOLOGY_PATH from full_analyzer
+    
     if not os.path.exists(ontology_file_path):
         logger.warning(f"Ontology file not found at {ontology_file_path}. Summary analysis might be incomplete.")
     else:
         local_monitor.load_metta_rules(ontology_file_path)
 
+    # Temporarily replace global monitor in full_analyzer if it exists
     original_global_monitor_full = getattr(full_analyzer, 'monitor', None)
     full_analyzer.monitor = local_monitor
 
+    # Capture stdout for this specific analyzer
     old_stdout = sys.stdout
     sys.stdout = captured_output = StringIO()
 
@@ -52,7 +58,8 @@ def run_summary_command(target_path: str):
         logger.info("Starting comprehensive codebase summary analysis...")
         logger.info(f"Target: {target_path}")
         logger.info("Analyzing codebase structure...")
-        full_analyzer.analyze_codebase_structure(target_path)
+        full_analyzer.analyze_codebase(target_path) # Corrected function call
+        logger.info("Summary analysis completed successfully.")
         logger.info("Analyzing temporal aspects (git history)...")
         full_analyzer.analyze_temporal_aspects(target_path)
         logger.info("Analyzing structural patterns...")
@@ -63,14 +70,15 @@ def run_summary_command(target_path: str):
         logger.error(f"An error occurred during summary analysis: {e}")
         logger.exception("Full traceback for summary analysis error:")
     finally:
-        sys.stdout = old_stdout
+        sys.stdout = old_stdout # Restore stdout
         analyzer_direct_output = captured_output.getvalue()
         if analyzer_direct_output.strip(): # Only log if there's actual output
             logger.info(f"[full_analyzer direct output]:\n{analyzer_direct_output}")
             
+        # Restore original monitor if it was replaced
         if original_global_monitor_full is not None:
             full_analyzer.monitor = original_global_monitor_full
-        elif hasattr(full_analyzer, 'monitor'):
+        elif hasattr(full_analyzer, 'monitor'): # If we set it and it wasn't there before
             delattr(full_analyzer, 'monitor')
     logger.info(f"Summary analysis for {target_path} complete.")
 
