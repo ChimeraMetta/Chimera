@@ -1009,7 +1009,7 @@ def run_comparative_evolution():
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[2] == "--compare":
+    if len(sys.argv) > 1 and sys.argv[1] == "--compare":
         run_comparative_evolution()
     else:
         run_donor_evolution_demo()
