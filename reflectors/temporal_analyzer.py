@@ -8,6 +8,10 @@ import os
 from hyperon import *
 from reflectors.dynamic_monitor import DynamicMonitor
 from typing import Dict, Any, Optional
+import logging
+
+# Added logger instance
+logger = logging.getLogger(__name__)
 
 TEMPORAL_RULE_PATH = "metta/temporal.metta"
 
@@ -72,7 +76,7 @@ def build_historical_knowledge_base(repo_path, output_file):
                         space.add_atom(dep_atom)
             
             except Exception as e:
-                print(f"Error processing {python_file} at commit {commit_id}: {e}")
+                logger.error(f"Error processing {python_file} at commit {commit_id}: {e}")
     
     # Return to the original state
     repo.git.checkout('master')
@@ -98,7 +102,7 @@ class TemporalCodeAnalyzer:
         if os.path.exists(os.path.join(repo_path, '.git')):
             self.repo = git.Repo(repo_path)
         else:
-            print(f"No git repository found at {repo_path}")
+            logger.info(f"No git repository found at {repo_path}")
         
         self.load_metta_rules(TEMPORAL_RULE_PATH)
         
@@ -127,18 +131,18 @@ class TemporalCodeAnalyzer:
                     self.metta_space.add_atom(atom)
                     atom_count += 1
                 except Exception as atom_err:
-                    print(f"Error adding atom: {atom}")
-                    print(f"  Error details: {atom_err}")
+                    logger.error(f"Error adding atom: {atom}")
+                    logger.error(f"  Error details: {atom_err}")
             
-            print(f"Successfully loaded {atom_count}/{len(parsed_atoms)} rules from {rules_file}")
+            logger.info(f"Successfully loaded {atom_count}/{len(parsed_atoms)} rules from {rules_file}")
             return atom_count > 0
         
         except Exception as e:
-            print(f"Error loading MeTTa rules: {e}")
+            logger.error(f"Error loading MeTTa rules: {e}")
             
             # Fallback approach using run and load-ascii
             try:
-                print("Trying alternate approach with load-ascii...")
+                logger.info("Trying alternate approach with load-ascii...")
                 
                 # Create a temporary binding for our space
                 space_name = f"&rules_space_{int(time.time())}"
@@ -149,10 +153,10 @@ class TemporalCodeAnalyzer:
                     !(load-ascii {space_name} "{rules_file}")
                 ''')
                 
-                print(f"Successfully loaded rules using load-ascii approach")
+                logger.info(f"Successfully loaded rules using load-ascii approach")
                 return True
             except Exception as e2:
-                print(f"Error in alternate approach: {e2}")
+                logger.error(f"Error in alternate approach: {e2}")
                 return False
     
     def analyze_history(self, max_commits: Optional[int] = None) -> bool:
@@ -166,7 +170,7 @@ class TemporalCodeAnalyzer:
             Success status
         """
         if not self.repo:
-            print("No Git repository available for analysis")
+            logger.info("No Git repository available for analysis")
             return False
         
         # Get commit history (most recent first)
@@ -174,7 +178,7 @@ class TemporalCodeAnalyzer:
         if max_commits:
             commits = commits[:max_commits]
         
-        print(f"Analyzing {len(commits)} commits in Git history")
+        logger.info(f"Analyzing {len(commits)} commits in Git history")
         
         # Add commit info to MeTTa space
         for commit in tqdm(commits, desc="Processing commits"):
@@ -217,7 +221,7 @@ class TemporalCodeAnalyzer:
                         # Extract function information
                         self._process_file_analysis(analysis, rel_path, commit_id)
                     except Exception as e:
-                        print(f"Error analyzing {py_file} at commit {commit_id}: {e}")
+                        logger.error(f"Error analyzing {py_file} at commit {commit_id}: {e}")
             finally:
                 # Restore original HEAD
                 self.repo.git.checkout(original_head, force=True)
@@ -307,7 +311,7 @@ class TemporalCodeAnalyzer:
         commits_result = self.monitor.metta_space.query(query_atom)
         
         if not commits_result or not commits_result[0]:
-            print(f"No history found for function {func_name}")
+            logger.info(f"No history found for function {func_name}")
             return []
         
         # Try to get the sorted commits using MeTTa's sorting
@@ -317,7 +321,7 @@ class TemporalCodeAnalyzer:
         
         # If MeTTa sorting fails, use a fallback approach
         if not sorted_result or not sorted_result[0]:
-            print(f"Warning: Could not sort commits in MeTTa. Using Python fallback.")
+            logger.warning(f"Warning: Could not sort commits in MeTTa. Using Python fallback.")
             # Extract commit IDs using atom iteration
             commit_ids = []
             for c in commits_atom.iterate():
@@ -391,7 +395,7 @@ class TemporalCodeAnalyzer:
                     'complexity': complexity
                 })
             except Exception as e:
-                print(f"Error processing commit {commit_id}: {e}")
+                logger.error(f"Error processing commit {commit_id}: {e}")
                 continue
         
         return history
@@ -418,7 +422,7 @@ class TemporalCodeAnalyzer:
                 commit_data.append((commit_id, timestamp))
             except Exception as e:
                 # If we can't get timestamp, put at the end
-                print(f"Error getting timestamp for {commit_id}: {e}")
+                logger.error(f"Error getting timestamp for {commit_id}: {e}")
                 commit_data.append((commit_id, float('inf') if isinstance(timestamp, (int, float)) else "ZZZZZZ"))
         
         # Sort by timestamp
@@ -426,7 +430,7 @@ class TemporalCodeAnalyzer:
             commit_data.sort(key=lambda x: x[1])
         except Exception as e:
             # If sorting fails, return unsorted
-            print(f"Warning: Failed to sort commits by timestamp: {e}")
+            logger.warning(f"Warning: Failed to sort commits by timestamp: {e}")
         
         return [c[0] for c in commit_data]
 
@@ -460,7 +464,7 @@ class TemporalCodeAnalyzer:
                         "confidence": "high" if freq_val > 5 else "medium"
                     })
             except Exception as e:
-                print(f"Error processing frequency result: {e}")
+                logger.error(f"Error processing frequency result: {e}")
         
         # Then get functions with high complexity
         complexity_query = self.metta.parse_single('(match &self (complexity-hotspot $func High) $func)')
@@ -543,7 +547,7 @@ class TemporalCodeAnalyzer:
             
             return result_str, None
         except Exception as e:
-            print(f"Error processing result {result_atom}: {e}")
+            logger.error(f"Error processing result {result_atom}: {e}")
             return None, None
 
     # Modify analyze_temporal_evolution in full_analyzer.py to use this method
@@ -570,9 +574,9 @@ class TemporalCodeAnalyzer:
                         except ValueError:
                             pass
                 except Exception as e:
-                    print(f"Error processing result: {e}")
+                    logger.error(f"Error processing result: {e}")
             
             return functions
         except Exception as e:
-            print(f"Error querying functions with changes: {e}")
+            logger.error(f"Error querying functions with changes: {e}")
             return []
