@@ -5,37 +5,10 @@ import os
 import re
 import sys
 from collections import defaultdict
-from colorama import init, Fore, Style
-import logging
-
-# Initialize colorama
-init()
-
-# Custom formatter for colorful logging
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter that adds colors to different log levels"""
-    
-    COLORS = {
-        'DEBUG': Fore.BLUE,
-        'INFO': Fore.GREEN,
-        'WARNING': Fore.YELLOW,
-        'ERROR': Fore.RED,
-        'CRITICAL': Fore.RED + Style.BRIGHT
-    }
-
-    def format(self, record):
-        # Add color to the level name
-        if record.levelname in self.COLORS:
-            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
-        return super().format(record)
+from common.logging_utils import get_logger
 
 # Configure logging
-handler = logging.StreamHandler()
-formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger = logging.getLogger("full_analyzer")
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
+logger = get_logger("full_analyzer")
 
 ONTOLOGY_PATH = "metta/code_ontology.metta"
 
@@ -51,11 +24,11 @@ def analyze_codebase(path):
                 if file.endswith('.py'):
                     analyze_file(os.path.join(root, file))
     else:
-        print(f"{Fore.RED}Invalid path or not a Python file: {path}{Style.RESET_ALL}")
+        logger.error(f"Invalid path or not a Python file: {path}")
 
 def analyze_file(file_path):
     """Analyze a single Python file and add to the ontology."""
-    print(f"{Fore.CYAN}Analyzing {file_path}...{Style.RESET_ALL}")
+    logger.info(f"Analyzing {file_path}...")
     
     # Run static analysis
     analysis_result = decompose_file(file_path)
@@ -68,16 +41,16 @@ def analyze_file(file_path):
                 monitor.add_atom(atom_str)
                 atoms_added += 1
             except Exception as e:
-                print(f"{Fore.RED}Error adding atom {atom_str}: {e}{Style.RESET_ALL}")
+                logger.error(f"Error adding atom {atom_str}: {e}")
                 pass
                 
-        print(f"{Fore.GREEN}Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}{Style.RESET_ALL}")
+        logger.info(f"Added {atoms_added}/{len(analysis_result['metta_atoms'])} atoms from {file_path}")
     else:
-        print(f"{Fore.YELLOW}No MeTTa atoms generated for {file_path}{Style.RESET_ALL}")
+        logger.warning(f"No MeTTa atoms generated for {file_path}")
 
 def find_function_relationships():
     """Find and analyze function call relationships."""
-    print(f"\n{Fore.CYAN}=== Function Call Relationships ==={Style.RESET_ALL}")
+    logger.info("\n=== Function Call Relationships ===")
     
     # Get function calls with a more robust query pattern
     # The old query may have had scope matching issues
@@ -114,7 +87,7 @@ def find_function_relationships():
         """)
     
     if results:
-        print(f"{Fore.GREEN}Found {len(results)} function call relationships{Style.RESET_ALL}")
+        logger.info(f"Found {len(results)} function call relationships")
         
         # Build caller -> callee map
         call_graph = {}
@@ -138,33 +111,33 @@ def find_function_relationships():
                         reverse_graph[callee] = set()
                     reverse_graph[callee].add(caller)
             except Exception as e:
-                print(f"{Fore.RED}Error processing result {result}: {e}{Style.RESET_ALL}")
+                logger.error(f"Error processing result {result}: {e}")
         
         # Display function call graph
-        print(f"\n{Fore.GREEN}Function call relationships:{Style.RESET_ALL}")
+        logger.info(f"\nFunction call relationships:")
         for caller, callees in call_graph.items():
-            print(f"- {caller} calls: {', '.join(callees)}")
+            logger.info(f"- {caller} calls: {', '.join(callees)}")
         
         # Find high fan-in functions (called by many)
         high_fan_in = [(func, len(callers)) for func, callers in reverse_graph.items() if len(callers) > 1]
         high_fan_in.sort(key=lambda x: x[1], reverse=True)
         
         if high_fan_in:
-            print(f"\n{Fore.GREEN}Most called functions (high fan-in):{Style.RESET_ALL}")
+            logger.info(f"\nMost called functions (high fan-in):")
             for func, count in high_fan_in[:10]:  # Show top 10
-                print(f"- {func}: called by {count} functions")
+                logger.info(f"- {func}: called by {count} functions")
         
         # Find high fan-out functions (call many others)
         high_fan_out = [(caller, len(callees)) for caller, callees in call_graph.items() if len(callees) > 1]
         high_fan_out.sort(key=lambda x: x[1], reverse=True)
         
         if high_fan_out:
-            print(f"\n{Fore.GREEN}Functions calling many others (high fan-out):{Style.RESET_ALL}")
+            logger.info(f"\nFunctions calling many others (high fan-out):")
             for func, count in high_fan_out[:10]:  # Show top 10
                 print(f"- {func}: calls {count} functions")
         
         # Additional debugging to show all function definitions and calls
-        print(f"\n{Fore.YELLOW}Debugging information:{Style.RESET_ALL}")
+        logger.warning(f"\nDebugging information:")
         
         func_defs = monitor.query("(match &self (function-def $name $scope $start $end) ($name $scope $start $end))")
         print(f"Total function definitions: {len(func_defs)}")
@@ -178,7 +151,7 @@ def find_function_relationships():
             for c in func_calls:
                 print(f"  {c}")
     else:
-        print(f"{Fore.YELLOW}No function call relationships found. Adding diagnostic information:{Style.RESET_ALL}")
+        logger.warning(f"No function call relationships found. Adding diagnostic information:")
         
         # Diagnostic information
         func_defs = monitor.query("(match &self (function-def $name $scope $start $end) $name)")
@@ -191,12 +164,12 @@ def find_function_relationships():
         
         # Show sample function definitions and calls for debugging
         if func_defs:
-            print(f"\n{Fore.YELLOW}Sample function definitions:{Style.RESET_ALL}")
+            logger.warning(f"\nSample function definitions:")
             for i, func in enumerate(func_defs[:5]):
-                print(f"  {func}")
+                logger.info(f"  {func}")
         
         if func_calls:
-            print(f"\n{Fore.YELLOW}Sample function calls:{Style.RESET_ALL}")
+            logger.warning(f"\nSample function calls:")
             for i, call in enumerate(func_calls[:5]):
                 print(f"  {call}")
 
@@ -398,7 +371,7 @@ def analyze_type_safety():
     """)
     
     if bin_op_mismatches:
-        print(f"Found {len(bin_op_mismatches)} potential binary operation type mismatches:")
+        logger.warning(f"Found {len(bin_op_mismatches)} potential binary operation type mismatches:")
         for mismatch in bin_op_mismatches:
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 5:
@@ -413,7 +386,7 @@ def analyze_type_safety():
     """)
     
     if param_mismatches:
-        print(f"\nFound {len(param_mismatches)} potential function parameter type mismatches:")
+        logger.warning(f"\nFound {len(param_mismatches)} potential function parameter type mismatches:")
         for mismatch in param_mismatches:
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 6:
@@ -428,7 +401,7 @@ def analyze_type_safety():
     """)
     
     if div_zero:
-        print(f"\nFound {len(div_zero)} potential division by zero operations:")
+        logger.warning(f"\nFound {len(div_zero)} potential division by zero operations:")
         for div in div_zero:
             parts = str(div).strip('()').split()
             if len(parts) >= 2:
@@ -443,7 +416,7 @@ def analyze_type_safety():
     """)
     
     if return_mismatches:
-        print(f"\nFound {len(return_mismatches)} potential return type mismatches:")
+        logger.warning(f"\nFound {len(return_mismatches)} potential return type mismatches:")
         for mismatch in return_mismatches:
             parts = str(mismatch).strip('()').split()
             if len(parts) >= 4:
@@ -458,7 +431,7 @@ def analyze_type_safety():
     """)
     
     if null_derefs:
-        print(f"\nFound {len(null_derefs)} potential null/None dereferences:")
+        logger.warning(f"\nFound {len(null_derefs)} potential null/None dereferences:")
         for deref in null_derefs:
             parts = str(deref).strip('()').split()
             if len(parts) >= 2:
@@ -539,7 +512,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
     
     # Analyze Git history
     if not temporal_analyzer.analyze_history(max_commits=20):  # Limit to 20 commits for faster processing
-        print("Could not analyze Git history. Skipping temporal analysis.")
+        logger.warning("Could not analyze Git history. Skipping temporal analysis.")
         return
         
     # DIRECT FIX: Rewrite the approach completely to use more direct queries and careful result handling
@@ -572,7 +545,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
                 if change_count > 3:  # Threshold for "frequent"
                     frequent_changes.append((func_name, change_count))
             except Exception as e:
-                print(f"Error analyzing changes for {func_name}: {e}")
+                logger.error(f"Error analyzing changes for {func_name}: {e}")
         
         # Sort by frequency
         frequent_changes.sort(key=lambda x: x[1], reverse=True)
@@ -630,7 +603,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
                 if growth > 0:
                     complexity_growth.append((func_name, growth))
             except Exception as e:
-                print(f"Error analyzing complexity for {func_name}: {e}")
+                logger.error(f"Error analyzing complexity for {func_name}: {e}")
         
         # Sort by growth
         complexity_growth.sort(key=lambda x: x[1], reverse=True)
@@ -677,7 +650,7 @@ def analyze_temporal_evolution(repo_path, monitor=None):
                         if co_change_ratio > 0.7:  # Threshold for co-evolution
                             co_evolving.append((func1, func2, co_change_ratio))
                 except Exception as e:
-                    print(f"Error analyzing co-evolution for {func1}/{func2}: {e}")
+                    logger.error(f"Error analyzing co-evolution for {func1}/{func2}: {e}")
         
         # Sort by co-change ratio
         co_evolving.sort(key=lambda x: x[2], reverse=True)
@@ -723,19 +696,19 @@ def analyze_temporal_evolution(repo_path, monitor=None):
             print("No potential code hotspots detected.")
         
     except Exception as e:
-        print(f"Error in temporal analysis: {e}")
+        logger.error(f"Error in temporal analysis: {e}")
         import traceback
         traceback.print_exc()
 
 def analyze_function_complexity(file_path):
     """Analyze complexity of functions in a file with our enhanced metrics."""
-    print(f"{Fore.CYAN}Analyzing complexity in {file_path}...{Style.RESET_ALL}")
+    logger.info(f"Analyzing complexity in {file_path}...")
     
     # Decompose the file
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
+        logger.error(f"Error: {result['error']}")
         return
     
     atoms = result["metta_atoms"]
@@ -832,8 +805,8 @@ def analyze_function_complexity(file_path):
     )
     
     # Print complexity ranking
-    print(f"\n{Fore.GREEN}=== Function Complexity Analysis ==={Style.RESET_ALL}")
-    print("Function complexity ranking:")
+    logger.info(f"\n=== Function Complexity Analysis ===")
+    logger.info("Function complexity ranking:")
     for i, (func_name, func_info) in enumerate(sorted_functions):
         print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
         if i > 20:  # Only show top 20 functions
@@ -851,7 +824,7 @@ def analyze_function_complexity(file_path):
     # Sort complex functions by score
     complex_funcs.sort(key=lambda x: x[1]["score"], reverse=True)
     
-    print(f"\n{Fore.GREEN}=== Complex Functions Detected ==={Style.RESET_ALL}")
+    logger.info(f"\n=== Complex Functions Detected ===")
     if complex_funcs:
         for i, (func_name, func_info) in enumerate(complex_funcs):
             print(f"{i+1}. {func_name}: score {func_info['score']:.1f} ({func_info['operations']} operations, {func_info['loops']} loops, {func_info['calls']} calls)")
@@ -923,13 +896,13 @@ def analyze_domain_concepts():
 
 def analyze_function_call_relationships(file_path):
     """Analyze function call relationships with proper handling of class methods."""
-    print(f"{Fore.CYAN}Analyzing function call relationships in {file_path}...{Style.RESET_ALL}")
+    logger.info(f"Analyzing function call relationships in {file_path}...")
     
     # Decompose the file
     result = decompose_file(file_path)
     
     if "error" in result and result["error"]:
-        print(f"{Fore.RED}Error: {result['error']}{Style.RESET_ALL}")
+        logger.error(f"Error: {result['error']}")
         return
     
     atoms = result["metta_atoms"]
@@ -1035,9 +1008,9 @@ def analyze_function_call_relationships(file_path):
                     call_relationships[qname].append(callee_qualified)
     
     # Print function call relationships
-    print(f"\n{Fore.GREEN}=== Function Call Relationships ==={Style.RESET_ALL}")
-    print(f"{Fore.GREEN}Found {len(call_relationships)} function call relationships{Style.RESET_ALL}")
-    print(f"{Fore.GREEN}Function call relationships:{Style.RESET_ALL}")
+    logger.info(f"\n=== Function Call Relationships ===")
+    logger.info(f"Found {len(call_relationships)} function call relationships")
+    logger.info(f"Function call relationships:")
     
     for caller, callees in sorted(call_relationships.items()):
         # Remove duplicates while preserving order
@@ -1049,18 +1022,18 @@ def analyze_function_call_relationships(file_path):
         print(f"- {caller} calls: {', '.join(unique_callees)}")
     
     # Print debugging information
-    print(f"{Fore.YELLOW}Debugging information:{Style.RESET_ALL}")
-    print(f"Total function definitions: {len(function_defs)}")
+    logger.warning(f"Debugging information:")
+    logger.info(f"Total function definitions: {len(function_defs)}")
     for qname, info in sorted(function_defs.items()):
-        print(f"  ({info['name']} {info['scope']} {info['line_start']} {info['line_end']})")
+        logger.info(f"  ({info['name']} {info['scope']} {info['line_start']} {info['line_end']})")
     
-    print(f"Total function calls: {len(function_calls)}")
+    logger.info(f"Total function calls: {len(function_calls)}")
     
     # Identify potential call chains
-    print(f"\n{Fore.GREEN}=== Function Call Chains ==={Style.RESET_ALL}")
+    logger.info(f"\n=== Function Call Chains ===")
     call_chains = find_call_chains(call_relationships)
     if call_chains:
-        print(f"{Fore.GREEN}Found {len(call_chains)} significant call chains:{Style.RESET_ALL}")
+        logger.info(f"Found {len(call_chains)} significant call chains:")
         for i, chain in enumerate(call_chains[:10], 1):  # Show top 10
             print(f"{i}. {' → '.join(chain)}")
     else:
