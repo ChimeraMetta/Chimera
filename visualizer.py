@@ -10,9 +10,8 @@ import json
 import inspect
 import os
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from typing import List, Any, Tuple
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
@@ -23,7 +22,7 @@ init(autoreset=True)
 
 # Try to import our components
 try:
-    from reflectors.metta_generator import integrate_metta_generation, GenerationStrategy
+    from executors.metta_generator import integrate_metta_generation, GenerationStrategy
     from reflectors.static_analyzer import decompose_function
     COMPONENTS_AVAILABLE = True
 except ImportError:

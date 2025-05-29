@@ -7,21 +7,14 @@ import inquirer
 from inquirer import themes
 from io import StringIO
 
-# --- Path Setup ---
-_WORKSPACE_ROOT = os.path.dirname(os.path.abspath(__file__))
-_EXEC_DIR = os.path.join(_WORKSPACE_ROOT, 'executors')
-if _EXEC_DIR not in sys.path:
-    sys.path.insert(0, _EXEC_DIR)
-_COMMON_DIR = os.path.join(_WORKSPACE_ROOT, 'common')
-if _COMMON_DIR not in sys.path:
-    sys.path.insert(0, _COMMON_DIR)
-
 # --- Imports from project modules (now in exec directory) ---
 from executors import full_analyzer
 from executors import complexity as complexity_analyzer_module
 from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
-from logging_utils import get_logger, Fore, Style
+from common.logging_utils import get_logger, Fore, Style
+
+_WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Setup logger for this module
 logger = get_logger(__name__)

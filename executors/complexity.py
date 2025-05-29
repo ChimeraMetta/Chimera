@@ -1,21 +1,13 @@
 import os
-import logging
 import sys
-import re
-from typing import Any
 
-# Add sys.path modification to find common.logging_utils
-_COMMON_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'common')
-if _COMMON_DIR not in sys.path:
-    sys.path.insert(0, _COMMON_DIR)
-
-from logging_utils import get_logger # Import the new logger
+from common.logging_utils import get_logger
 
 # Import existing components
 from hyperon import *
 from reflectors.static_analyzer import decompose_file, decompose_function
 from executors.impl_generator import ProofGuidedImplementationGenerator
-from reflectors.dynamic_analyzer import DynamicMonitor
+from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 from proofs.verifier import MeTTaPropertyVerifier
 
