@@ -795,7 +795,7 @@ class DonorGenerationVisualizer:
         # Display original function code
         print("\nORIGINAL FUNCTION:")
         print("="*50)
-        print(self._format_code_for_display(self.original_function_code))
+        print(self._format_code_for_display(self.original_function))
         
         print(f"\nSuccessful Candidates Found: {len(successful_candidates)}")
         
