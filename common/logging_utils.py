@@ -16,27 +16,35 @@ class ColoredFormatter(logging.Formatter):
     }
 
     def format(self, record):
-        # Add color to the level name
-        log_level_color = self.COLORS.get(record.levelname)
+        # Get the plain levelname string (e.g., "INFO", "CRITICAL")
+        plain_levelname = record.levelname 
         
-        # Store original levelname for coloring the entire message
-        original_levelname = record.levelname
-        
-        if log_level_color:
-            record.levelname = f"{log_level_color}{record.levelname}{Style.RESET_ALL}"
-        
-        # Format the message first
-        formatted_message = super().format(record)
+        # Determine the color for the entire line based on the plain levelname
+        line_color = self.COLORS.get(plain_levelname)
 
-        # Color the entire message based on the original levelname
-        message_color = self.COLORS.get(original_levelname)
-        if message_color:
-            # For CRITICAL, we want BRIGHT RED for the whole message
-            if original_levelname == 'CRITICAL':
-                 return f"{Fore.RED + Style.BRIGHT}{formatted_message}{Style.RESET_ALL}"
-            return f"{message_color}{formatted_message}{Style.RESET_ALL}"
-            
-        return formatted_message
+        # Temporarily use the plain levelname for super().format()
+        # This ensures that super().format() uses the uncolored levelname
+        # when creating the log message string.
+        # We save and restore record.levelname around this call.
+        
+        original_record_levelname_value = record.levelname # Save current value
+        record.levelname = plain_levelname # Ensure super().format sees the plain levelname
+
+        # Generate the full log message string using the plain levelname
+        log_message_content = super().format(record)
+        
+        # Restore record.levelname to its original value for this record object
+        record.levelname = original_record_levelname_value
+
+        # Apply the determined line color to the entire log message content
+        if line_color:
+            # Prepend the color and append RESET_ALL to color the whole line.
+            # colorama's autoreset=True handles resets after individual color codes,
+            # but explicitly adding RESET_ALL here ensures the entire line is bracketed.
+            return f"{line_color}{log_message_content}{Style.RESET_ALL}"
+        else:
+            # No color defined for this level, return the plain message
+            return log_message_content
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     """
