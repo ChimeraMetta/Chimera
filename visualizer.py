@@ -8,6 +8,7 @@ the original function's constraints until it finds successful solutions.
 import time
 import json
 import inspect
+import os
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from datetime import datetime
@@ -143,6 +144,9 @@ class DonorGenerationVisualizer:
         # Setup visualization
         self.fig, self.axes = plt.subplots(2, 2, figsize=(16, 12))
         self.fig.suptitle(f"Donor Generation Evolution: {original_function.__name__}", fontsize=16)
+        self.save_plots = True
+        self.plot_save_dir = "evolution_plots"
+        self._ensure_plot_directory()
         
         # Initialize plots
         self._setup_plots()
@@ -170,6 +174,12 @@ class DonorGenerationVisualizer:
         self.axes[1, 1].set_title("Generation Timeline")
         self.axes[1, 1].set_xlabel("Time (seconds)")
         self.axes[1, 1].set_ylabel("Candidates")
+    
+    def _ensure_plot_directory(self):
+        """Create directory for saving plots if it doesn't exist."""
+        if not os.path.exists(self.plot_save_dir):
+            os.makedirs(self.plot_save_dir)
+            print(f"Created directory: {self.plot_save_dir}")
     
     def _get_function_source(self, func):
         """Get the source code of a function."""
@@ -774,17 +784,19 @@ class DonorGenerationVisualizer:
         
         # Plot 4: Timeline
         timestamps = [e.timestamp for e in self.events]
-        candidate_names = [e.candidate_name.split('_')[-2:] for e in self.events]  # Last 2 parts
-        candidate_labels = ['_'.join(parts) for parts in candidate_names]
         
         self.axes[1, 1].scatter(timestamps, range(len(timestamps)), 
                                c=success_rates, cmap='RdYlGn', s=60, alpha=0.8)
         
-        # Add colorbar for success rates
-        scatter = self.axes[1, 1].scatter(timestamps, range(len(timestamps)), 
-                                         c=success_rates, cmap='RdYlGn', s=60, alpha=0.8)
-        
         plt.tight_layout()
+
+        if self.save_plots:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            iteration_num = max(iterations) if iterations else 0
+            filename = f"{self.plot_save_dir}/evolution_iter_{iteration_num:02d}_{timestamp}.png"
+            plt.savefig(filename, dpi=300, bbox_inches='tight')
+            print(f"    Plot saved: {filename}")
+
         plt.draw()
         
     def show_final_summary(self, successful_candidates):
@@ -890,6 +902,94 @@ class DonorGenerationVisualizer:
         
         print(f"\nEvolution data with code saved to {filename}")
 
+    def save_final_plot(self, filename=None):
+        """Save a final comprehensive plot with all evolution data."""
+        if not self.events:
+            print("No data to plot")
+            return
+        
+        if filename is None:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"{self.plot_save_dir}/final_evolution_{self.original_function.__name__}_{timestamp}.png"
+        
+        # Update plots one final time
+        self._update_plots()
+        
+        # Add title with summary statistics
+        if self.successful_candidate_codes:
+            success_count = len(self.successful_candidate_codes)
+            best_rate = max(c['success_rate'] for c in self.successful_candidate_codes)
+            self.fig.suptitle(f"Donor Evolution: {self.original_function.__name__} "
+                            f"({success_count} successful, best: {best_rate:.1%})", 
+                            fontsize=16)
+        
+        # Save high-quality version
+        plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
+        print(f"Final comprehensive plot saved: {filename}")
+        
+        return filename
+
+    def save_strategy_analysis_plots(self):
+        """Save detailed plots analyzing each strategy's performance."""
+        if not self.events:
+            return
+        
+        # Group events by strategy
+        strategy_data = {}
+        for event in self.events:
+            if event.strategy not in strategy_data:
+                strategy_data[event.strategy] = []
+            strategy_data[event.strategy].append(event)
+        
+        # Create a plot for each strategy
+        for strategy, events in strategy_data.items():
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+            fig.suptitle(f"Strategy Analysis: {strategy.replace('_', ' ').title()}", fontsize=14)
+            
+            # Success rates over iterations
+            iterations = [e.iteration for e in events]
+            success_rates = [e.success_rate * 100 for e in events]
+            ax1.plot(iterations, success_rates, 'o-', alpha=0.7)
+            ax1.set_title("Success Rate Over Iterations")
+            ax1.set_xlabel("Iteration")
+            ax1.set_ylabel("Success Rate (%)")
+            ax1.grid(True, alpha=0.3)
+            
+            # Confidence vs actual performance
+            confidences = [e.confidence for e in events]
+            actual_perf = [e.success_rate for e in events]
+            ax2.scatter(confidences, actual_perf, alpha=0.7)
+            ax2.plot([0, 1], [0, 1], 'k--', alpha=0.5)
+            ax2.set_title("Confidence vs Actual Performance")
+            ax2.set_xlabel("Predicted Confidence")
+            ax2.set_ylabel("Actual Success Rate")
+            ax2.grid(True, alpha=0.3)
+            
+            # Constraints satisfied distribution
+            constraints_satisfied = [e.constraints_satisfied for e in events]
+            ax3.hist(constraints_satisfied, bins=10, alpha=0.7, edgecolor='black')
+            ax3.set_title("Distribution of Constraints Satisfied")
+            ax3.set_xlabel("Constraints Satisfied")
+            ax3.set_ylabel("Frequency")
+            
+            # Execution time over iterations
+            exec_times = [e.execution_time for e in events]
+            ax4.plot(iterations, exec_times, 'o-', alpha=0.7, color='orange')
+            ax4.set_title("Execution Time Over Iterations")
+            ax4.set_xlabel("Iteration")
+            ax4.set_ylabel("Execution Time (seconds)")
+            ax4.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            
+            # Save the strategy-specific plot
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"{self.plot_save_dir}/strategy_{strategy}_{timestamp}.png"
+            plt.savefig(filename, dpi=300, bbox_inches='tight')
+            plt.close()  # Close to save memory
+            
+            print(f"Strategy analysis plot saved: {filename}")
+
 # Demo function
 def run_donor_evolution_demo():
     """Run the donor evolution visualization demo."""
@@ -926,6 +1026,10 @@ def run_donor_evolution_demo():
         
         # Show final results
         visualizer.show_final_summary(successful_candidates)
+
+        # Save comprehensive plots
+        final_plot_file = visualizer.save_final_plot()
+        visualizer.save_strategy_analysis_plots()
         
         # Save data for analysis
         visualizer.save_evolution_data_with_code("general_evolution_data.json")
@@ -984,6 +1088,10 @@ def run_comparative_evolution():
 
         # Show final results
         visualizer.show_final_summary(successful_candidates)
+
+        # Save comprehensive plots
+        final_plot_file = visualizer.save_final_plot()
+        visualizer.save_strategy_analysis_plots()
         
         # Save data for analysis
         visualizer.save_evolution_data_with_code(f"{func.__name__}_evolution_data.json")
