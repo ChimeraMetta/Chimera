@@ -7,6 +7,7 @@ the original function's constraints until it finds successful solutions.
 
 import time
 import json
+import inspect
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from datetime import datetime
@@ -136,6 +137,7 @@ class DonorGenerationVisualizer:
         self.tester = ConstraintBasedTester(original_function)
         self.events: List[GenerationEvent] = []
         self.generation_start_time = time.time()
+        self.successful_candidate_codes = []
         
         # Setup visualization
         self.fig, self.axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -167,6 +169,28 @@ class DonorGenerationVisualizer:
         self.axes[1, 1].set_title("Generation Timeline")
         self.axes[1, 1].set_xlabel("Time (seconds)")
         self.axes[1, 1].set_ylabel("Candidates")
+    
+    def _get_function_source(self, func):
+        """Get the source code of a function."""
+        try:
+            return inspect.getsource(func)
+        except (OSError, TypeError):
+            # Fallback for functions defined in REPL or other edge cases
+            return f"def {func.__name__}(...):\n    # Source code not available"
+    
+    def _format_code_for_display(self, code, title=""):
+        """Format code for nice display with proper indentation."""
+        lines = code.strip().split('\n')
+        formatted_lines = []
+        
+        if title:
+            formatted_lines.append(f"# {title}")
+            formatted_lines.append("#" + "="*50)
+        
+        for line in lines:
+            formatted_lines.append(line)
+        
+        return '\n'.join(formatted_lines)
         
     def run_evolution_process(self, max_iterations=8, target_success_rate=0.8):
         """
@@ -204,6 +228,16 @@ class DonorGenerationVisualizer:
                 
                 if success_rate >= target_success_rate:
                     successful_candidates.append((candidate, event))
+                    # Store the successful candidate's code
+                    self.successful_candidate_codes.append({
+                        'name': candidate['name'],
+                        'code': candidate['code'],
+                        'strategy': candidate['strategy'],
+                        'success_rate': success_rate,
+                        'iteration': iteration,
+                        'constraints_satisfied': constraints_met,
+                        'total_constraints': event.total_constraints
+                    })
                     print(f"  SUCCESS: {candidate['name']} meets target!")
                 
             # Update visualization
@@ -753,37 +787,44 @@ class DonorGenerationVisualizer:
         plt.draw()
         
     def show_final_summary(self, successful_candidates):
-        """Show final summary of the evolution process."""
-        print("\n" + "="*60)
-        print("FINAL EVOLUTION SUMMARY")
-        print("="*60)
+        """Show final summary with original function code and successful candidate codes."""
+        print("\n" + "="*80)
+        print("FINAL EVOLUTION SUMMARY WITH CODE")
+        print("="*80)
+        
+        # Display original function code
+        print("\nORIGINAL FUNCTION:")
+        print("="*50)
+        print(self._format_code_for_display(self.original_function_code))
         
         print(f"\nSuccessful Candidates Found: {len(successful_candidates)}")
-        for i, (candidate, event) in enumerate(successful_candidates, 1):
-            print(f"\n{i}. {candidate['name']}")
-            print(f"   Strategy: {candidate['strategy']}")
-            print(f"   Success Rate: {event.success_rate:.1%}")
-            print(f"   Constraints Satisfied: {event.constraints_satisfied}/{event.total_constraints}")
-            
-            # Show some example test results
-            passed_tests = [t for t in event.test_results if t.result == TestResult.PASSED]
-            failed_tests = [t for t in event.test_results if t.result == TestResult.FAILED]
-            
-            if passed_tests:
-                print(f"   Sample passed test: {passed_tests[0].test_input} -> {passed_tests[0].actual_output}")
-            if failed_tests:
-                print(f"   Sample failed test: {failed_tests[0].test_input} -> {failed_tests[0].error_message}")
         
-        # Show evolution statistics
+        # Display each successful candidate's code
+        for i, candidate_info in enumerate(self.successful_candidate_codes, 1):
+            print(f"\n" + "="*80)
+            print(f"SUCCESSFUL CANDIDATE #{i}: {candidate_info['name']}")
+            print("="*80)
+            print(f"Strategy: {candidate_info['strategy']}")
+            print(f"Success Rate: {candidate_info['success_rate']:.1%}")
+            print(f"Constraints Satisfied: {candidate_info['constraints_satisfied']}/{candidate_info['total_constraints']}")
+            print(f"Generated in Iteration: {candidate_info['iteration']}")
+            print("\nCODE:")
+            print("-"*50)
+            print(candidate_info['code'])
+            print("-"*50)
+        
+        # Show evolution statistics (existing code)
         if self.events:
             initial_success = self.events[0].success_rate
             final_success = max(e.success_rate for e in self.events)
             
-            print(f"\nEvolution Progress:")
-            print(f"   Initial success rate: {initial_success:.1%}")
-            print(f"   Final success rate: {final_success:.1%}")
-            print(f"   Improvement: {final_success - initial_success:.1%}")
-            print(f"   Total candidates tested: {len(self.events)}")
+            print(f"\n" + "="*80)
+            print("EVOLUTION STATISTICS")
+            print("="*80)
+            print(f"Initial success rate: {initial_success:.1%}")
+            print(f"Final success rate: {final_success:.1%}")
+            print(f"Improvement: {final_success - initial_success:.1%}")
+            print(f"Total candidates tested: {len(self.events)}")
             
             strategy_performance = {}
             for event in self.events:
@@ -796,11 +837,11 @@ class DonorGenerationVisualizer:
                 avg_rate = np.mean(rates)
                 best_rate = max(rates)
                 count = len(rates)
-                print(f"   {strategy}: avg={avg_rate:.1%}, best={best_rate:.1%} ({count} candidates)")
+                print(f"  {strategy}: avg={avg_rate:.1%}, best={best_rate:.1%} ({count} candidates)")
         
-        # Show constraint analysis
+        # Show constraint analysis (existing code)
         print(f"\nConstraint Analysis:")
-        print(f"   Total test cases: {len(self.tester.test_cases)}")
+        print(f"  Total test cases: {len(self.tester.test_cases)}")
         
         # Find most commonly failed constraints
         if self.events:
@@ -812,16 +853,20 @@ class DonorGenerationVisualizer:
                         constraint_failures[key] = constraint_failures.get(key, 0) + 1
             
             if constraint_failures:
-                print("   Most challenging constraints:")
+                print("  Most challenging constraints:")
                 sorted_failures = sorted(constraint_failures.items(), key=lambda x: x[1], reverse=True)
                 for constraint, failure_count in sorted_failures[:3]:
-                    print(f"     {constraint}: {failure_count} failures")
+                    print(f"    {constraint}: {failure_count} failures")
 
-    def save_evolution_data(self, filename="evolution_data.json"):
-        """Save evolution data for later analysis."""
+    def save_evolution_data_with_code(self, filename="evolution_data_with_code.json"):
+        """Save evolution data including successful candidate codes."""
         data = {
-            "original_function": self.original_function.__name__,
+            "original_function": {
+                "name": self.original_function.__name__,
+                "code": self.original_function_code
+            },
             "total_events": len(self.events),
+            "successful_candidates": self.successful_candidate_codes,
             "events": []
         }
         
@@ -842,7 +887,7 @@ class DonorGenerationVisualizer:
         with open(filename, 'w') as f:
             json.dump(data, f, indent=2)
         
-        print(f"\nEvolution data saved to {filename}")
+        print(f"\nEvolution data with code saved to {filename}")
 
 # Demo function
 def run_donor_evolution_demo():
@@ -882,7 +927,7 @@ def run_donor_evolution_demo():
         visualizer.show_final_summary(successful_candidates)
         
         # Save data for analysis
-        visualizer.save_evolution_data()
+        visualizer.save_evolution_data_with_code(f"{visualizer.original_function.__name__}_evolution_data.json")
         
         # Keep the plot open
         print("\nVisualization complete - close the plot window to exit")
@@ -935,6 +980,12 @@ def run_comparative_evolution():
             max_iterations=5,
             target_success_rate=0.7
         )
+
+        # Show final results
+        visualizer.show_final_summary(successful_candidates)
+        
+        # Save data for analysis
+        visualizer.save_evolution_data_with_code(f"{func.__name__}_evolution_data.json")
         
         results[func.__name__] = {
             'successful_count': len(successful_candidates),
