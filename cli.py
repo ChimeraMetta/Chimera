@@ -13,7 +13,13 @@ from executors import complexity as complexity_analyzer_module
 from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
 from common.logging_utils import get_logger, Fore, Style
-from executors.atomspace_manager import export_atomspace as export_atomspace_func, import_atomspace as import_atomspace_func
+from executors.exporter import (
+    export_from_summary_analysis, 
+    export_from_complexity_analysis, 
+    import_metta_file,
+    combine_metta_files,
+    verify_export
+)
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
@@ -41,9 +47,9 @@ class ChimeraTheme(themes.GreenPassion):
 def run_summary_command(target_path: str):
     logger.info(f"Running 'summary' command for: {target_path}")
 
-    # Initialize a local monitor for this command
+    # Initialize a local monitor for this command (keep for ontology loading)
     local_monitor = DynamicMonitor()
-    ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH) # Use ONTOLOGY_PATH from full_analyzer
+    ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
     
     if not os.path.exists(ontology_file_path):
         logger.warning(f"Ontology file not found at {ontology_file_path}. Summary analysis might be incomplete.")
@@ -62,10 +68,10 @@ def run_summary_command(target_path: str):
         logger.info("Starting comprehensive codebase summary analysis...")
         logger.info(f"Target: {target_path}")
         logger.info("Analyzing codebase structure...")
-        full_analyzer.analyze_codebase(target_path) # Corrected function call
+        full_analyzer.analyze_codebase(target_path)
         logger.info("Summary analysis completed successfully.")
         logger.info("Analyzing temporal aspects (git history)...")
-        full_analyzer.analyze_temporal_evolution(target_path, monitor=local_monitor) # Corrected function call
+        full_analyzer.analyze_temporal_evolution(target_path, monitor=local_monitor)
         logger.info("Analyzing structural patterns...")
         full_analyzer.analyze_structural_patterns()
         logger.info("Analyzing domain concepts...")
@@ -74,30 +80,40 @@ def run_summary_command(target_path: str):
         logger.error(f"An error occurred during summary analysis: {e}")
         logger.exception("Full traceback for summary analysis error:")
     finally:
-        sys.stdout = old_stdout # Restore stdout
+        sys.stdout = old_stdout
         analyzer_direct_output = captured_output.getvalue()
-        if analyzer_direct_output.strip(): # Only log if there's actual output
+        if analyzer_direct_output.strip():
             logger.info(f"[full_analyzer direct output]:\n{analyzer_direct_output}")
             
         # Restore original monitor if it was replaced
         if original_global_monitor_full is not None:
             full_analyzer.monitor = original_global_monitor_full
-        elif hasattr(full_analyzer, 'monitor'): # If we set it and it wasn't there before
+        elif hasattr(full_analyzer, 'monitor'):
             delattr(full_analyzer, 'monitor')
 
-        # Automatically export the atomspace for this command
+        # DIRECT EXPORT: Export atoms directly from static analysis (no atomspace needed)
         try:
             if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
                 os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
                 logger.info(f"Created intermediate export directory: {_INTERMEDIATE_EXPORT_DIR}")
-            logger.info(f"Automatically exporting summary atomspace to: {_SUMMARY_EXPORT_FILE}")
-            export_success = export_atomspace_func(_SUMMARY_EXPORT_FILE, monitor=local_monitor)
+            
+            logger.info(f"Directly exporting static analysis atoms to: {_SUMMARY_EXPORT_FILE}")
+            
+            # Direct export from static analysis - no monitor needed!
+            export_success = export_from_summary_analysis(target_path, _SUMMARY_EXPORT_FILE)
+            
             if export_success:
-                logger.info(f"Summary atomspace automatically exported successfully.")
+                # Verify the export
+                verification = verify_export(_SUMMARY_EXPORT_FILE)
+                if verification["success"]:
+                    logger.info(f"Summary atoms directly exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
+                else:
+                    logger.warning(f"Export verification failed: {verification.get('error', 'Unknown error')}")
             else:
-                logger.warning(f"Failed to automatically export summary atomspace.")
+                logger.warning(f"Failed to directly export summary atoms.")
+                
         except Exception as e:
-            logger.error(f"Error during automatic summary atomspace export: {e}")
+            logger.error(f"Error during direct summary atom export: {e}")
 
     logger.info(f"Summary analysis for {target_path} complete.")
 
@@ -114,25 +130,10 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     original_global_monitor_complexity = getattr(complexity_analyzer_module, 'monitor', None)
     complexity_analyzer_module.monitor = local_monitor
     
-    # Check if complexity_analyzer_module has its own logger and if it's configured
-    # This is a temporary measure. Ideally, complexity_analyzer_module.py should be refactored.
-    if hasattr(complexity_analyzer_module, 'logger') and isinstance(getattr(complexity_analyzer_module, 'logger'), logging.Logger):
-        comp_logger = getattr(complexity_analyzer_module, 'logger')
-        if not comp_logger.handlers:
-            logger.debug(f"Complexity module logger ('{comp_logger.name}') has no handlers. It might not produce output unless configured elsewhere or prints directly.")
-            # If necessary, one could add a basic handler here for it:
-            # basic_handler = logging.StreamHandler()
-            # basic_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            # basic_handler.setFormatter(basic_formatter)
-            # comp_logger.addHandler(basic_handler)
-            # comp_logger.setLevel(logging.INFO) # Or an appropriate level
-            # logger.info(f"Temporarily added a basic handler to {comp_logger.name}")
-
     analyzer_instance_for_complexity = None
     if api_key:
         logger.debug("API key provided. Attempting to initialize ImmuneSystemProofAnalyzer...")
         try:
-            # Log before initialization attempt
             logger.info("Initializing proof-guided implementation generator...")
             analyzer_instance_for_complexity = ImmuneSystemProofAnalyzer(metta_space=local_monitor.metta_space, api_key=api_key)
             analyzer_instance_for_complexity = complexity_analyzer_module.integrate_with_immune_system(analyzer_instance_for_complexity)
@@ -147,19 +148,32 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
 
     logger.debug(f"Analyzer instance for complexity: {type(analyzer_instance_for_complexity)}")
     
+    # Store analysis results for export
+    analysis_results = {
+        "complexity_metrics": {},
+        "optimization_suggestions": []
+    }
+    
     # Capture stdout from complexity_analyzer_module calls
     old_stdout_complexity = sys.stdout
     sys.stdout = captured_output_complexity = StringIO()
     try:
         logger.info(f"Running complexity analysis for {target_path}...")
+        
+        # Your existing complexity analysis
         complexity_analyzer_module.analyze_function_complexity_and_optimize(target_path, analyzer_instance_for_complexity)
+        
+        # If you have access to complexity results, add them to analysis_results
+        # This depends on what your complexity analyzer returns
+        # analysis_results["complexity_metrics"] = some_complexity_data
+        
     except Exception as e:
         logger.error(f"An error occurred during 'analyze_function_complexity_and_optimize': {e}")
         logger.exception("Full traceback for complexity analysis error:")
     finally:
         sys.stdout = old_stdout_complexity
         complexity_direct_output = captured_output_complexity.getvalue()
-        if complexity_direct_output.strip(): # Only log if there's actual output
+        if complexity_direct_output.strip():
             logger.info(f"[complexity_analyzer direct output]:\n{complexity_direct_output}")
 
         if original_global_monitor_complexity is not None:
@@ -167,20 +181,31 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         elif hasattr(complexity_analyzer_module, 'monitor'):
             delattr(complexity_analyzer_module, 'monitor')
 
-        # Automatically export the atomspace for this command
+        # DIRECT EXPORT: Export atoms directly from static analysis (no atomspace needed)
         try:
             if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
                 os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
                 logger.info(f"Created intermediate export directory: {_INTERMEDIATE_EXPORT_DIR}")
-            logger.info(f"Automatically exporting analyze atomspace to: {_ANALYZE_EXPORT_FILE}")
-            export_success = export_atomspace_func(_ANALYZE_EXPORT_FILE, monitor=local_monitor)
+            
+            logger.info(f"Directly exporting complexity analysis atoms to: {_ANALYZE_EXPORT_FILE}")
+            
+            # Direct export from static analysis - no monitor needed!
+            export_success = export_from_complexity_analysis(target_path, _ANALYZE_EXPORT_FILE, analysis_results)
+            
             if export_success:
-                logger.info(f"Analyze atomspace automatically exported successfully.")
+                # Verify the export
+                verification = verify_export(_ANALYZE_EXPORT_FILE)
+                if verification["success"]:
+                    logger.info(f"Analyze atoms directly exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
+                else:
+                    logger.warning(f"Export verification failed: {verification.get('error', 'Unknown error')}")
             else:
-                logger.warning(f"Failed to automatically export analyze atomspace.")
+                logger.warning(f"Failed to directly export analyze atoms.")
+                
         except Exception as e:
-            logger.error(f"Error during automatic analyze atomspace export: {e}")
+            logger.error(f"Error during direct analyze atom export: {e}")
 
+    # Your existing interactive optimization logic
     if analyzer_instance_for_complexity and os.path.isfile(target_path):
         logger.info(f"Starting interactive function optimization for file: {target_path}")
         
@@ -197,13 +222,13 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                   choices=functions_in_file + ['skip'],
                                   default='skip'),
                 ]
-                current_theme = ChimeraTheme() # Use the custom theme
+                current_theme = ChimeraTheme()
                 try:
                     logger.info("Displaying interactive prompt for function selection...")
                     answers = inquirer.prompt(questions, theme=current_theme)
                     selected_func = answers['selected_func'] if answers and 'selected_func' in answers else 'skip'
                 except Exception as e: 
-                    logger.warning(f"Could not display interactive prompt (อาจไม่ใช่ TTY): {e}. Skipping function selection.")
+                    logger.warning(f"Could not display interactive prompt: {e}. Skipping function selection.")
                     selected_func = 'skip'
 
                 if selected_func and selected_func != 'skip':
@@ -236,7 +261,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                     logger.info(f"  Code:\n{best_code}")
                                     
                                     original_path_func = func_info.get('file', target_path) 
-                                    optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code") # Changed dir name
+                                    optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code")
                                     optimized_file_name = f"{os.path.splitext(os.path.basename(original_path_func))[0]}_{selected_func}_optimized.py"
                                     optimized_path = os.path.join(optimized_dir, optimized_file_name)
                                     
@@ -256,77 +281,102 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                         logger.error(f"Could not retrieve source code for '{selected_func}'. Skipping optimization for this function.")
                 elif selected_func == 'skip':
                     logger.info("User chose to skip function optimization.")
-                else: # Should not happen if logic is correct
+                else:
                     logger.warning("No function selected for optimization or an unexpected state occurred.")
         else:
             logger.warning(f"No functions found in the analysis of {target_path} to offer for optimization, or file info is missing.")
             
     logger.info(f"'Analyze' command for {target_path} complete.")
 
-# --- New function for the export command ---
+
 def run_export_atomspace_command(output_metta_path: str):
     logger.info(f"Running 'export' command. Output will be saved to: {output_metta_path}")
 
-    export_monitor = DynamicMonitor()
+    # Collect all available .metta files to combine
+    files_to_combine = []
     
-    # Load base ontology (e.g., from full_analyzer, assuming it's general enough)
+    # Add base ontology if available
     try:
-        if not isinstance(getattr(full_analyzer, 'ONTOLOGY_PATH', None), str):
-            raise AttributeError("full_analyzer.ONTOLOGY_PATH is not defined or not a string.")
-
-        ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
-        logger.info(f"Attempting to load base ontology rules from: {ontology_file_path} into the main export monitor.")
-
-        if os.path.exists(ontology_file_path):
-            try:
-                export_monitor.load_metta_rules(ontology_file_path)
-                logger.info(f"Successfully loaded base ontology rules from {ontology_file_path}.")
-            except Exception as e:
-                logger.error(f"Failed to load base ontology rules from {ontology_file_path}: {e}")
-                logger.warning("Proceeding with export, but base atomspace may be incomplete.")
+        if hasattr(full_analyzer, 'ONTOLOGY_PATH') and isinstance(full_analyzer.ONTOLOGY_PATH, str):
+            ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
+            if os.path.exists(ontology_file_path):
+                files_to_combine.append(ontology_file_path)
+                logger.info(f"Including base ontology: {ontology_file_path}")
+            else:
+                logger.warning(f"Base ontology file not found: {ontology_file_path}")
         else:
-            logger.warning(f"Base ontology file not found at {ontology_file_path}. The exported atomspace will only contain imported data if available.")
-    except AttributeError as e:
-        logger.error(f"Error accessing ONTOLOGY_PATH for base ontology loading: {e}")
-        logger.warning("Cannot load base ontology. The exported atomspace will rely solely on imported data.")
+            logger.warning("No base ontology path available")
     except Exception as e:
-        logger.error(f"Unexpected error during base ontology setup for export: {e}")
-        logger.warning("Proceeding with export, but base atomspace may be incomplete.")
+        logger.error(f"Error checking base ontology: {e}")
 
-    # Import atomspace from summary command if it exists
+    # Add summary export if it exists
     if os.path.exists(_SUMMARY_EXPORT_FILE):
-        logger.info(f"Importing atomspace from summary export: {_SUMMARY_EXPORT_FILE}")
-        import_result = import_atomspace_func(_SUMMARY_EXPORT_FILE, monitor=export_monitor, overwrite=True)
-        if import_result.get("success"):
-            logger.info(f"Successfully imported {import_result.get('imported',0) + import_result.get('overwritten',0)} atoms from summary export. Conflicts skipped: {import_result.get('skipped',0)}")
-        else:
-            logger.warning(f"Could not import from summary export: {import_result.get('error', 'Unknown error')}")
+        files_to_combine.append(_SUMMARY_EXPORT_FILE)
+        logger.info(f"Including summary export: {_SUMMARY_EXPORT_FILE}")
     else:
-        logger.info(f"Summary export file not found: {_SUMMARY_EXPORT_FILE}. Skipping import.")
+        logger.info(f"Summary export file not found: {_SUMMARY_EXPORT_FILE}")
 
-    # Import atomspace from analyze command if it exists
+    # Add analyze export if it exists
     if os.path.exists(_ANALYZE_EXPORT_FILE):
-        logger.info(f"Importing atomspace from analyze export: {_ANALYZE_EXPORT_FILE}")
-        import_result = import_atomspace_func(_ANALYZE_EXPORT_FILE, monitor=export_monitor, overwrite=True)
-        if import_result.get("success"):
-            logger.info(f"Successfully imported {import_result.get('imported',0) + import_result.get('overwritten',0)} atoms from analyze export. Conflicts skipped: {import_result.get('skipped',0)}")
-        else:
-            logger.warning(f"Could not import from analyze export: {import_result.get('error', 'Unknown error')}")
+        files_to_combine.append(_ANALYZE_EXPORT_FILE)
+        logger.info(f"Including analyze export: {_ANALYZE_EXPORT_FILE}")
     else:
-        logger.info(f"Analyze export file not found: {_ANALYZE_EXPORT_FILE}. Skipping import.")
+        logger.info(f"Analyze export file not found: {_ANALYZE_EXPORT_FILE}")
 
-    logger.info(f"Exporting consolidated atomspace via atomspace_manager to: {output_metta_path}")
+    # Check if we have any files to combine
+    if not files_to_combine:
+        logger.warning("No files found to export. Run 'summary' or 'analyze' commands first.")
+        # Create an empty export file with just metadata
+        try:
+            with open(output_metta_path, 'w') as f:
+                f.write(f"; MeTTa Atomspace Export\n")
+                f.write(f"; Exported: {time.ctime()}\n")
+                f.write(f"; No atoms available - run 'summary' or 'analyze' commands first\n")
+                f.write(f";\n")
+            logger.info(f"Created empty export file: {output_metta_path}")
+        except Exception as e:
+            logger.error(f"Error creating empty export file: {e}")
+        return
+
+    # Combine all files into the final export
+    logger.info(f"Combining {len(files_to_combine)} files into consolidated export: {output_metta_path}")
     try:
-        success = export_atomspace_func(output_metta_path, monitor=export_monitor)
+        success = combine_metta_files(files_to_combine, output_metta_path, "consolidated_export")
+        
         if success:
-            logger.info(f"Consolidated atomspace successfully exported to: {output_metta_path}")
+            # Verify the final export
+            verification = verify_export(output_metta_path)
+            if verification["success"]:
+                logger.info(f"Consolidated atomspace successfully exported: {verification['atom_count']} atoms, {verification['file_size']} bytes")
+                logger.info(f"Combined from {len(files_to_combine)} source files:")
+                for file_path in files_to_combine:
+                    logger.info(f"  - {os.path.basename(file_path)}")
+            else:
+                logger.warning(f"Export verification failed: {verification.get('error', 'Unknown error')}")
         else:
-            logger.error(f"Failed to export consolidated atomspace to: {output_metta_path}. Check logs for details.")
+            logger.error(f"Failed to combine files into consolidated export: {output_metta_path}")
+            
     except Exception as e:
-        logger.error(f"An unexpected error occurred during consolidated atomspace export: {e}")
-        logger.exception("Full traceback for export_atomspace_command error:")
+        logger.error(f"An unexpected error occurred during consolidated export: {e}")
+        logger.exception("Full traceback for export command error:")
 
     logger.info(f"'export' command for {output_metta_path} complete.")
+
+def run_import_metta_command(source_file: str, target_file: str, overwrite: bool = True):
+    """
+    Helper function for importing one .metta file into another.
+    Not used by default CLI but available if needed.
+    """
+    logger.info(f"Importing {source_file} into {target_file} (overwrite: {overwrite})")
+    
+    try:
+        result = import_metta_file(source_file, target_file, overwrite)
+        if result["success"]:
+            logger.info(f"Import successful: {result['message']}")
+        else:
+            logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
+    except Exception as e:
+        logger.error(f"Error during import: {e}")
 
 
 # --- Main CLI Logic ---
