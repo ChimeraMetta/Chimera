@@ -138,9 +138,15 @@ class ColoredHelpFormatter(argparse.HelpFormatter):
         """
         if prefix is None:
             prefix = f'{Fore.YELLOW}Usage: {Style.RESET_ALL}'
-        # Ensure the program name is colored if it's part of the usage
-        usage = usage.replace(self.prog, f"{Fore.GREEN}{self.prog}{Style.RESET_ALL}")
-        return super()._format_usage(usage, actions, groups, prefix)
+        
+        # Let the superclass handle the initial formatting (including generating usage if it's None)
+        formatted_usage = super()._format_usage(usage, actions, groups, prefix)
+        
+        # Now, ensure the program name is colored if it's part of the usage string
+        if self.prog and formatted_usage:
+            formatted_usage = formatted_usage.replace(self.prog, f"{Fore.GREEN}{self.prog}{Style.RESET_ALL}")
+            
+        return formatted_usage
 
     def start_section(self, heading):
         super().start_section(f"{Fore.YELLOW}{heading.capitalize()}{Style.RESET_ALL}")
