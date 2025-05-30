@@ -22,7 +22,7 @@ Chimera bridges the gap between symbolic systems (using [MeTTa](https://metta-la
 
 **If you'd like to know more about how Chimera has been designed and how it pushes the goal of AGI forward, you can [read this](./DESIGN.md)**
 
-[![Alternative](./assets/alternative.png)](./assets/alternative.png)
+[![Info](./assets/help.png)](./assets/help.png)
 
 ## Key Features
 
