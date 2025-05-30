@@ -419,12 +419,12 @@ def run_export_atomspace_command(output_metta_path: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Chimera Indexer: A CLI tool for analyzing Python codebases and managing MeTTa atomspaces.",
-        epilog=f"Example usage:\\n"
-               f"  python cli.py summary /path/to/your/code\\n"
-               f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\\n"
-               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\\n"
-               f"  python cli.py import /path/to/existing/atomspace.metta\\n"
-               f"  python cli.py import /path/to/atomspace.metta --overwrite\\n"
+        epilog=f"Example usage:\n"
+               f"  python cli.py summary /path/to/your/code\n"
+               f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\n"
+               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\n"
+               f"  python cli.py import /path/to/existing/atomspace.metta\n"
+               f"  python cli.py import /path/to/atomspace.metta --overwrite\n"
                f"  python cli.py export /path/to/output/atomspace.metta",
         formatter_class=ColoredHelpFormatter # Use the custom formatter
     )
@@ -432,10 +432,10 @@ if __name__ == "__main__":
         "command", 
         choices=["summary", "analyze", "import", "export"],
         help=(
-            "The command to execute. Each command has specific behaviors:\\n"
-            "  summary: Codebase structure, patterns, and concepts analysis.\\n"
-            "  analyze: Function complexity analysis and AI-driven optimization.\\n"
-            "  import:  Import atoms from an external .metta file.\\n"
+            "The command to execute. Each command has specific behaviors:\n"
+            "  summary: Codebase structure, patterns, and concepts analysis.\n"
+            "  analyze: Function complexity analysis and AI-driven optimization.\n"
+            "  import:  Import atoms from an external .metta file.\n"
             "  export:  Export a consolidated MeTTa atomspace."
         )
     )
@@ -515,6 +515,21 @@ if __name__ == "__main__":
         run_export_atomspace_command(args.path)
     else:
         logger.error(f"Unknown command: {args.command}") 
+        print("""
+
+     ___           ___                       ___           ___           ___           ___     
+     /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    
+    /::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   
+   /:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  
+  /:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ 
+ /:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\
+ \:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /
+  \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / 
+   \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  
+    \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   
+     \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    
+
+""")
         parser.print_help()
         sys.exit(1)
 
