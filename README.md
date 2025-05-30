@@ -62,6 +62,8 @@ You can now run the following commands:
 chimera --help                                    # a help command
 chimera summary file.py                           # analyzes and then provides a MeTTa summary of your file
 chimera analyze file.py --api_key=OPENAI_API_KEY  # will perform complexity analysis and guide you through generating improved alternatives to your functions
+chimera export file.metta                         # exports your current atomspace to a .metta file at the specified path
+chimera import file.metta                         # imports an external .metta file into your atomspace
 ```
 
 The last of these functions takes an `--api_key` parameter that is technically optional. If you don't include it, Chimera will be unable to 
@@ -70,6 +72,8 @@ generate new candidates for your code and will simply provide standard complexit
 --
 
 ## Current Features
+
+### Summary
 
 For its current phase, Chimera is able to statically analyze your code symbolically. It can be invoked through 
 
@@ -80,6 +84,8 @@ chimera summary file_to_summarize.py
 which will provide a full summary of the relational ontology of your files and folders
 
 [![Summary](./assets/summary.png)](./assets/summary.png)
+
+### Complexity
 
 You can also ask Chimera to improve your code by looking for complexity in the ontology and generate alternative 
 candidates that simplify and improve its structure using
@@ -95,6 +101,32 @@ This feature uses an LLM to generate alternative candidates that preserve the st
 
 
 [![Alternative](./assets/alternative.png)](./assets/alternative.png)
+
+### Export
+
+You can export your Atomspace, containing all your MeTTa proofs and learned ontologies, to an external file as well
+
+```sh
+chimera export my_atomspace.metta
+```
+
+[![Export](./assets/export.png)](./assets/export.png)
+
+This will allow you to reuse the Atomspace and its learnings in another context, or share it with others. Exporting your Atomspace 
+exports __everything__, including your base code and proof ontologies.
+
+### Import
+
+Of course, you can't have an export command without being able to import the result.
+
+```sh
+chimera import your_atomspace.metta --overwrite # Overwrite flag is optional
+```
+
+[![Import](./assets/import.png)](./assets/import.png)
+
+The `--overwrite` flag is optional and should be used with caution, since it will completely overwrite the current Atomspace 
+your Chimera instance is using. This is useful for resetting your environment or for ensuring parity with someone else's environment.
 
 -- 
 
