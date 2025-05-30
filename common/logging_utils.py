@@ -62,6 +62,7 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+        logger.propagate = False # Prevent messages from being passed to the root logger
     
     return logger
 
