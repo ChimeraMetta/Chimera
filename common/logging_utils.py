@@ -1,5 +1,7 @@
 import logging
 from colorama import init, Fore, Style
+import argparse
+from inquirer import themes
 
 # Initialize colorama globally
 init(autoreset=True)
@@ -63,6 +65,108 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     
     return logger
 
-# Re-export Fore and Style if direct usage is still needed in some places,
-# though using the logger is preferred.
-__all__ = ['get_logger', 'Fore', 'Style', 'ColoredFormatter'] 
+# Custom theme for inquirer that matches our color scheme
+class ChimeraTheme(themes.GreenPassion):
+    def __init__(self):
+        """
+        This is a custom theme for inquirer that matches our color scheme.
+        It's used to style the inquirer prompts.
+        It's based on the GreenPassion theme from inquirer.
+        It's used to style the inquirer prompts.
+        """
+        super().__init__()
+        # Assuming Fore and Style are available (e.g., imported from logging_utils or globally)
+        self.Checkbox.selected_icon = f"{Fore.GREEN}✓{Style.RESET_ALL}"
+        self.Checkbox.unselected_icon = " "
+        self.Checkbox.selected_color = Fore.GREEN # Inquirer might handle RESET_ALL
+        self.Checkbox.unselected_color = Style.RESET_ALL # Or rely on autoreset
+        # For List prompt, cursor color can be set if supported by theme
+        if hasattr(self.List, 'selection_cursor'):
+            self.List.selection_cursor = f"{Fore.GREEN}❯{Style.RESET_ALL}"
+        if hasattr(self.List, 'selection_color'):
+            self.List.selection_color = Fore.GREEN
+
+# Custom HelpFormatter for colored output (moved from cli.py)
+class ColoredHelpFormatter(argparse.HelpFormatter):
+    def __init__(self, prog):
+        """
+        This is a custom help formatter for argparse that adds colors to the output.
+        It's used to style the help text.
+        It's based on the HelpFormatter from argparse.
+        It's used to style the help text.
+        """
+        super().__init__(prog)
+
+    def _format_action_invocation(self, action):
+        """
+        This is a custom help formatter for argparse that adds colors to the output.
+
+        Args:
+            action: The action to format.
+
+        Returns:
+            The formatted action invocation.
+        """
+        if not action.option_strings:
+            # For positional arguments
+            metavar, = self._metavar_formatter(action, action.dest)(1)
+            return f"{Fore.CYAN}{metavar}{Style.RESET_ALL}"
+        else:
+            # For optional arguments
+            parts = []
+            if action.nargs == 0:
+                parts.extend([f"{Fore.GREEN}{opt}{Style.RESET_ALL}" for opt in action.option_strings])
+            else:
+                default = action.dest.upper()
+                args_string = self._format_args(action, default)
+                for opt in action.option_strings:
+                    parts.append(f"{Fore.GREEN}{opt}{Style.RESET_ALL} {Fore.CYAN}{args_string}{Style.RESET_ALL}")
+            return ", ".join(parts)
+
+    def _format_usage(self, usage, actions, groups, prefix):
+        """
+        This is a custom help formatter for argparse that adds colors to the output
+
+        Args:
+            usage: The usage string to format.
+            actions: The actions to format.
+            groups: The groups to format.
+            prefix: The prefix to format.
+
+        Returns:
+            The formatted usage string.
+        """
+        if prefix is None:
+            prefix = f'{Fore.YELLOW}Usage: {Style.RESET_ALL}'
+        # Ensure the program name is colored if it's part of the usage
+        usage = usage.replace(self.prog, f"{Fore.GREEN}{self.prog}{Style.RESET_ALL}")
+        return super()._format_usage(usage, actions, groups, prefix)
+
+    def start_section(self, heading):
+        super().start_section(f"{Fore.YELLOW}{heading.capitalize()}{Style.RESET_ALL}")
+
+    # Color choices for subparsers (commands)
+    def _format_action(self, action):
+        parts = super()._format_action(action)
+        if action.nargs == argparse.ZERO_OR_MORE or action.nargs == argparse.ONE_OR_MORE:
+            # This is likely for the 'command' positional argument with choices
+            if action.choices is not None:
+                 # Color the choices list in the help text
+                 # The original parts string looks like: "usage: PROG command {cmd1,cmd2} ...\\n..."
+                 # or for the choices section: "  {cmd1,cmd2,cmd3,cmd4} The command to execute..."
+                
+                # Color choices in the main help line for the command argument
+                # Example: "{summary,analyze,import,export}"
+                colored_choices_inner = f"{Style.RESET_ALL},{Fore.GREEN}{Style.BRIGHT}".join(action.choices)
+                colored_choices = f"{{{Fore.GREEN}{Style.BRIGHT}{colored_choices_inner}{Style.RESET_ALL}}}"
+                
+                # Attempt to replace the uncolored choices in the generated parts string
+                # This is a bit fragile as it depends on argparse's internal formatting
+                import re
+                # Pattern to find "{choice1,choice2,...}"
+                choices_pattern = r"\\{" + r",".join(re.escape(c) for c in action.choices) + r"\\}"
+                
+                # Color the {command1, command2} part in the "positional arguments" section
+                parts = re.sub(choices_pattern, colored_choices, parts)
+
+        return parts 

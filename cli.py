@@ -1,10 +1,8 @@
 import argparse
 import os
 import sys
-import logging
 from typing import Union
 import inquirer
-from inquirer import themes
 from io import StringIO
 
 # --- Imports from project modules (now in exec directory) ---
@@ -12,8 +10,8 @@ from executors import full_analyzer
 from executors import complexity as complexity_analyzer_module
 from reflectors.dynamic_monitor import DynamicMonitor
 from proofs.analyzer import ImmuneSystemProofAnalyzer
-from common.logging_utils import get_logger, Fore, Style
-from executors.exporter import (
+from common.logging_utils import get_logger, ColoredHelpFormatter, ChimeraTheme
+from executors.export_importer import (
     export_from_summary_analysis, 
     export_from_complexity_analysis, 
     import_metta_file,
@@ -29,21 +27,6 @@ _IMPORTED_ATOMSPACE_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "imported_atom
 
 # Setup logger for this module
 logger = get_logger(__name__)
-
-# Custom theme for inquirer that matches our color scheme
-class ChimeraTheme(themes.GreenPassion):
-    def __init__(self):
-        super().__init__()
-        # Assuming Fore and Style are available (e.g., imported from logging_utils or globally)
-        self.Checkbox.selected_icon = f"{Fore.GREEN}✓{Style.RESET_ALL}"
-        self.Checkbox.unselected_icon = " "
-        self.Checkbox.selected_color = Fore.GREEN # Inquirer might handle RESET_ALL
-        self.Checkbox.unselected_color = Style.RESET_ALL # Or rely on autoreset
-        # For List prompt, cursor color can be set if supported by theme
-        if hasattr(self.List, 'selection_cursor'):
-            self.List.selection_cursor = f"{Fore.GREEN}❯{Style.RESET_ALL}"
-        if hasattr(self.List, 'selection_color'):
-            self.List.selection_color = Fore.GREEN
 
 def run_summary_command(target_path: str):
     logger.info(f"Running 'summary' command for: {target_path}")
@@ -436,28 +419,25 @@ def run_export_atomspace_command(output_metta_path: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Chimera Indexer: A CLI tool for analyzing Python codebases and managing MeTTa atomspaces.",
-        epilog=f"Example usage:\n"
-               f"  python cli.py summary /path/to/your/code\n"
-               f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\n"
-               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\n"
-               f"  python cli.py import /path/to/existing/atomspace.metta\n"
-               f"  python cli.py import /path/to/atomspace.metta --overwrite\n"
+        epilog=f"Example usage:\\n"
+               f"  python cli.py summary /path/to/your/code\\n"
+               f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\\n"
+               f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\\n"
+               f"  python cli.py import /path/to/existing/atomspace.metta\\n"
+               f"  python cli.py import /path/to/atomspace.metta --overwrite\\n"
                f"  python cli.py export /path/to/output/atomspace.metta",
-        formatter_class=argparse.RawTextHelpFormatter
+        formatter_class=ColoredHelpFormatter # Use the custom formatter
     )
     parser.add_argument(
         "command", 
         choices=["summary", "analyze", "import", "export"],
-        help="The command to execute:\n"
-             "  summary: Performs a comprehensive static analysis of the codebase structure,\n"
-             "           relationships, patterns, and concepts (using exec/full_analyzer.py).\n"
-             "  analyze: Focuses on function complexity analysis and offers potential\n"
-             "           AI-driven optimization suggestions if an API key is provided\n"
-             "           (using exec/complexity.py).\n"
-             "  import:  Imports atoms from an external .metta file into the current atomspace.\n"
-             "           Imported atoms will be included in subsequent export operations.\n"
-             "  export:  Exports a consolidated MeTTa atomspace (including imported atoms,\n"
-             "           summary analysis, and complexity analysis) to a specified .metta file."
+        help=(
+            "The command to execute. Each command has specific behaviors:\\n"
+            "  summary: Codebase structure, patterns, and concepts analysis.\\n"
+            "  analyze: Function complexity analysis and AI-driven optimization.\\n"
+            "  import:  Import atoms from an external .metta file.\\n"
+            "  export:  Export a consolidated MeTTa atomspace."
+        )
     )
     parser.add_argument(
         "path", 
