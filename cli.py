@@ -501,7 +501,7 @@ class ChimeraApp(App):
 
     COMMANDS = {
         "summary": "Performs a comprehensive static analysis of the codebase structure, relationships, patterns, and concepts (using exec/full_analyzer.py).",
-        "analyze": "Focuses on function complexity analysis and offers potential AI-driven optimization suggestions if an API key is provided (using exec/complexity.py). The interactive part of selecting functions for optimization is currently TUI-stubbed.",
+        "analyze": "Focuses on function complexity analysis and offers potential AI-driven optimization suggestions if an API key is provided (using exec/complexity.py). The interactive part of selecting functions for optimization is now TUI-based.",
         "export": "Exports a MeTTa atomspace (typically after combining previous analysis results and an ontology) to a specified .metta file."
     }
     
@@ -542,7 +542,7 @@ class ChimeraApp(App):
             
             with Vertical(id="right-panel"):
                 yield Label("Output Log:")
-                self.log_widget = Log(id="output_log", highlight=True, markup=True, auto_scroll=True)
+                self.log_widget = Log(id="output_log", highlight=True, auto_scroll=True)
                 yield self.log_widget
         yield Footer()
 
