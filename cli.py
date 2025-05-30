@@ -25,6 +25,7 @@ _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
 _SUMMARY_EXPORT_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "summary_export.metta")
 _ANALYZE_EXPORT_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "analyze_export.metta")
+_IMPORTED_ATOMSPACE_FILE = os.path.join(_INTERMEDIATE_EXPORT_DIR, "imported_atomspace.metta")
 
 # Setup logger for this module
 logger = get_logger(__name__)
@@ -288,6 +289,66 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             
     logger.info(f"'Analyze' command for {target_path} complete.")
 
+def run_import_command(source_metta_path: str, overwrite: bool = False):
+    """
+    Import atoms from an external .metta file into the current atomspace.
+    
+    Args:
+        source_metta_path: Path to the .metta file to import
+        overwrite: Whether to overwrite conflicting atoms
+    """
+    logger.info(f"Running 'import' command from: {source_metta_path} (overwrite: {overwrite})")
+    
+    # Validate source file exists
+    if not os.path.exists(source_metta_path):
+        logger.error(f"Source file does not exist: {source_metta_path}")
+        return
+    
+    # Verify it's a .metta file
+    if not source_metta_path.endswith('.metta'):
+        logger.warning(f"File does not have .metta extension: {source_metta_path}")
+    
+    # Create intermediate export directory if it doesn't exist
+    if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
+        os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
+        logger.info(f"Created intermediate export directory: {_INTERMEDIATE_EXPORT_DIR}")
+    
+    try:
+        # Import the file into our intermediate atomspace file
+        result = import_metta_file(source_metta_path, _IMPORTED_ATOMSPACE_FILE, overwrite_conflicts=overwrite)
+        
+        if result["success"]:
+            logger.info(f"Import successful: {result['message']}")
+            
+            # Provide detailed statistics
+            if "imported" in result:
+                logger.info(f"  - New atoms imported: {result['imported']}")
+            if "overwritten" in result:
+                logger.info(f"  - Atoms overwritten: {result['overwritten']}")
+            if "skipped" in result:
+                logger.info(f"  - Atoms skipped (conflicts): {result['skipped']}")
+            
+            # Verify the imported atomspace
+            verification = verify_export(_IMPORTED_ATOMSPACE_FILE)
+            if verification["success"]:
+                logger.info(f"Imported atomspace verified: {verification['atom_count']} total atoms, {verification['file_size']} bytes")
+            else:
+                logger.warning(f"Import verification failed: {verification.get('error', 'Unknown error')}")
+            
+            # Provide guidance on next steps
+            logger.info(f"\nNext steps:")
+            logger.info(f"  1. The imported atoms are now available in: {_IMPORTED_ATOMSPACE_FILE}")
+            logger.info(f"  2. Use 'export' command to create a consolidated atomspace including imported atoms")
+            logger.info(f"  3. Imported atoms will be included in future export operations")
+            
+        else:
+            logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during import: {e}")
+        logger.exception("Full traceback for import command error:")
+
+    logger.info(f"'import' command for {source_metta_path} complete.")
 
 def run_export_atomspace_command(output_metta_path: str):
     logger.info(f"Running 'export' command. Output will be saved to: {output_metta_path}")
@@ -309,6 +370,13 @@ def run_export_atomspace_command(output_metta_path: str):
     except Exception as e:
         logger.error(f"Error checking base ontology: {e}")
 
+    # Add imported atomspace if it exists
+    if os.path.exists(_IMPORTED_ATOMSPACE_FILE):
+        files_to_combine.append(_IMPORTED_ATOMSPACE_FILE)
+        logger.info(f"Including imported atomspace: {_IMPORTED_ATOMSPACE_FILE}")
+    else:
+        logger.info(f"No imported atomspace found: {_IMPORTED_ATOMSPACE_FILE}")
+
     # Add summary export if it exists
     if os.path.exists(_SUMMARY_EXPORT_FILE):
         files_to_combine.append(_SUMMARY_EXPORT_FILE)
@@ -325,13 +393,14 @@ def run_export_atomspace_command(output_metta_path: str):
 
     # Check if we have any files to combine
     if not files_to_combine:
-        logger.warning("No files found to export. Run 'summary' or 'analyze' commands first.")
+        logger.warning("No files found to export. Run 'summary', 'analyze', or 'import' commands first.")
         # Create an empty export file with just metadata
         try:
+            import time
             with open(output_metta_path, 'w') as f:
                 f.write(f"; MeTTa Atomspace Export\n")
                 f.write(f"; Exported: {time.ctime()}\n")
-                f.write(f"; No atoms available - run 'summary' or 'analyze' commands first\n")
+                f.write(f"; No atoms available - run 'summary', 'analyze', or 'import' commands first\n")
                 f.write(f";\n")
             logger.info(f"Created empty export file: {output_metta_path}")
         except Exception as e:
@@ -362,23 +431,6 @@ def run_export_atomspace_command(output_metta_path: str):
 
     logger.info(f"'export' command for {output_metta_path} complete.")
 
-def run_import_metta_command(source_file: str, target_file: str, overwrite: bool = True):
-    """
-    Helper function for importing one .metta file into another.
-    Not used by default CLI but available if needed.
-    """
-    logger.info(f"Importing {source_file} into {target_file} (overwrite: {overwrite})")
-    
-    try:
-        result = import_metta_file(source_file, target_file, overwrite)
-        if result["success"]:
-            logger.info(f"Import successful: {result['message']}")
-        else:
-            logger.error(f"Import failed: {result.get('error', 'Unknown error')}")
-    except Exception as e:
-        logger.error(f"Error during import: {e}")
-
-
 # --- Main CLI Logic ---
 
 if __name__ == "__main__":
@@ -388,25 +440,30 @@ if __name__ == "__main__":
                f"  python cli.py summary /path/to/your/code\n"
                f"  python cli.py analyze /path/to/your/file.py --api_key YOUR_API_KEY\n"
                f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\n"
+               f"  python cli.py import /path/to/existing/atomspace.metta\n"
+               f"  python cli.py import /path/to/atomspace.metta --overwrite\n"
                f"  python cli.py export /path/to/output/atomspace.metta",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "command", 
-        choices=["summary", "analyze", "export"],
+        choices=["summary", "analyze", "import", "export"],
         help="The command to execute:\n"
              "  summary: Performs a comprehensive static analysis of the codebase structure,\n"
              "           relationships, patterns, and concepts (using exec/full_analyzer.py).\n"
              "  analyze: Focuses on function complexity analysis and offers potential\n"
              "           AI-driven optimization suggestions if an API key is provided\n"
              "           (using exec/complexity.py).\n"
-             "  export: Exports a MeTTa atomspace (typically after loading a default\n"
-             "                    ontology like the one used by 'summary') to a specified .metta file."
+             "  import:  Imports atoms from an external .metta file into the current atomspace.\n"
+             "           Imported atoms will be included in subsequent export operations.\n"
+             "  export:  Exports a consolidated MeTTa atomspace (including imported atoms,\n"
+             "           summary analysis, and complexity analysis) to a specified .metta file."
     )
     parser.add_argument(
         "path", 
         help="The path argument, meaning depends on the command:\n"
              "  For 'summary', 'analyze': Path to the target Python file or directory to analyze.\n"
+             "  For 'import': Path to the .metta file to import atoms from.\n"
              "  For 'export': Path to the output .metta file where the atomspace will be saved."
     )
     parser.add_argument(
@@ -418,6 +475,13 @@ if __name__ == "__main__":
              "runs only the complexity analysis without suggesting alternatives.",
         default=None
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="[Optional] For 'import' command: overwrite conflicting atoms instead of skipping them.\n"
+             "Default behavior is to skip atoms that already exist in the atomspace.",
+        default=False
+    )
 
     args = parser.parse_args()
 
@@ -425,6 +489,13 @@ if __name__ == "__main__":
     if args.command in ["summary", "analyze"]:
         if not os.path.exists(args.path):
             logger.error(f"Error: The input path '{args.path}' for command '{args.command}' does not exist. Please provide a valid file or directory path.")
+            sys.exit(1)
+    elif args.command == "import":
+        if not os.path.exists(args.path):
+            logger.error(f"Error: The import source file '{args.path}' does not exist. Please provide a valid .metta file path.")
+            sys.exit(1)
+        if not os.path.isfile(args.path):
+            logger.error(f"Error: The import path '{args.path}' must be a file, not a directory.")
             sys.exit(1)
     elif args.command == "export":
         output_path_str = str(args.path) # Ensure it's a string
@@ -445,7 +516,6 @@ if __name__ == "__main__":
         if os.path.isdir(output_path_str):
             logger.error(f"Error: The output path '{output_path_str}' for 'export' must be a file path, not a directory.")
             sys.exit(1)
-    # No 'else' here, as other commands might be added in the future with different path handling.
 
     effective_api_key = args.api_key
     if not effective_api_key:
@@ -459,6 +529,8 @@ if __name__ == "__main__":
         if not effective_api_key:
             logger.info("No API key provided or found in environment. 'analyze' will run without AI optimization features.")
         run_analyze_command(args.path, effective_api_key)
+    elif args.command == "import":
+        run_import_command(args.path, args.overwrite)
     elif args.command == "export":
         run_export_atomspace_command(args.path)
     else:
