@@ -143,8 +143,8 @@ class ColoredHelpFormatter(argparse.HelpFormatter):
         formatted_usage = super()._format_usage(usage, actions, groups, prefix)
         
         # Now, ensure the program name is colored if it's part of the usage string
-        if self.prog and formatted_usage:
-            formatted_usage = formatted_usage.replace(self.prog, f"{Fore.GREEN}{self.prog}{Style.RESET_ALL}")
+        if self._prog and formatted_usage:
+            formatted_usage = formatted_usage.replace(self._prog, f"{Fore.GREEN}{self._prog}{Style.RESET_ALL}")
             
         return formatted_usage
 
