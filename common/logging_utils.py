@@ -158,7 +158,7 @@ class ColoredHelpFormatter(argparse.HelpFormatter):
             # This is likely for the 'command' positional argument with choices
             if action.choices is not None:
                  # Color the choices list in the help text
-                 # The original parts string looks like: "usage: PROG command {cmd1,cmd2} ...\\n..."
+                 # The original parts string looks like: "usage: PROG command {cmd1,cmd2} ...\n..."
                  # or for the choices section: "  {cmd1,cmd2,cmd3,cmd4} The command to execute..."
                 
                 # Color choices in the main help line for the command argument
@@ -170,9 +170,47 @@ class ColoredHelpFormatter(argparse.HelpFormatter):
                 # This is a bit fragile as it depends on argparse's internal formatting
                 import re
                 # Pattern to find "{choice1,choice2,...}"
-                choices_pattern = r"\\{" + r",".join(re.escape(c) for c in action.choices) + r"\\}"
+                choices_pattern = r"\{" + r",".join(re.escape(c) for c in action.choices) + r"\}"
                 
                 # Color the {command1, command2} part in the "positional arguments" section
                 parts = re.sub(choices_pattern, colored_choices, parts)
 
-        return parts 
+        return parts
+
+    def format_help(self):
+        #ascii_art = """
+        # ___           ___                       ___           ___           ___           ___     
+        # /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    
+        #/::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   
+        #/:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  
+        #/:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ 
+        #/:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\
+        #\:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /
+        # \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / 
+        #  \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  
+        #   \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   
+        #    \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    
+        #
+        #"""
+        # Note: The ASCII art contains backslashes, which need to be escaped in a Python string literal.
+        # Or, use a raw string if the art doesn't contain characters that would be misinterpreted by raw strings (like trailing backslash).
+        # For simplicity in this example, direct embedding is tricky with complex escape sequences.
+        # It's often better to load from a file or define carefully with escaped characters.
+        # The user has the art in cli.py, so we will copy it exactly, escaping as necessary.
+        
+        ascii_art = (
+            "     ___           ___                       ___           ___           ___           ___     \n"
+            "     /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    \n"
+            "    /::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   \n"
+            "   /:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  \n"
+            "  /:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ \n"
+            " /:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\\n"
+            " \:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /\n"
+            "  \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / \n"
+            "   \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  \n"
+            "    \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   \n"
+            "     \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    \n"
+            "\n"
+        )
+        help_message = super().format_help()
+        return f"{Fore.CYAN}{ascii_art}{Style.RESET_ALL}\n{help_message}" 
