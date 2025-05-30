@@ -1,0 +1,91 @@
+Screen {
+    layout: vertical;
+    overflow-y: auto;
+}
+
+#app-grid {
+    layout: horizontal;
+    height: 1fr; /* Take remaining vertical space */
+}
+
+#left-panel {
+    width: 40%;
+    padding: 1 2;
+    border-right: thick $primary-lighten-2; /* Textual variable, linter might not recognize */
+    overflow-y: auto;
+}
+
+#right-panel {
+    width: 60%;
+    padding: 1 2;
+    overflow-y: auto; /* Ensure log can scroll if content exceeds height */
+}
+
+RadioSet {
+    margin-bottom: 1;
+}
+
+Input {
+    margin-bottom: 1;
+}
+
+Button {
+    width: 100%;
+    margin-top: 1;
+}
+
+Label {
+    margin-bottom: 1; /* Add some space below labels */
+}
+
+#path_label, #api_key_label {
+    margin-top: 1; /* Add some space above these specific labels */
+}
+
+/* Contextual Help Area Styling */
+.contextual-help-label {
+    margin-top: 2; /* Add more space above the help label */
+    text-style: bold;
+}
+
+#contextual_help_text {
+    height: auto; /* Adjust height based on content */
+    min-height: 3; /* Ensure it has some minimum height */
+    padding: 1;
+    margin-top: 0; /* Reduce space between label and text */
+    margin-bottom: 1;
+    border: round $primary-lighten-2; /* Textual variable, linter might not recognize */
+    background: $boost; /* Textual variable, linter might not recognize */
+}
+
+#output_log {
+    height: 1fr; /* Make log take available space in its panel */
+    border: round $primary; /* Textual variable, linter might not recognize */
+    background: $surface; /* Textual variable, linter might not recognize */
+    overflow-y: auto; /* Explicitly allow vertical scroll for log */
+    width: 100%;
+}
+
+/* Helper class for hidden elements */
+.hidden {
+    display: none;
+}
+
+Header {
+    dock: top;
+    background: $primary-darken-1; /* Textual variable, linter might not recognize */
+}
+
+Footer {
+    dock: bottom;
+    background: $primary-darken-1; /* Textual variable, linter might not recognize */
+}
+
+/* Input validation styling (using Textual classes) */
+Input.-valid {
+    border: tall $success; /* Textual variable, linter might not recognize */
+}
+
+Input.-invalid {
+    border: tall $error; /* Textual variable, linter might not recognize */
+} 
