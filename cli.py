@@ -221,7 +221,7 @@ class FunctionSelectionModal(ModalScreen[Optional[str]]):
         else:
             self.query_one("#skip_function_button", Button).focus()
 
-    def on_selection_list_selection_changed(self, event: SelectionList.SelectionChanged[str]) -> None:
+    def on_selection_list_selected_changed(self, event: SelectionList.SelectedChanged[str]) -> None:
         if event.selection_list.selected:
             self._selected_function_in_list = event.selection_list.selected[0]
             self.query_one("#select_function_button", Button).disabled = False
