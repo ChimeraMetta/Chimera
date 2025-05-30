@@ -54,13 +54,13 @@ Label {
     padding: 1;
     margin-top: 0; /* Reduce space between label and text */
     margin-bottom: 1;
-    border: round $primary-lighten-2; /* Textual variable, linter might not recognize */
+    border: solid $primary-lighten-2; /* Changed from round to solid */
     background: $boost; /* Textual variable, linter might not recognize */
 }
 
 #output_log {
     height: 1fr; /* Make log take available space in its panel */
-    border: round $primary; /* Textual variable, linter might not recognize */
+    border: solid $primary; /* Changed from round to solid */
     background: $surface; /* Textual variable, linter might not recognize */
     overflow-y: auto; /* Explicitly allow vertical scroll for log */
     width: 100%;
@@ -88,4 +88,18 @@ Input.-valid {
 
 Input.-invalid {
     border: tall $error; /* Textual variable, linter might not recognize */
-} 
+}
+
+/* For the FunctionSelectionModal, ensure its border is also solid if it was round */
+/* The modal's DEFAULT_CSS uses 'border: thick $primary;', which should be fine (implies solid). */
+/* If FunctionSelectionModal's dialog itself had 'round', it would be in its DEFAULT_CSS. */
+/* Let's ensure the list within it also uses a simple border. */
+
+/* Example if we wanted to ensure modal list has solid border explicitly, */
+/* though its current 'border: round $primary-darken-1;' will also be affected */
+/* by the general advice to avoid 'round' if box characters are an issue. */
+/* The modal CSS is embedded in cli.py, so we'd change it there if needed. */
+
+/* The current modal DEFAULT_CSS has: */
+/* #function_selection_dialog { border: thick $primary; } -> This is solid-like */
+/* #function_select_list { border: round $primary-darken-1; } -> This could be changed to solid */ 

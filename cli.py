@@ -161,8 +161,8 @@ class FunctionSelectionModal(ModalScreen[Optional[str]]):
     }
     #function_select_list {
         height: auto;
-        max-height: 15; /* Limit height of the list itself */
-        border: round $primary-darken-1;
+        max-height: 15;
+        border: solid $primary-darken-1;
         margin-bottom: 1;
     }
     .modal_buttons {
