@@ -63,11 +63,15 @@ chimera --help                                    # a help command
 chimera summary file.py                           # analyzes and then provides a MeTTa summary of your file
 chimera analyze file.py --api_key=OPENAI_API_KEY  # will perform complexity analysis and guide you through generating improved alternatives to your functions
 chimera export file.metta                         # exports your current atomspace to a .metta file at the specified path
-chimera import file.metta                         # imports an external .metta file into your atomspace
+chimera import file.metta --overwrite             # imports an external .metta file into your atomspace
 ```
 
-The last of these functions takes an `--api_key` parameter that is technically optional. If you don't include it, Chimera will be unable to 
-generate new candidates for your code and will simply provide standard complexity analysis.
+The `analyze` command takes an `--api_key` argument with an OpenAI API key, which is optional. If you supply it Chimera will 
+generate full donor code from OpenAI, and if not the donor code will be composed using MeTTa only. Either way, MeTTa is used as 
+a proof system.
+
+The `import` command takes an `--overwrite` argument, which is also optional. This will overwrite your existing Atomspace with the 
+one imported. If it is not provided, Chimera will only import atoms that are not already in your current Atomspace from the file specified.
 
 --
 
