@@ -18,6 +18,7 @@ from executors.export_importer import (
     combine_metta_files,
     verify_export
 )
+from executors.metta_generator import integrate_metta_generation
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
@@ -115,6 +116,8 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     complexity_analyzer_module.monitor = local_monitor
     
     analyzer_instance_for_complexity = None
+    using_metta_generator = False # Flag to indicate which optimization path
+    
     if api_key:
         logger.debug("API key provided. Attempting to initialize ImmuneSystemProofAnalyzer...")
         try:
@@ -128,9 +131,13 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             logger.warning("Could not initialize proof-guided implementation generator. Proceeding with complexity analysis only.")
             analyzer_instance_for_complexity = None 
     else:
-        logger.warning("No API key provided. AI-driven optimization suggestions will be unavailable. Proceeding with complexity analysis only.")
+        logger.warning("No API key provided. AI-driven optimization suggestions will be unavailable.")
+        logger.info("Defaulting to MeTTa-based donor generation for optimization suggestions.")
+        using_metta_generator = True
+        analyzer_instance_for_complexity = None # Ensure it's None for MeTTa path
 
     logger.debug(f"Analyzer instance for complexity: {type(analyzer_instance_for_complexity)}")
+    logger.debug(f"Using MeTTa generator for suggestions: {using_metta_generator}")
     
     # Store analysis results for export
     analysis_results = {
@@ -189,8 +196,8 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         except Exception as e:
             logger.error(f"Error during direct analyze atom export: {e}")
 
-    # Your existing interactive optimization logic
-    if analyzer_instance_for_complexity and os.path.isfile(target_path):
+    # Interactive optimization logic updated
+    if (analyzer_instance_for_complexity or using_metta_generator) and os.path.isfile(target_path):
         logger.info(f"Starting interactive function optimization for file: {target_path}")
         
         decomposed_file_info = complexity_analyzer_module.decompose_file(target_path)
@@ -221,46 +228,111 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                     
                     if func_info and "source" in func_info:
                         func_source = func_info["source"]
-                        try:
-                            logger.info(f"Generating up to 2 alternative implementations for '{selected_func}'...")
-                            alternatives = analyzer_instance_for_complexity.generate_verified_alternatives(
-                                func_source, selected_func, count=2)
-                            
-                            if alternatives:
-                                logger.info(f"=== {len(alternatives)} Alternative Implementations Generated for {selected_func} ===")
-                                for i, alt in enumerate(alternatives, 1):
-                                    logger.info(f"--- Alternative {i} ---")
-                                    logger.info(f"  Strategy: {alt.get('strategy', 'N/A')}")
-                                    logger.info(f"  Success: {alt.get('success', False)}")
-                                    logger.info(f"  Properties Preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
-                                    alt_code = alt.get('alternative_function', 'No code generated')
-                                    logger.info(f"  Code:\n{alt_code}") 
+                        
+                        if using_metta_generator:
+                            logger.info(f"Generating donor candidates for '{selected_func}' using MeTTa Donor Generator...")
+                            try:
+                                metta_candidates = integrate_metta_generation(func_source)
                                 
-                                best_alt = analyzer_instance_for_complexity.select_best_alternative(alternatives)
-                                if best_alt:
-                                    logger.info("=== Best Alternative Selected ===")
-                                    logger.info(f"  Strategy: {best_alt.get('strategy', 'N/A')}")
-                                    logger.info(f"  Properties Preserved: {best_alt.get('verification_result', {}).get('properties_preserved', False)}")
-                                    best_code = best_alt.get('alternative_function', 'No code selected')
-                                    logger.info(f"  Code:\n{best_code}")
+                                if metta_candidates:
+                                    logger.info(f"=== {len(metta_candidates)} MeTTa Donor Candidates Generated for {selected_func} ===")
+                                    best_metta_alt_display = None # To store the display dict of the best MeTTa candidate
                                     
-                                    original_path_func = func_info.get('file', target_path) 
-                                    optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code")
-                                    optimized_file_name = f"{os.path.splitext(os.path.basename(original_path_func))[0]}_{selected_func}_optimized.py"
-                                    optimized_path = os.path.join(optimized_dir, optimized_file_name)
-                                    
-                                    logger.info("Suggestion for using this optimized implementation:")
-                                    logger.info(f"  1. Ensure directory exists or create: {optimized_dir}")
-                                    logger.info(f"  2. Save the BEST alternative code to a new file: {optimized_path}")
-                                    logger.info(f"  3. Manually review and integrate this new function into your codebase, replacing the original '{selected_func}' in '{original_path_func}'.")
+                                    for i, mc in enumerate(metta_candidates, 1):
+                                        # Create a display dictionary for consistent logging
+                                        alt_display = {
+                                            'strategy': mc.get('strategy', 'N/A'),
+                                            'success': True, # Assuming generation itself means success
+                                            'verification_result': {'properties_preserved': mc.get('properties', [])},
+                                            'alternative_function': mc.get('code', 'No code generated'),
+                                            'description': mc.get('description', ''),
+                                            'name': mc.get('name', f"{selected_func}_metta_alt_{i}"),
+                                            'score': mc.get('final_score', 0.0)
+                                        }
+                                        logger.info(f"--- MeTTa Alternative {i} ({alt_display['name']}) ---")
+                                        logger.info(f"  Strategy: {alt_display['strategy']}")
+                                        logger.info(f"  Score: {alt_display['score']:.2f}")
+                                        logger.info(f"  Description: {alt_display['description']}")
+                                        logger.info(f"  Properties Preserved: {alt_display['verification_result']['properties_preserved']}")
+                                        logger.info(f"  Code:\\n{alt_display['alternative_function']}")
+                                        
+                                        if i == 1: # First one is the best due to prior sorting in metta_generator
+                                            best_metta_alt_display = alt_display
+
+                                    if best_metta_alt_display:
+                                        logger.info("=== Best MeTTa Alternative Selected (Top Scoring) ===")
+                                        logger.info(f"  Name: {best_metta_alt_display['name']}")
+                                        logger.info(f"  Strategy: {best_metta_alt_display.get('strategy', 'N/A')}")
+                                        logger.info(f"  Score: {best_metta_alt_display.get('score', 0.0):.2f}")
+                                        logger.info(f"  Description: {best_metta_alt_display.get('description', 'N/A')}")
+                                        logger.info(f"  Properties Preserved: {best_metta_alt_display.get('verification_result', {}).get('properties_preserved', [])}")
+                                        best_code = best_metta_alt_display.get('alternative_function', 'No code selected')
+                                        logger.info(f"  Code:\\n{best_code}")
+                                        
+                                        original_path_func = func_info.get('file', target_path) 
+                                        optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code_metta")
+                                        safe_candidate_name = best_metta_alt_display['name'].replace(' ', '_').replace('/', '_').replace('\\\\', '_') # Ensure filename safety
+                                        optimized_file_name = f"{os.path.splitext(os.path.basename(original_path_func))[0]}_{safe_candidate_name}_optimized.py"
+                                        optimized_path = os.path.join(optimized_dir, optimized_file_name)
+                                        
+                                        logger.info("Suggestion for using this MeTTa-generated implementation:")
+                                        logger.info(f"  1. Ensure directory exists or create: {optimized_dir}")
+                                        logger.info(f"  2. Save the BEST alternative code to a new file: {optimized_path}")
+                                        logger.info(f"  3. Manually review and integrate this new function into your codebase, replacing the original '{selected_func}' in '{original_path_func}'.")
+                                    else:
+                                        logger.warning("No best MeTTa alternative was selected (list empty or processing issue).")
                                 else:
-                                    logger.warning("No best alternative was selected from the generated options.")
-                            else:
-                                logger.info(f"No alternatives were generated for '{selected_func}'.")
+                                    logger.info(f"No MeTTa donor candidates were generated for '{selected_func}'.")
+                                    
+                            except Exception as e:
+                                logger.error(f"Error during MeTTa donor generation for '{selected_func}': {e}")
+                                logger.exception("Full traceback for MeTTa donor generation error:")
+
+                        elif analyzer_instance_for_complexity: # Original API key path
+                            try:
+                                logger.info(f"Generating up to 2 alternative implementations for '{selected_func}' using API...")
+                                alternatives = analyzer_instance_for_complexity.generate_verified_alternatives(
+                                    func_source, selected_func, count=2)
                                 
-                        except Exception as e:
-                            logger.error(f"Error generating or selecting alternatives for '{selected_func}': {e}")
-                            logger.exception("Full traceback for alternative generation/selection error:")
+                                if alternatives:
+                                    logger.info(f"=== {len(alternatives)} Alternative Implementations Generated for {selected_func} (API) ===")
+                                    for i, alt in enumerate(alternatives, 1):
+                                        logger.info(f"--- API Alternative {i} ---")
+                                        logger.info(f"  Strategy: {alt.get('strategy', 'N/A')}")
+                                        logger.info(f"  Success: {alt.get('success', False)}")
+                                        logger.info(f"  Properties Preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
+                                        alt_code = alt.get('alternative_function', 'No code generated')
+                                        logger.info(f"  Code:\\n{alt_code}") 
+                                    
+                                    best_api_alt = analyzer_instance_for_complexity.select_best_alternative(alternatives)
+                                    if best_api_alt:
+                                        logger.info("=== Best API Alternative Selected ===")
+                                        logger.info(f"  Strategy: {best_api_alt.get('strategy', 'N/A')}")
+                                        logger.info(f"  Properties Preserved: {best_api_alt.get('verification_result', {}).get('properties_preserved', False)}")
+                                        best_code_api = best_api_alt.get('alternative_function', 'No code selected')
+                                        logger.info(f"  Code:\\n{best_code_api}")
+                                        
+                                        original_path_func = func_info.get('file', target_path) 
+                                        optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code")
+                                        optimized_file_name = f"{os.path.splitext(os.path.basename(original_path_func))[0]}_{selected_func}_optimized.py"
+                                        optimized_path = os.path.join(optimized_dir, optimized_file_name)
+                                        
+                                        logger.info("Suggestion for using this optimized implementation:")
+                                        logger.info(f"  1. Ensure directory exists or create: {optimized_dir}")
+                                        logger.info(f"  2. Save the BEST alternative code to a new file: {optimized_path}")
+                                        logger.info(f"  3. Manually review and integrate this new function into your codebase, replacing the original '{selected_func}' in '{original_path_func}'.")
+                                    else:
+                                        logger.warning("No best alternative was selected from the API-generated options.")
+                                else:
+                                    logger.info(f"No alternatives were generated for '{selected_func}' using the API.")
+                                    
+                            except Exception as e:
+                                logger.error(f"Error generating or selecting API alternatives for '{selected_func}': {e}")
+                                logger.exception("Full traceback for API alternative generation/selection error:")
+                        else:
+                            # This case should ideally not be reached if the top `if (analyzer_instance_for_complexity or using_metta_generator)` is true
+                            # but as a safeguard:
+                            logger.info("No optimization engine (API or MeTTa) configured or initialized for generating alternatives.")
                     else:
                         logger.error(f"Could not retrieve source code for '{selected_func}'. Skipping optimization for this function.")
                 elif selected_func == 'skip':
