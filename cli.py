@@ -4,6 +4,8 @@ import sys
 from typing import Union
 import inquirer
 from io import StringIO
+import ast
+import importlib.util
 
 # --- Imports from project modules (now in exec directory) ---
 from executors import full_analyzer
@@ -19,6 +21,7 @@ from executors.export_importer import (
     verify_export
 )
 from executors.metta_generator import integrate_metta_generation
+from visualizer import DonorGenerationVisualizer
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
@@ -486,6 +489,131 @@ def run_export_atomspace_command(output_metta_path: str):
 
     logger.info(f"'export' command for {output_metta_path} complete.")
 
+def run_visualize_command(target_path: str):
+    """
+    Run the donor generation visualization for a function in the target file.
+    """
+    logger.info(f"Running 'visualize' command for: {target_path}")
+
+    if not os.path.isfile(target_path) or not target_path.endswith(".py"):
+        logger.error(f"Target path '{target_path}' must be a Python file.")
+        return
+
+    # 1. Extract functions from the file
+    functions_found = []
+    try:
+        with open(target_path, 'r', encoding='utf-8') as source_file:
+            tree = ast.parse(source_file.read(), filename=target_path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                # Only include top-level functions for simplicity
+                if isinstance(node.__dict__.get('parent', tree), ast.Module): # Check if parent is the Module itself
+                    functions_found.append({
+                        "name": node.name,
+                        "args": [arg.arg for arg in node.args.args]
+                    })
+    except Exception as e:
+        logger.error(f"Error parsing Python file {target_path}: {e}")
+        return
+
+    if not functions_found:
+        logger.info(f"No top-level functions found in {target_path}.")
+        return
+
+    logger.info("Found the following functions. Please select one to visualize:")
+    for f_info in functions_found:
+        logger.info(f"  - {f_info['name']}({', '.join(f_info['args'])})")
+    
+    logger.warning("Note: The visualizer's ConstraintBasedTester works best with functions "
+                   "that operate on a list and take start/end indices, e.g., func(data_list, start_idx, end_idx). "
+                   "Other function signatures may lead to errors during testing.")
+
+    questions = [
+        inquirer.List('selected_func_name',
+                      message="Select a function to visualize",
+                      choices=[f_info['name'] for f_info in functions_found] + ['skip'],
+                      default='skip'),
+    ]
+    current_theme = ChimeraTheme()
+    try:
+        answers = inquirer.prompt(questions, theme=current_theme)
+        selected_func_name = answers['selected_func_name'] if answers and 'selected_func_name' in answers else 'skip'
+    except Exception as e:
+        logger.warning(f"Could not display interactive prompt: {e}. Skipping function selection.")
+        selected_func_name = 'skip'
+
+    if selected_func_name == 'skip' or not selected_func_name:
+        logger.info("Visualization skipped by user or no function selected.")
+        return
+
+    logger.info(f"Attempting to import function '{selected_func_name}' from {target_path}...")
+
+    # 2. Dynamically import the selected function
+    imported_function = None
+    try:
+        module_name = os.path.splitext(os.path.basename(target_path))[0]
+        spec = importlib.util.spec_from_file_location(module_name, target_path)
+        if spec is None or spec.loader is None:
+            logger.error(f"Could not create module spec for {target_path}")
+            return
+        
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module # Add to sys.modules before exec
+        spec.loader.exec_module(module)
+        imported_function = getattr(module, selected_func_name, None)
+    except Exception as e:
+        logger.error(f"Error importing function '{selected_func_name}' from {target_path}: {e}")
+        logger.exception("Full traceback for function import error:")
+        return
+
+    if not imported_function:
+        logger.error(f"Could not find or import function '{selected_func_name}' from {target_path}.")
+        return
+
+    logger.info(f"Successfully imported '{selected_func_name}'. Initializing visualizer...")
+
+    # 3. Initialize and run the DonorGenerationVisualizer
+    try:
+        visualizer = DonorGenerationVisualizer(imported_function)
+        
+        # Customize plot save directory
+        plot_base_dir = "evolution_plots" # Default in visualizer
+        func_plot_dir = os.path.join(plot_base_dir, imported_function.__name__)
+        visualizer.plot_save_dir = func_plot_dir
+        visualizer._ensure_plot_directory() # Call after changing dir
+
+        logger.info(f"Starting donor evolution process for '{imported_function.__name__}'.")
+        logger.info(f"Plots and data will be saved in: {os.path.abspath(func_plot_dir)}")
+
+        # Run the evolution (using default parameters from demo)
+        # Note: visualizer.run_evolution_process() contains plt.pause(1.0) which might affect CLI experience
+        successful_candidates = visualizer.run_evolution_process(
+            max_iterations=8, 
+            target_success_rate=0.8 
+        )
+        
+        visualizer.show_final_summary(successful_candidates)
+        
+        final_plot_file = visualizer.save_final_plot() # Saves to visualizer.plot_save_dir
+        if final_plot_file:
+             logger.info(f"Final comprehensive plot saved: {os.path.abspath(final_plot_file)}")
+        
+        visualizer.save_strategy_analysis_plots() # Saves to visualizer.plot_save_dir
+        
+        data_filename = f"{imported_function.__name__}_evolution_data.json"
+        full_data_path = os.path.join(func_plot_dir, data_filename)
+        visualizer.save_evolution_data_with_code(full_data_path)
+        logger.info(f"Evolution data saved to: {os.path.abspath(full_data_path)}")
+        
+        logger.info(f"Visualization for '{imported_function.__name__}' complete.")
+        logger.info(f"Output directory: {os.path.abspath(func_plot_dir)}")
+
+    except Exception as e:
+        logger.error(f"An error occurred during visualization for '{selected_func_name}': {e}")
+        logger.exception("Full traceback for visualization error:")
+
+    logger.info(f"'visualize' command for {target_path} complete.")
+
 # --- Main CLI Logic ---
 
 if __name__ == "__main__":
@@ -497,16 +625,18 @@ if __name__ == "__main__":
                f"  python cli.py analyze /path/to/your/dir --api_key $OPENAI_API_KEY\n"
                f"  python cli.py import /path/to/existing/atomspace.metta\n"
                f"  python cli.py import /path/to/atomspace.metta --overwrite\n"
-               f"  python cli.py export /path/to/output/atomspace.metta",
+               f"  python cli.py export /path/to/output/atomspace.metta\n"
+               f"  python cli.py visualize /path/to/your/file.py",
         formatter_class=ColoredHelpFormatter # Use the custom formatter
     )
     parser.add_argument(
         "command", 
-        choices=["summary", "analyze", "import", "export"],
+        choices=["summary", "analyze", "import", "export", "visualize"],
         help=(
             "The command to execute. Each command has specific behaviors:\n"
             "  summary: Codebase structure, patterns, and concepts analysis.\n"
             "  analyze: Function complexity analysis and AI-driven optimization.\n"
+            "  visualize: Generate and visualize donor candidates for a function from a file.\n"
             "  import:  Import atoms from an external .metta file.\n"
             "  export:  Export a consolidated MeTTa atomspace."
         )
@@ -515,6 +645,7 @@ if __name__ == "__main__":
         "path", 
         help="The path argument, meaning depends on the command:\n"
              "  For 'summary', 'analyze': Path to the target Python file or directory to analyze.\n"
+             "  For 'visualize': Path to the target Python file containing the function to visualize.\n"
              "  For 'import': Path to the .metta file to import atoms from.\n"
              "  For 'export': Path to the output .metta file where the atomspace will be saved."
     )
@@ -548,6 +679,13 @@ if __name__ == "__main__":
             sys.exit(1)
         if not os.path.isfile(args.path):
             logger.error(f"Error: The import path '{args.path}' must be a file, not a directory.")
+            sys.exit(1)
+    elif args.command == "visualize":
+        if not os.path.exists(args.path):
+            logger.error(f"Error: The input path '{args.path}' for command 'visualize' does not exist. Please provide a valid Python file path.")
+            sys.exit(1)
+        if not os.path.isfile(args.path) or not args.path.endswith(".py"):
+            logger.error(f"Error: The input path '{args.path}' for command 'visualize' must be a Python file (e.g., example.py).")
             sys.exit(1)
     elif args.command == "export":
         output_path_str = str(args.path) # Ensure it's a string
@@ -585,6 +723,8 @@ if __name__ == "__main__":
         run_import_command(args.path, args.overwrite)
     elif args.command == "export":
         run_export_atomspace_command(args.path)
+    elif args.command == "visualize":
+        run_visualize_command(args.path)
     else:
         logger.error(f"Unknown command: {args.command}") 
         parser.print_help()
