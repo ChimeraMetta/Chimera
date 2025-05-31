@@ -497,9 +497,9 @@ def run_export_atomspace_command(output_metta_path: str):
 
 def run_visualize_command(target_path: str):
     """
-    Run the donor generation visualization for a function in the target file.
+    Run the enhanced donor generation visualization for a function in the target file.
     """
-    logger.info(f"Running 'visualize' command for: {target_path}")
+    logger.info(f"Running enhanced 'visualize' command for: {target_path}")
 
     if not os.path.isfile(target_path) or not target_path.endswith(".py"):
         logger.error(f"Target path '{target_path}' must be a Python file.")
@@ -513,7 +513,7 @@ def run_visualize_command(target_path: str):
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 # Only include top-level functions for simplicity
-                if isinstance(node.__dict__.get('parent', tree), ast.Module): # Check if parent is the Module itself
+                if isinstance(getattr(node, 'parent', tree), ast.Module):
                     functions_found.append({
                         "name": node.name,
                         "args": [arg.arg for arg in node.args.args]
@@ -530,13 +530,12 @@ def run_visualize_command(target_path: str):
     for f_info in functions_found:
         logger.info(f"  - {f_info['name']}({', '.join(f_info['args'])})")
     
-    logger.warning("Note: The visualizer's ConstraintBasedTester works best with functions "
-                   "that operate on a list and take start/end indices, e.g., func(data_list, start_idx, end_idx). "
-                   "Other function signatures may lead to errors during testing.")
+    logger.info("Note: The enhanced visualizer works with the ModularMettaDonorGenerator "
+                "and can adapt to different function signatures automatically.")
 
     questions = [
         inquirer.List('selected_func_name',
-                      message="Select a function to visualize",
+                      message="Select a function to visualize with enhanced MeTTa system",
                       choices=[f_info['name'] for f_info in functions_found] + ['skip'],
                       default='skip'),
     ]
@@ -564,7 +563,7 @@ def run_visualize_command(target_path: str):
             return
         
         module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module # Add to sys.modules before exec
+        sys.modules[module_name] = module  # Add to sys.modules before exec
         spec.loader.exec_module(module)
         imported_function = getattr(module, selected_func_name, None)
     except Exception as e:
@@ -576,49 +575,92 @@ def run_visualize_command(target_path: str):
         logger.error(f"Could not find or import function '{selected_func_name}' from {target_path}.")
         return
 
-    logger.info(f"Successfully imported '{selected_func_name}'. Initializing visualizer...")
+    logger.info(f"Successfully imported '{selected_func_name}'. Initializing enhanced visualizer...")
 
-    # 3. Initialize and run the DonorGenerationVisualizer
+    # 3. Initialize and run the Enhanced MeTTa Donor Generation Visualizer
     try:
-        visualizer = DonorGenerationVisualizer(imported_function)
+        # Import the enhanced visualizer
+        from visualizer import EnhancedDonorGenerationVisualizer
+        
+        # Determine ontology file path
+        ontology_file_path = os.path.join(_WORKSPACE_ROOT, full_analyzer.ONTOLOGY_PATH)
+        ontology_file = ontology_file_path if os.path.exists(ontology_file_path) else None
+        
+        if ontology_file:
+            logger.info(f"Using ontology file: {ontology_file}")
+        else:
+            logger.warning(f"Ontology file not found at {ontology_file_path}. Using defaults.")
+        
+        # Create the enhanced visualizer
+        visualizer = EnhancedDonorGenerationVisualizer(imported_function, ontology_file)
         
         # Customize plot save directory
-        plot_base_dir = "evolution_plots" # Default in visualizer
-        func_plot_dir = os.path.join(plot_base_dir, imported_function.__name__)
+        plot_base_dir = "evolution_plots"
+        func_plot_dir = os.path.join(plot_base_dir, f"{imported_function.__name__}_enhanced")
         visualizer.plot_save_dir = func_plot_dir
-        visualizer._ensure_plot_directory() # Call after changing dir
+        visualizer._ensure_plot_directory()
 
-        logger.info(f"Starting donor evolution process for '{imported_function.__name__}'.")
-        logger.info(f"Plots and data will be saved in: {os.path.abspath(func_plot_dir)}")
+        logger.info(f"Starting enhanced donor evolution process for '{imported_function.__name__}'.")
+        logger.info(f"Using ModularMettaDonorGenerator with specialized generators:")
+        if hasattr(visualizer, 'metta_generator') and visualizer.metta_generator:
+            generator_count = len(visualizer.metta_generator.registry.generators)
+            strategy_count = len(visualizer.metta_generator.registry.get_supported_strategies())
+            logger.info(f"  - {generator_count} registered generators")
+            logger.info(f"  - {strategy_count} supported strategies")
+        else:
+            logger.info(f"  - Running in simulation mode (MeTTa components not available)")
+        logger.info(f"Enhanced plots and data will be saved in: {os.path.abspath(func_plot_dir)}")
 
-        # Run the evolution (using default parameters from demo)
-        # Note: visualizer.run_evolution_process() contains plt.pause(1.0) which might affect CLI experience
+        # Run the evolution process with enhanced system
         successful_candidates = visualizer.run_evolution_process(
             max_iterations=8, 
             target_success_rate=0.8 
         )
         
+        # Show comprehensive final summary
         visualizer.show_final_summary(successful_candidates)
         
-        final_plot_file = visualizer.save_final_plot() # Saves to visualizer.plot_save_dir
+        # Save enhanced plots and data
+        final_plot_file = visualizer.save_final_plot()
         if final_plot_file:
-             logger.info(f"Final comprehensive plot saved: {os.path.abspath(final_plot_file)}")
+             logger.info(f"Final enhanced comprehensive plot saved: {os.path.abspath(final_plot_file)}")
         
-        visualizer.save_strategy_analysis_plots() # Saves to visualizer.plot_save_dir
+        visualizer.save_strategy_analysis_plots()
         
-        data_filename = f"{imported_function.__name__}_evolution_data.json"
+        data_filename = f"{imported_function.__name__}_enhanced_evolution_data.json"
         full_data_path = os.path.join(func_plot_dir, data_filename)
         visualizer.save_evolution_data_with_code(full_data_path)
-        logger.info(f"Evolution data saved to: {os.path.abspath(full_data_path)}")
+        logger.info(f"Enhanced evolution data saved to: {os.path.abspath(full_data_path)}")
         
-        logger.info(f"Visualization for '{imported_function.__name__}' complete.")
+        # Log summary of results
+        if successful_candidates:
+            logger.info(f"🎉 Enhanced visualization successful: {len(successful_candidates)} successful candidates found")
+            
+            # Log generator attribution
+            if hasattr(visualizer, 'events') and visualizer.events:
+                generator_stats = {}
+                for event in visualizer.events:
+                    gen = event.generator_used
+                    generator_stats[gen] = generator_stats.get(gen, 0) + 1
+                
+                logger.info("Generator usage statistics:")
+                for generator, count in sorted(generator_stats.items(), key=lambda x: x[1], reverse=True):
+                    logger.info(f"  - {generator}: {count} candidates")
+        else:
+            logger.info("No successful candidates found, but evolution data captured for analysis.")
+        
+        logger.info(f"Enhanced visualization for '{imported_function.__name__}' complete.")
         logger.info(f"Output directory: {os.path.abspath(func_plot_dir)}")
 
+    except ImportError as e:
+        logger.error(f"Could not import enhanced visualizer: {e}")
+        logger.error("Please ensure the enhanced visualizer is available.")
+        return
     except Exception as e:
-        logger.error(f"An error occurred during visualization for '{selected_func_name}': {e}")
-        logger.exception("Full traceback for visualization error:")
+        logger.error(f"An error occurred during enhanced visualization for '{selected_func_name}': {e}")
+        logger.exception("Full traceback for enhanced visualization error:")
 
-    logger.info(f"'visualize' command for {target_path} complete.")
+    logger.info(f"Enhanced 'visualize' command for {target_path} complete.")
 
 def run_metta_generate_command(target_path: str):
     """
