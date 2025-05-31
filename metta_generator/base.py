@@ -581,7 +581,9 @@ class ModularMettaDonorGenerator:
                 original_code = func
                 function_name = self._extract_function_name(func)
             else:
+                print(f"[MODULAR_METTA_GENERATOR_BASE]   Getting source code for {func.__name__}")
                 original_code = inspect.getsource(func)
+                print(f"[MODULAR_METTA_GENERATOR_BASE]   Source code: {original_code}")
                 function_name = func.__name__
             
             # Analyze the function

@@ -93,7 +93,9 @@ class RealModularIntegration:
             func_name = func.__name__
             try:
                 import inspect
+                print(f"[REAL_MODULAR_INTEGRATION]   Getting source code for {func_name}")
                 code = inspect.getsource(func)
+                print(f"[REAL_MODULAR_INTEGRATION]   Source code: {code}")
             except:
                 code = f"def {func_name}(): pass"
         
