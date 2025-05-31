@@ -6,7 +6,7 @@ Generates donor candidates by adapting functions to work with different data str
 
 from typing import List, Optional
 import re
-from base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
+from metta_generator.base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
 
 class DataStructureAdaptationGenerator(BaseDonorGenerator):
     """Generator that creates variants by adapting data structures."""
