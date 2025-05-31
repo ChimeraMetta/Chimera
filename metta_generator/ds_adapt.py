@@ -23,7 +23,6 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
             "dict": {
                 "list": self._adapt_dict_to_list,
                 "namedtuple": self._adapt_dict_to_namedtuple,
-                "dataclass": self._adapt_dict_to_dataclass,
                 "set": self._adapt_dict_to_set
             },
             "set": {
@@ -33,8 +32,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
             },
             "string": {
                 "list": self._adapt_string_to_list,
-                "bytes": self._adapt_string_to_bytes,
-                "array": self._adapt_string_to_array
+                "bytes": self._adapt_string_to_bytes
             },
             "tuple": {
                 "list": self._adapt_tuple_to_list,
@@ -237,6 +235,18 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
         adapted_code = self._add_adaptation_docstring(adapted_code, "list", "set")
         
         return adapted_code
+    
+    def _get_primary_pattern_family(self, context: GenerationContext) -> str:
+        """Get the primary pattern family from context."""
+        if context.detected_patterns:
+            return context.detected_patterns[0].pattern_family
+        return "generic"
+    
+    def _get_operations_from_context(self, context: GenerationContext) -> List[str]:
+        """Get operations from context."""
+        if context.detected_patterns:
+            return context.detected_patterns[0].operations
+        return ["adaptation"]
     
     def _adapt_list_to_dict(self, code: str, func_name: str) -> str:
         """Adapt list-based code to work with dictionaries."""
@@ -725,14 +735,94 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
             print(f"      Failed to create container protocol candidate: {e}")
             return None
     
-    def _get_primary_pattern_family(self, context: GenerationContext) -> str:
-        """Get the primary pattern family from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].pattern_family
-        return "generic"
+    def _adapt_dict_to_set(self, code: str, func_name: str) -> str:
+        """Adapt dict-based code to work with sets."""
+        adapted_code = code
+        new_func_name = f"{func_name}_set_adapted"
+        
+        # Replace function name
+        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Replace dict operations with set operations
+        adapted_code = adapted_code.replace("{}", "set()")
+        adapted_code = adapted_code.replace(".keys()", "")
+        adapted_code = adapted_code.replace(".values()", "")
+        adapted_code = adapted_code.replace(".items()", "enumerate()")
+        
+        # Add docstring
+        adapted_code = self._add_adaptation_docstring(adapted_code, "dict", "set")
+        
+        return adapted_code
     
-    def _get_operations_from_context(self, context: GenerationContext) -> List[str]:
-        """Get operations from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].operations
-        return ["adaptation"]
+    def _adapt_string_to_bytes(self, code: str, func_name: str) -> str:
+        """Adapt string-based code to work with bytes."""
+        adapted_code = code
+        new_func_name = f"{func_name}_bytes_adapted"
+        
+        # Replace function name
+        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Add encoding/decoding logic
+        lines = adapted_code.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i + 2, "    # Convert string to bytes for processing")
+                lines.insert(i + 3, "    if isinstance(data, str):")
+                lines.insert(i + 4, "        data = data.encode('utf-8')")
+                break
+        
+        adapted_code = '\n'.join(lines)
+        
+        # Replace string operations with bytes operations
+        adapted_code = adapted_code.replace(".lower()", ".lower()")
+        adapted_code = adapted_code.replace(".upper()", ".upper()")
+        
+        # Add docstring
+        adapted_code = self._add_adaptation_docstring(adapted_code, "string", "bytes")
+        
+        return adapted_code
+    
+    def _adapt_tuple_to_namedtuple(self, code: str, func_name: str) -> str:
+        """Adapt tuple-based code to work with namedtuples."""
+        adapted_code = code
+        new_func_name = f"{func_name}_namedtuple_adapted"
+        
+        # Add namedtuple import
+        adapted_code = "from collections import namedtuple\n\n" + adapted_code
+        
+        # Replace function name
+        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Add namedtuple definition
+        lines = adapted_code.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i + 2, "    # Define namedtuple structure")
+                lines.insert(i + 3, "    DataTuple = namedtuple('DataTuple', ['field1', 'field2', 'field3'])")
+                break
+        
+        adapted_code = '\n'.join(lines)
+        
+        # Add docstring
+        adapted_code = self._add_adaptation_docstring(adapted_code, "tuple", "namedtuple")
+        
+        return adapted_code
+    
+    def _adapt_set_to_dict(self, code: str, func_name: str) -> str:
+        """Adapt set-based code to work with dictionaries."""
+        adapted_code = code
+        new_func_name = f"{func_name}_dict_adapted"
+        
+        # Replace function name
+        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Replace set operations with dict operations
+        adapted_code = adapted_code.replace("set()", "{}")
+        adapted_code = adapted_code.replace(".add(", "[item] = True; # ")
+        adapted_code = adapted_code.replace(".update(", ".update(dict.fromkeys(")
+        adapted_code = adapted_code.replace(".discard(", ".pop(")
+        
+        # Add docstring
+        adapted_code = self._add_adaptation_docstring(adapted_code, "set", "dict")
+        
+        return adapted_code
