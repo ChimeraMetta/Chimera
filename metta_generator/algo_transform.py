@@ -7,7 +7,7 @@ Generates donor candidates by transforming algorithmic approaches
 from typing import List, Optional
 import re
 import ast
-from base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
+from metta_generator.base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
 
 class AlgorithmTransformationGenerator(BaseDonorGenerator):
     """Generator that creates variants by transforming algorithmic approaches."""

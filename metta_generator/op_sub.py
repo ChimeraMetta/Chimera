@@ -5,7 +5,7 @@ Generates donor candidates by substituting operations (e.g., > to <, + to -, etc
 """
 
 from typing import List, Dict, Optional
-from base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
+from metta_generator.base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
 
 class OperationSubstitutionGenerator(BaseDonorGenerator):
     """Generator that creates variants by substituting operations."""
