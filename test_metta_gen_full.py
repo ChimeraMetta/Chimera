@@ -19,6 +19,44 @@ from metta_generator.op_sub import OperationSubstitutionGenerator
 from metta_generator.ds_adapt import DataStructureAdaptationGenerator  
 from metta_generator.algo_transform import AlgorithmTransformationGenerator
 
+def find_max_in_range(numbers, start_idx, end_idx):
+    """Find the maximum value in a list within a specific range."""
+    if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+        return None
+            
+    max_val = numbers[start_idx]
+    for i in range(start_idx + 1, end_idx):
+        if numbers[i] > max_val:
+            max_val = numbers[i]
+            
+    return max_val
+
+def clean_and_normalize_text(text):
+    """Clean and normalize text input."""
+    if not text or not isinstance(text, str):
+        return ""
+            
+    # Remove extra whitespace and convert to lowercase
+    cleaned = text.strip().lower()
+            
+    # Replace multiple spaces with single space
+    import re
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+            
+    return cleaned
+
+def calculate_moving_average(numbers, window_size):
+    """Calculate moving average with specified window size."""
+    if not numbers or window_size <= 0 or window_size > len(numbers):
+        return []
+            
+    averages = []
+    for i in range(len(numbers) - window_size + 1):
+        window_sum = sum(numbers[i:i + window_size])
+        averages.append(window_sum / window_size)
+            
+    return averages
+
 class RealModularIntegration:
     """Real integration that uses the actual modular MeTTa system."""
     
@@ -205,9 +243,9 @@ class RealModularIntegration:
         
         # Test with actual functions that would work with the real system
         test_functions = [
-            ("Search Function with Real Generators", self._get_search_function()),
-            ("String Processing with Real Adapters", self._get_string_function()),  
-            ("Numeric Calculation with Real Transformers", self._get_numeric_function())
+            ("Search Function with Real Generators", find_max_in_range),
+            ("String Processing with Real Adapters", clean_and_normalize_text),  
+            ("Numeric Calculation with Real Transformers", calculate_moving_average)
         ]
         
         for test_name, test_func in test_functions:
@@ -359,58 +397,6 @@ class RealModularIntegration:
         print(f"     Consistent interfaces across all generators")
         print(f"     Independent testing and development")
         print(f"     Selective strategy application")
-    
-    # Helper methods for creating realistic examples
-    
-    def _get_search_function(self):
-        """Get a search function for testing."""
-        def find_max_in_range(numbers, start_idx, end_idx):
-            """Find the maximum value in a list within a specific range."""
-            if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
-                return None
-            
-            max_val = numbers[start_idx]
-            for i in range(start_idx + 1, end_idx):
-                if numbers[i] > max_val:
-                    max_val = numbers[i]
-            
-            return max_val
-        
-        return find_max_in_range
-    
-    def _get_string_function(self):
-        """Get a string processing function for testing."""
-        def clean_and_normalize_text(text):
-            """Clean and normalize text input."""
-            if not text or not isinstance(text, str):
-                return ""
-            
-            # Remove extra whitespace and convert to lowercase
-            cleaned = text.strip().lower()
-            
-            # Replace multiple spaces with single space
-            import re
-            cleaned = re.sub(r'\s+', ' ', cleaned)
-            
-            return cleaned
-        
-        return clean_and_normalize_text
-    
-    def _get_numeric_function(self):
-        """Get a numeric calculation function for testing."""
-        def calculate_moving_average(numbers, window_size):
-            """Calculate moving average with specified window size."""
-            if not numbers or window_size <= 0 or window_size > len(numbers):
-                return []
-            
-            averages = []
-            for i in range(len(numbers) - window_size + 1):
-                window_sum = sum(numbers[i:i + window_size])
-                averages.append(window_sum / window_size)
-            
-            return averages
-        
-        return calculate_moving_average
     
     def _extract_function_name(self, code: str) -> str:
         """Extract function name from code."""
