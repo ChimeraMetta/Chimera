@@ -327,7 +327,7 @@ class RealModularIntegration:
         print("=" * 60)
         
         # Test function for comparison
-        test_function = self._get_search_function()
+        test_function = find_max_in_range
         
         print(f"\n  Testing with: {test_function.__name__}")
         
