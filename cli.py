@@ -624,7 +624,7 @@ def run_metta_generate_command(target_path: str):
     """
     Run MeTTa donor generation for all functions in the target file.
     """
-    logger.info(f"Running 'metta-generate' command for: {target_path}")
+    logger.info(f"Running 'generate' command for: {target_path}")
     
     if not os.path.isfile(target_path) or not target_path.endswith(".py"):
         logger.error(f"Target path '{target_path}' must be a Python file.")
@@ -954,7 +954,7 @@ def run_metta_generate_command(target_path: str):
     except Exception as e:
         logger.error(f"Error during MeTTa generation atom export: {e}")
 
-    logger.info(f"'metta-generate' command for {target_path} complete.")
+    logger.info(f"'generate' command for {target_path} complete.")
 
 # --- Main CLI Logic ---
 
@@ -987,7 +987,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "path", 
         help="The path argument, meaning depends on the command:\n"
-            "  For 'summary', 'analyze', 'metta-generate': Path to the target Python file or directory to analyze.\n"
+            "  For 'summary', 'analyze', 'generate': Path to the target Python file or directory to analyze.\n"
             "  For 'visualize': Path to the target Python file containing the function to visualize.\n"
             "  For 'import': Path to the .metta file to import atoms from.\n"
             "  For 'export': Path to the output .metta file where the atomspace will be saved."
@@ -1030,6 +1030,13 @@ if __name__ == "__main__":
         if not os.path.isfile(args.path) or not args.path.endswith(".py"):
             logger.error(f"Error: The input path '{args.path}' for command 'visualize' must be a Python file (e.g., example.py).")
             sys.exit(1)
+    elif args.command == "generate":
+        if not os.path.exists(args.path):
+            logger.error(f"Error: The input path '{args.path}' for command 'generate' does not exist. Please provide a valid Python file path.")
+            sys.exit(1)
+        if not os.path.isfile(args.path) or not args.path.endswith(".py"):
+            logger.error(f"Error: The input path '{args.path}' for command 'generate' must be a Python file (e.g., example.py).")
+            sys.exit(1)
     elif args.command == "export":
         output_path_str = str(args.path) # Ensure it's a string
         output_dir = os.path.dirname(output_path_str)
@@ -1068,6 +1075,8 @@ if __name__ == "__main__":
         run_export_atomspace_command(args.path)
     elif args.command == "visualize":
         run_visualize_command(args.path)
+    elif args.command == "generate":
+        run_metta_generate_command(args.path)
     else:
         logger.error(f"Unknown command: {args.command}") 
         parser.print_help()
