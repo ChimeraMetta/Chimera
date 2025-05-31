@@ -57,7 +57,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
             ("string", "bytes"): 0.9
         }
         
-        print("    ✓ Complete Data Structure Adaptation Generator initialized")
+        print("     Complete Data Structure Adaptation Generator initialized")
     
     def can_generate(self, context: GenerationContext, strategy) -> bool:
         """Check if this generator can handle the given context and strategy."""
@@ -97,14 +97,14 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
                         )
                         if candidate:
                             candidates.append(candidate)
-                            print(f"        ✓ Created {source_structure}→{target_structure} candidate")
+                            print(f"         Created {source_structure}→{target_structure} candidate")
                     except Exception as e:
-                        print(f"        ❌ Failed {source_structure}→{target_structure}: {e}")
+                        print(f"         Failed {source_structure}→{target_structure}: {e}")
         
         # Always add generic adaptations
         generic_candidates = self._generate_generic_adaptations(context)
         candidates.extend(generic_candidates)
-        print(f"        ✓ Added {len(generic_candidates)} generic candidates")
+        print(f"         Added {len(generic_candidates)} generic candidates")
         
         return candidates
     
@@ -592,7 +592,7 @@ def test_complete_generator():
     return max_val'''
     
     # Create generator and context
-    generator = CompleteDataStructureAdaptationGenerator()
+    generator = DataStructureAdaptationGenerator()
     context = TestContext(test_code, "find_max_in_range")
     
     # Test if it can generate
