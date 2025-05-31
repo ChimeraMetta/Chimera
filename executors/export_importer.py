@@ -1,7 +1,7 @@
 import time
 import os
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from reflectors.static_analyzer import decompose_function, decompose_file, decompose_source
 
 def export_metta_atoms(atoms: List[str], output_path: str, 
@@ -461,6 +461,143 @@ def verify_export(export_path: str) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def export_from_metta_generation(generation_results: Dict[str, Any], output_file: str) -> bool:
+    """
+    Export MeTTa donor generation results to a .metta file with generator attribution.
+    
+    Args:
+        generation_results: Dictionary containing generation results for each function
+        output_file: Path to the output .metta file
+        
+    Returns:
+        bool: True if export successful, False otherwise
+    """
+    try:
+        import time
+        
+        with open(output_file, 'w') as f:
+            # Write header
+            f.write(f"; MeTTa Donor Generation Export\n")
+            f.write(f"; Generated: {time.ctime()}\n")
+            f.write(f"; Functions processed: {len(generation_results)}\n")
+            f.write(f";\n\n")
+            
+            atom_count = 0
+            
+            # Export generation metadata with generator information
+            f.write(f"; Generation Metadata\n")
+            for func_name, result in generation_results.items():
+                f.write(f"(metta-generation-function {func_name})\n")
+                atom_count += 1
+                
+                if result["generation_success"]:
+                    f.write(f"(generation-success {func_name} {len(result['candidates'])})\n")
+                    atom_count += 1
+                    
+                    # Export generator usage for this function
+                    generators_used = set(result.get("generators_used", []))
+                    for generator in generators_used:
+                        f.write(f"(function-generator-used {func_name} {generator})\n")
+                        atom_count += 1
+                else:
+                    f.write(f"(generation-failure {func_name})\n")
+                    atom_count += 1
+            
+            f.write(f"\n; Generated Candidates with Generator Attribution\n")
+            
+            # Export candidate information with generator details
+            for func_name, result in generation_results.items():
+                if result["generation_success"] and result["candidates"]:
+                    for i, candidate in enumerate(result["candidates"]):
+                        candidate_id = f"{func_name}-candidate-{i+1}"
+                        generator_used = candidate.get('generator_used', candidate['strategy'])
+                        
+                        # Basic candidate info
+                        f.write(f"(donor-candidate {candidate_id} {candidate['name']})\n")
+                        f.write(f"(candidate-generator {candidate_id} {generator_used})\n")
+                        f.write(f"(candidate-strategy {candidate_id} {candidate['strategy']})\n")
+                        f.write(f"(candidate-score {candidate_id} {candidate['final_score']})\n")
+                        f.write(f"(candidate-confidence {candidate_id} {candidate['confidence']})\n")
+                        f.write(f"(candidate-pattern-family {candidate_id} {candidate['pattern_family']})\n")
+                        f.write(f"(candidate-complexity {candidate_id} {candidate['complexity_estimate']})\n")
+                        f.write(f"(candidate-scope {candidate_id} {candidate['applicability_scope']})\n")
+                        atom_count += 8
+                        
+                        # Properties
+                        for prop in candidate['properties']:
+                            f.write(f"(candidate-property {candidate_id} {prop})\n")
+                            atom_count += 1
+                        
+                        # Data structures used
+                        for ds in candidate['data_structures_used']:
+                            f.write(f"(candidate-data-structure {candidate_id} {ds})\n")
+                            atom_count += 1
+                        
+                        # Operations used
+                        for op in candidate['operations_used']:
+                            f.write(f"(candidate-operation {candidate_id} {op})\n")
+                            atom_count += 1
+                        
+                        # MeTTa derivation
+                        for derivation in candidate['metta_derivation']:
+                            # Clean derivation string for MeTTa format
+                            clean_derivation = derivation.replace('"', '\\"')
+                            f.write(f"(candidate-derivation {candidate_id} \"{clean_derivation}\")\n")
+                            atom_count += 1
+                        
+                        # Description (escaped)
+                        escaped_desc = candidate['description'].replace('"', '\\"')
+                        f.write(f"(candidate-description {candidate_id} \"{escaped_desc}\")\n")
+                        atom_count += 1
+                        
+                        f.write(f"\n")
+            
+            # Export generator statistics
+            f.write(f"; Generator Statistics\n")
+            generator_stats = {}
+            strategy_stats = {}
+            total_candidates = 0
+            
+            for func_name, result in generation_results.items():
+                if result["generation_success"]:
+                    for candidate in result["candidates"]:
+                        total_candidates += 1
+                        generator = candidate.get('generator_used', candidate['strategy'])
+                        strategy = candidate['strategy']
+                        
+                        generator_stats[generator] = generator_stats.get(generator, 0) + 1
+                        strategy_stats[strategy] = strategy_stats.get(strategy, 0) + 1
+            
+            # Export generator usage statistics
+            for generator, count in generator_stats.items():
+                f.write(f"(generator-usage {generator} {count})\n")
+                atom_count += 1
+            
+            # Export strategy usage statistics
+            for strategy, count in strategy_stats.items():
+                f.write(f"(strategy-usage {strategy} {count})\n")
+                atom_count += 1
+            
+            # Export summary statistics
+            f.write(f"\n; Summary Statistics\n")
+            successful_count = sum(1 for r in generation_results.values() if r["generation_success"])
+            
+            f.write(f"(generation-summary total-functions {len(generation_results)})\n")
+            f.write(f"(generation-summary successful-functions {successful_count})\n")
+            f.write(f"(generation-summary total-candidates {total_candidates})\n")
+            f.write(f"(generation-summary total-generators {len(generator_stats)})\n")
+            f.write(f"(generation-summary total-strategies {len(strategy_stats)})\n")
+            atom_count += 5
+            
+            f.write(f"\n; Export completed with {atom_count} atoms\n")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error exporting MeTTa generation results: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 # Example usage for testing
 if __name__ == "__main__":
