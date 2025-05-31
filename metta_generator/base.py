@@ -536,7 +536,7 @@ class ModularMettaDonorGenerator:
         # For now, we'll create placeholder registrations
         # In the full implementation, these would be actual generator classes
         
-    def load_ontology(self, ontology_file: str = "metta/modular_donor_ontology.metta") -> bool:
+    def load_ontology(self, ontology_file: str = "metta/donor_generation.metta") -> bool:
         """Load MeTTa ontology for modular generation."""
         print(" Loading modular donor generation ontology...")
         return self.monitor.load_metta_rules(ontology_file)
