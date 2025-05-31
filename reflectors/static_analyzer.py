@@ -1231,7 +1231,9 @@ def decompose_function(func) -> Dict:
             func_name = "<unnamed_function>"  # Default name for string inputs
         else:
             # Otherwise, get the source code using inspect
+            print(f"[STATIC_ANALYZER]   Getting source code for {func.__name__}")
             source = inspect.getsource(func)
+            print(f"[STATIC_ANALYZER]   Source code: {source}")
             func_name = func.__name__
             
         result = decompose_source(source)

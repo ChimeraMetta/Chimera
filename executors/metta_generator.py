@@ -95,7 +95,9 @@ class MettaDonorGenerator:
             self.function_name = self._extract_function_name(func)
         else:
             try:
+                print(f"[METTA_GENERATOR]   Getting source code for {func.__name__}")
                 self.original_code = inspect.getsource(func)
+                print(f"[METTA_GENERATOR]   Source code: {self.original_code}")
                 self.function_name = func.__name__
             except Exception as e:
                 print(f"  Failed to extract source code: {e}")
