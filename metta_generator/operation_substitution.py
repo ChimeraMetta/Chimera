@@ -12,6 +12,8 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
     """Generator that creates variants by substituting operations."""
     
     def __init__(self):
+        super().__init__()
+
         self.operation_mappings = {
             # Comparison operations
             ">": "<",
@@ -100,7 +102,7 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
         
         return has_binary_ops or has_substitutable_ops or has_semantic_subs
     
-    def generate_candidates(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
+    def _generate_candidates_impl(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
         """Generate operation substitution candidates."""
         candidates = []
         
@@ -268,7 +270,8 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 confidence=self._calculate_substitution_confidence(original_op, substitute_op),
                 properties=["operation-substituted", "semantics-inverted"],
                 complexity_estimate="same",
-                applicability_scope="medium"
+                applicability_scope="medium",
+                generator_used=self.generator_name
             )
             
         except Exception as e:
@@ -313,7 +316,8 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 confidence=0.85,
                 properties=["semantically-substituted", "intent-inverted"],
                 complexity_estimate="same",
-                applicability_scope="broad"
+                applicability_scope="broad",
+                generator_used=self.generator_name
             )
             
         except Exception as e:
@@ -356,7 +360,8 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 confidence=0.75,
                 properties=["method-substituted", "behavior-modified"],
                 complexity_estimate="same",
-                applicability_scope="medium"
+                applicability_scope="medium",
+                generator_used=self.generator_name
             )
             
         except Exception as e:
@@ -408,7 +413,8 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 confidence=0.65,  # Lower confidence for multiple changes
                 properties=["multi-substituted", "complex-transformation"],
                 complexity_estimate="same",
-                applicability_scope="narrow"
+                applicability_scope="narrow",
+                generator_used=self.generator_name
             )
             
         except Exception as e:

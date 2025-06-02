@@ -12,6 +12,8 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
     """Generator that uses MeTTa symbolic reasoning to guide algorithm transformations."""
     
     def __init__(self):
+        super().__init__()
+
         self.metta_space = None  # Will be set from context
         self._current_context = None  # For fallback methods
         
@@ -69,7 +71,7 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             
         return can_generate
     
-    def generate_candidates(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
+    def _generate_candidates_impl(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
         """Generate algorithm transformation candidates using MeTTa symbolic reasoning."""
         candidates = []
         
@@ -571,7 +573,8 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
                 confidence=0.9 if transformation_guidance.get('is_safe', False) else 0.7,
                 properties=properties,
                 complexity_estimate=transformation_guidance.get('complexity_impact', 'same'),
-                applicability_scope="broad" if transformation_guidance.get('is_safe', False) else "medium"
+                applicability_scope="broad" if transformation_guidance.get('is_safe', False) else "medium",
+                generator_used=self.generator_name
             )
             
         except Exception as e:
