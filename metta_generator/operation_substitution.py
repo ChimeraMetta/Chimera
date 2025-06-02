@@ -101,6 +101,17 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                                for pattern in self.semantic_substitutions.keys())
         
         return has_binary_ops or has_substitutable_ops or has_semantic_subs
+
+    def generate_candidates(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
+        """Generate donor candidates for the given context and strategy."""
+        candidates = self._generate_candidates_impl(context, strategy)
+        
+        # Ensure all candidates have proper generator attribution
+        for candidate in candidates:
+            if not hasattr(candidate, 'generator_used') or candidate.generator_used == "UnknownGenerator":
+                candidate.generator_used = self.generator_name
+        
+        return candidates
     
     def _generate_candidates_impl(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
         """Generate operation substitution candidates."""
