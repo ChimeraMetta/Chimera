@@ -325,20 +325,20 @@ class EnhancedDonorGenerationVisualizer:
             self.metta_generator.registry.register_generator(data_adapt_generator)
             self.metta_generator.registry.register_generator(algo_transform_generator)
             
-            print(f"  ✓ Registered {len(self.metta_generator.registry.generators)} specialized generators")
+            print(f"   Registered {len(self.metta_generator.registry.generators)} specialized generators")
             
             # Load ontology
             if ontology_file and os.path.exists(ontology_file):
                 ontology_loaded = self.metta_generator.load_ontology(ontology_file)
                 if ontology_loaded:
-                    print(f"  ✓ Loaded ontology: {ontology_file}")
+                    print(f"   Loaded ontology: {ontology_file}")
                 else:
                     print(f"  ⚠ Failed to load ontology: {ontology_file}")
             else:
                 print(f"  ⚠ No ontology file provided or file not found")
             
         except Exception as e:
-            print(f"  ✗ Failed to initialize MeTTa components: {e}")
+            print(f"   Failed to initialize MeTTa components: {e}")
             self.metta_generator = None
     
     def _setup_plots(self):
@@ -465,7 +465,7 @@ class EnhancedDonorGenerationVisualizer:
                         if 'generator_used' not in candidate:
                             candidate['generator_used'] = candidate.get('strategy', 'unknown')
                     
-                    print(f"  ✓ Generated {len(real_candidates)} real MeTTa candidates")
+                    print(f"   Generated {len(real_candidates)} real MeTTa candidates")
                     
                     # Take a subset to avoid overwhelming the visualization
                     max_candidates = min(4, len(real_candidates))

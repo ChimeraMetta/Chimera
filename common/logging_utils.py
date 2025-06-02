@@ -77,7 +77,7 @@ class ChimeraTheme(themes.GreenPassion):
         """
         super().__init__()
         # Assuming Fore and Style are available (e.g., imported from logging_utils or globally)
-        self.Checkbox.selected_icon = f"{Fore.GREEN}✓{Style.RESET_ALL}"
+        self.Checkbox.selected_icon = f"{Fore.GREEN}{Style.RESET_ALL}"
         self.Checkbox.unselected_icon = " "
         self.Checkbox.selected_color = Fore.GREEN # Inquirer might handle RESET_ALL
         self.Checkbox.unselected_color = Style.RESET_ALL # Or rely on autoreset
