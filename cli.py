@@ -23,9 +23,9 @@ from executors.export_importer import (
     export_from_metta_generation
 )
 from metta_generator.base import ModularMettaDonorGenerator
-from metta_generator.op_sub import OperationSubstitutionGenerator
-from metta_generator.ds_adapt import DataStructureAdaptationGenerator  
-from metta_generator.algo_transform import AlgorithmTransformationGenerator
+from metta_generator.operation_substitution import OperationSubstitutionGenerator
+from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
+from metta_generator.algo_transformation import AlgorithmTransformationGenerator
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")

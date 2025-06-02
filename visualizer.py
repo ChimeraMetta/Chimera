@@ -313,9 +313,9 @@ class EnhancedDonorGenerationVisualizer:
             self.metta_generator = ModularMettaDonorGenerator(metta_space=self.local_monitor.metta_space)
             
             # Register the specialized generators
-            from metta_generator.op_sub import OperationSubstitutionGenerator
-            from metta_generator.ds_adapt import DataStructureAdaptationGenerator  
-            from metta_generator.algo_transform import AlgorithmTransformationGenerator
+            from metta_generator.operation_substitution import OperationSubstitutionGenerator
+            from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
+            from metta_generator.algo_transformation import AlgorithmTransformationGenerator
             
             op_sub_generator = OperationSubstitutionGenerator()
             data_adapt_generator = DataStructureAdaptationGenerator()

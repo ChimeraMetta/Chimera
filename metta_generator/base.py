@@ -5,7 +5,7 @@ Organized into separate modules for better maintainability and extensibility.
 """
 
 # ==============================================================================
-# Core Module: base_generator.py
+# Core Module
 # ==============================================================================
 
 from abc import ABC, abstractmethod
@@ -14,6 +14,11 @@ from dataclasses import dataclass
 from enum import Enum
 import ast
 import inspect
+from metta_generator.operation_substitution import OperationSubstitutionGenerator
+from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator
+from metta_generator.algo_transformation import AlgorithmTransformationGenerator
+
+DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 
 @dataclass
 class GenerationContext:
@@ -87,7 +92,7 @@ class BaseDonorGenerator(ABC):
         pass
 
 # ==============================================================================
-# Pattern Detection Module: pattern_detector.py
+# Pattern Detection Module
 # ==============================================================================
 
 class PatternDetector:
@@ -358,7 +363,7 @@ class PatternDetector:
         )
 
 # ==============================================================================
-# Strategy Manager Module: strategy_manager.py
+# Strategy Manager Module
 # ==============================================================================
 
 class StrategyManager:
@@ -449,7 +454,7 @@ class StrategyManager:
         return []
 
 # ==============================================================================
-# Generator Registry Module: generator_registry.py
+# Generator Registry Module
 # ==============================================================================
 
 class GeneratorRegistry:
@@ -504,7 +509,7 @@ class GeneratorRegistry:
         return list(all_strategies)
 
 # ==============================================================================
-# Main Coordinator Module: modular_metta_generator.py
+# Main Coordinator Class
 # ==============================================================================
 
 class ModularMettaDonorGenerator:
@@ -524,19 +529,27 @@ class ModularMettaDonorGenerator:
         self._register_default_generators()
     
     def _register_default_generators(self):
-        """Register the default set of generators."""
-        # Import and register generators from separate modules
-        # These would be implemented in separate files:
-        # - operation_substitution_generator.py
-        # - data_structure_adaptation_generator.py  
-        # - algorithm_transformation_generator.py
-        # - etc.
-        
+        """Register the default set of generators - NOW IMPLEMENTED"""
         print("  Registering default generators...")
-        # For now, we'll create placeholder registrations
-        # In the full implementation, these would be actual generator classes
+            
+        # Register operation substitution generator
+        op_sub_generator = OperationSubstitutionGenerator()
+        self.registry.register_generator(op_sub_generator)
+        print("     OperationSubstitutionGenerator registered")
+            
+        # Register data structure adaptation generator
+        data_adapt_generator = DataStructureAdaptationGenerator()
+        self.registry.register_generator(data_adapt_generator)
+        print("     DataStructureAdaptationGenerator registered")
+            
+        # Register algorithm transformation generator
+        algo_transform_generator = AlgorithmTransformationGenerator()
+        self.registry.register_generator(algo_transform_generator)
+        print("     AlgorithmTransformationGenerator registered")
+
+        print(f"     Successfully registered {len(self.registry.generators)} generators")
         
-    def load_ontology(self, ontology_file: str = "metta/donor_generation.metta") -> bool:
+    def load_ontology(self, ontology_file: str = DONOR_GENERATION_ONTOLOGY) -> bool:
         """Load MeTTa ontology for modular generation."""
         print(" Loading modular donor generation ontology...")
         return self.monitor.load_metta_rules(ontology_file)

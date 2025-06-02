@@ -15,9 +15,9 @@ from metta_generator.base import (
     DonorCandidate
 )
 
-from metta_generator.op_sub import OperationSubstitutionGenerator
-from metta_generator.ds_adapt import DataStructureAdaptationGenerator  
-from metta_generator.algo_transform import AlgorithmTransformationGenerator
+from metta_generator.operation_substitution import OperationSubstitutionGenerator
+from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
+from metta_generator.algo_transformation import AlgorithmTransformationGenerator
 
 def find_max_in_range(numbers, start_idx, end_idx):
     """Find the maximum value in a list within a specific range."""
