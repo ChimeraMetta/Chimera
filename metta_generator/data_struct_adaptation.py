@@ -122,7 +122,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
     
     def get_supported_strategies(self) -> List:
         """Get list of strategies this generator supports."""
-        return ["data_structure_adaptation"]
+        return [GenerationStrategy.DATA_STRUCTURE_ADAPTATION]
     
     def _detect_data_structures_in_context(self, context: GenerationContext) -> List[str]:
         """Detect data structures used in the function context."""
