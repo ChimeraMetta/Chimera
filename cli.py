@@ -22,7 +22,6 @@ from executors.export_importer import (
     verify_export,
     export_from_metta_generation
 )
-from executors.metta_generator import integrate_metta_generation
 from visualizer import DonorGenerationVisualizer
 from metta_generator.base import ModularMettaDonorGenerator
 from metta_generator.op_sub import OperationSubstitutionGenerator
@@ -126,6 +125,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
     
     analyzer_instance_for_complexity = None
     using_metta_generator = False # Flag to indicate which optimization path
+    metta_donor_generator_instance = None # For the new Modular MeTTa Donor Generator
     
     if api_key:
         logger.debug("API key provided. Attempting to initialize ImmuneSystemProofAnalyzer...")
@@ -144,6 +144,42 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         logger.info("Defaulting to MeTTa-based donor generation for optimization suggestions.")
         using_metta_generator = True
         analyzer_instance_for_complexity = None # Ensure it's None for MeTTa path
+        try:
+            logger.info("Initializing Modular MeTTa Donor Generator for fallback...")
+            metta_donor_generator_instance = ModularMettaDonorGenerator(metta_space=local_monitor.metta_space)
+
+            logger.info("Registering specialized donor generators for fallback...")
+            op_sub_gen = OperationSubstitutionGenerator()
+            metta_donor_generator_instance.registry.register_generator(op_sub_gen)
+            logger.info("  ✓ OperationSubstitutionGenerator registered for fallback")
+
+            ds_adapt_gen = DataStructureAdaptationGenerator()
+            metta_donor_generator_instance.registry.register_generator(ds_adapt_gen)
+            logger.info("  ✓ DataStructureAdaptationGenerator registered for fallback")
+
+            algo_transform_gen = AlgorithmTransformationGenerator()
+            metta_donor_generator_instance.registry.register_generator(algo_transform_gen)
+            logger.info("  ✓ AlgorithmTransformationGenerator registered for fallback")
+
+            total_gens = len(metta_donor_generator_instance.registry.generators)
+            supported_strats = len(metta_donor_generator_instance.registry.get_supported_strategies())
+            logger.info(f"  Total fallback generators registered: {total_gens}")
+            logger.info(f"  Supported fallback strategies: {supported_strats}")
+
+            if os.path.exists(ontology_file_path):
+                ontology_loaded = metta_donor_generator_instance.load_ontology(ontology_file_path)
+                if ontology_loaded:
+                    logger.info("  ✓ MeTTa ontology loaded successfully for fallback generator.")
+                else:
+                    logger.warning("  ⚠ Fallback MeTTa ontology could not be loaded, continuing with defaults.")
+            else:
+                logger.warning(f"  ⚠ MeTTa ontology file not found at {ontology_file_path} for fallback generator, continuing with defaults.")
+            logger.info("Modular MeTTa Donor Generator initialized successfully for fallback.")
+        except Exception as e:
+            logger.error(f"Error initializing Modular MeTTa Donor Generator for fallback: {e}")
+            logger.exception("Full traceback for Modular MeTTa generator initialization error:")
+            using_metta_generator = False 
+            metta_donor_generator_instance = None
 
     logger.debug(f"Analyzer instance for complexity: {type(analyzer_instance_for_complexity)}")
     logger.debug(f"Using MeTTa generator for suggestions: {using_metta_generator}")
@@ -238,13 +274,13 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                     if func_info and "source" in func_info:
                         func_source = func_info["source"]
                         
-                        if using_metta_generator:
-                            logger.info(f"Generating donor candidates for '{selected_func}' using MeTTa Donor Generator...")
+                        if using_metta_generator and metta_donor_generator_instance:
+                            logger.info(f"Generating donor candidates for '{selected_func}' using Modular MeTTa Donor Generator...")
                             try:
-                                metta_candidates = integrate_metta_generation(func_source)
+                                metta_candidates = metta_donor_generator_instance.generate_donors_from_function(func_source)
                                 
                                 if metta_candidates:
-                                    logger.info(f"=== {len(metta_candidates)} MeTTa Donor Candidates Generated for {selected_func} ===")
+                                    logger.info(f"=== {len(metta_candidates)} MeTTa Donor Candidates Generated for {selected_func} (Modular Generator) ===")
                                     best_metta_alt_display = None # To store the display dict of the best MeTTa candidate
                                     
                                     for i, mc in enumerate(metta_candidates, 1):
@@ -263,20 +299,20 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                         logger.info(f"  Score: {alt_display['score']:.2f}")
                                         logger.info(f"  Description: {alt_display['description']}")
                                         logger.info(f"  Properties Preserved: {alt_display['verification_result']['properties_preserved']}")
-                                        logger.info(f"  Code:\\n{alt_display['alternative_function']}")
+                                        logger.info(f"  Code:\n{alt_display['alternative_function']}")
                                         
                                         if i == 1: # First one is the best due to prior sorting in metta_generator
                                             best_metta_alt_display = alt_display
 
                                     if best_metta_alt_display:
-                                        logger.info("=== Best MeTTa Alternative Selected (Top Scoring) ===")
+                                        logger.info("=== Best MeTTa Alternative Selected (Top Scoring - Modular Generator) ===")
                                         logger.info(f"  Name: {best_metta_alt_display['name']}")
                                         logger.info(f"  Strategy: {best_metta_alt_display.get('strategy', 'N/A')}")
                                         logger.info(f"  Score: {best_metta_alt_display.get('score', 0.0):.2f}")
                                         logger.info(f"  Description: {best_metta_alt_display.get('description', 'N/A')}")
                                         logger.info(f"  Properties Preserved: {best_metta_alt_display.get('verification_result', {}).get('properties_preserved', [])}")
                                         best_code = best_metta_alt_display.get('alternative_function', 'No code selected')
-                                        logger.info(f"  Code:\\n{best_code}")
+                                        logger.info(f"  Code:\n{best_code}")
                                         
                                         original_path_func = func_info.get('file', target_path) 
                                         optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code_metta")
@@ -291,11 +327,11 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                     else:
                                         logger.warning("No best MeTTa alternative was selected (list empty or processing issue).")
                                 else:
-                                    logger.info(f"No MeTTa donor candidates were generated for '{selected_func}'.")
+                                    logger.info(f"No MeTTa donor candidates were generated for '{selected_func}' by the Modular Generator.")
                                     
                             except Exception as e:
-                                logger.error(f"Error during MeTTa donor generation for '{selected_func}': {e}")
-                                logger.exception("Full traceback for MeTTa donor generation error:")
+                                logger.error(f"Error during Modular MeTTa donor generation for '{selected_func}': {e}")
+                                logger.exception("Full traceback for Modular MeTTa donor generation error:")
 
                         elif analyzer_instance_for_complexity: # Original API key path
                             try:
@@ -311,7 +347,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                         logger.info(f"  Success: {alt.get('success', False)}")
                                         logger.info(f"  Properties Preserved: {alt.get('verification_result', {}).get('properties_preserved', False)}")
                                         alt_code = alt.get('alternative_function', 'No code generated')
-                                        logger.info(f"  Code:\\n{alt_code}") 
+                                        logger.info(f"  Code:\n{alt_code}") 
                                     
                                     best_api_alt = analyzer_instance_for_complexity.select_best_alternative(alternatives)
                                     if best_api_alt:
@@ -319,7 +355,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
                                         logger.info(f"  Strategy: {best_api_alt.get('strategy', 'N/A')}")
                                         logger.info(f"  Properties Preserved: {best_api_alt.get('verification_result', {}).get('properties_preserved', False)}")
                                         best_code_api = best_api_alt.get('alternative_function', 'No code selected')
-                                        logger.info(f"  Code:\\n{best_code_api}")
+                                        logger.info(f"  Code:\n{best_code_api}")
                                         
                                         original_path_func = func_info.get('file', target_path) 
                                         optimized_dir = os.path.join(os.path.dirname(original_path_func), "optimized_code")
