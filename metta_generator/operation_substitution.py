@@ -2,6 +2,7 @@
 """
 Operation Substitution Generator Module
 Generates donor candidates by substituting operations (e.g., > to <, + to -, etc.)
+Fixed Unicode encoding issues by replacing arrow characters with ASCII equivalents.
 """
 
 from typing import List, Dict, Optional
@@ -250,9 +251,12 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 substituted_code, f"Substituted '{original_op}' with '{substitute_op}'"
             )
             
+            # FIX: Replace Unicode arrow with ASCII equivalent
+            description = f"Operation substitution: {original_op} to {substitute_op}"
+            
             return DonorCandidate(
                 name=new_func_name,
-                description=f"Operation substitution: {original_op} → {substitute_op}",
+                description=description,  # Fixed: No Unicode arrow
                 code=substituted_code,
                 strategy="operation_substitution",
                 pattern_family=self._get_primary_pattern_family(context),
@@ -289,12 +293,15 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
             
             # Add documentation
             substituted_code = self._add_substitution_documentation(
-                substituted_code, f"Semantic substitution: {original_pattern} → {substitute_pattern}"
+                substituted_code, f"Semantic substitution: {original_pattern} to {substitute_pattern}"
             )
+            
+            # FIX: Replace Unicode arrow with ASCII equivalent
+            description = f"Semantic substitution: {original_pattern} to {substitute_pattern}"
             
             return DonorCandidate(
                 name=new_func_name,
-                description=f"Semantic substitution: {original_pattern} → {substitute_pattern}",
+                description=description,  # Fixed: No Unicode arrow
                 code=substituted_code,
                 strategy="operation_substitution",
                 pattern_family=self._get_primary_pattern_family(context),
@@ -329,12 +336,15 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
             
             # Add documentation
             substituted_code = self._add_substitution_documentation(
-                substituted_code, f"Method substitution: {original_method} → {substitute_method}"
+                substituted_code, f"Method substitution: {original_method} to {substitute_method}"
             )
+            
+            # FIX: Replace Unicode arrow with ASCII equivalent
+            description = f"Method substitution: {original_method} to {substitute_method}"
             
             return DonorCandidate(
                 name=new_func_name,
-                description=f"Method substitution: {original_method} → {substitute_method}",
+                description=description,  # Fixed: No Unicode arrow
                 code=substituted_code,
                 strategy="operation_substitution",
                 pattern_family=self._get_primary_pattern_family(context),
@@ -364,7 +374,7 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
             for original, substitute in substitution_set.items():
                 if original in substituted_code:
                     substituted_code = substituted_code.replace(original, substitute)
-                    substitution_descriptions.append(f"{original}→{substitute}")
+                    substitution_descriptions.append(f"{original} to {substitute}")  # Fixed: ASCII only
             
             if not substitution_descriptions:
                 return None
@@ -381,9 +391,12 @@ class OperationSubstitutionGenerator(BaseDonorGenerator):
                 substituted_code, f"Combined substitutions: {', '.join(substitution_descriptions)}"
             )
             
+            # FIX: Replace Unicode arrow with ASCII equivalent
+            description = f"Combined substitutions: {', '.join(substitution_descriptions)}"
+            
             return DonorCandidate(
                 name=new_func_name,
-                description=f"Combined substitutions: {', '.join(substitution_descriptions)}",
+                description=description,  # Fixed: No Unicode arrow
                 code=substituted_code,
                 strategy="operation_substitution",
                 pattern_family=self._get_primary_pattern_family(context),

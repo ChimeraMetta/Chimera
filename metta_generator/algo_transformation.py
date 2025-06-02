@@ -1,708 +1,702 @@
 #!/usr/bin/env python3
 """
-Algorithm Transformation Generator Module
-Generates donor candidates by transforming algorithmic approaches
+MeTTa-Guided Algorithm Transformation Generator
+Uses MeTTa reasoning to determine and generate algorithm transformations
 """
 
-from typing import List, Optional
-import re
-import ast
+from typing import List, Dict, Optional
 from metta_generator.base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
 
 class AlgorithmTransformationGenerator(BaseDonorGenerator):
-    """Generator that creates variants by transforming algorithmic approaches."""
+    """Generator that uses MeTTa ontology to guide algorithm transformations."""
     
     def __init__(self):
-        self.transformation_types = {
-            "iterative_to_recursive": self._transform_iterative_to_recursive,
-            "recursive_to_iterative": self._transform_recursive_to_iterative,
-            "imperative_to_functional": self._transform_imperative_to_functional,
-            "functional_to_imperative": self._transform_functional_to_imperative,
-            "sequential_to_parallel": self._transform_sequential_to_parallel,
-            "eager_to_lazy": self._transform_eager_to_lazy,
-            "divide_and_conquer": self._transform_to_divide_and_conquer,
-            "dynamic_programming": self._transform_to_dynamic_programming,
-            "greedy_approach": self._transform_to_greedy,
-            "backtracking": self._transform_to_backtracking
-        }
+        self.metta_space = None  # Will be set from context
+        self._current_context = None  # For fallback methods
         
-        self.confidence_scores = {
-            "iterative_to_recursive": 0.8,
-            "recursive_to_iterative": 0.85,
-            "imperative_to_functional": 0.9,
-            "functional_to_imperative": 0.75,
-            "sequential_to_parallel": 0.7,
-            "eager_to_lazy": 0.8,
-            "divide_and_conquer": 0.7,
-            "dynamic_programming": 0.6,
-            "greedy_approach": 0.65,
-            "backtracking": 0.6
+        # Basic template mappings for code generation
+        self.transformation_templates = {
+            "iterative_to_recursive": self._create_recursive_template,
+            "recursive_to_iterative": self._create_iterative_template,
+            "imperative_to_functional": self._create_functional_template,
+            "sequential_to_parallel": self._create_parallel_template,
+            "eager_to_lazy": self._create_lazy_template
         }
     
-    def can_generate(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
+    def can_generate(self, context: GenerationContext, strategy) -> bool:
         """Check if this generator can handle the given context and strategy."""
-        if strategy != GenerationStrategy.ALGORITHM_TRANSFORMATION:
+        if hasattr(strategy, 'value'):
+            strategy_name = strategy.value
+        else:
+            strategy_name = str(strategy)
+            
+        if strategy_name != "algorithm_transformation":
             return False
         
-        # Check if function has algorithmic patterns that can be transformed
-        code = context.original_code
+        self.metta_space = context.metta_space
         
-        # Check for iterative patterns
-        has_loops = any(pattern in code for pattern in ["for ", "while "])
+        # Use MeTTa reasoning to determine if transformations are applicable
+        applicable_transformations = self._query_metta_for_applicable_transformations(context)
         
-        # Check for recursive patterns
-        func_name = context.function_name
-        has_recursion = func_name in code.replace(f"def {func_name}", "")
+        can_generate = len(applicable_transformations) > 0
         
-        # Check for functional patterns
-        has_functional = any(pattern in code for pattern in ["map(", "filter(", "reduce(", "lambda"])
-        
-        # Check for sequential processing
-        has_sequential = "for " in code and "append" in code
-        
-        return has_loops or has_recursion or has_functional or has_sequential
+        if can_generate:
+            print(f"      MeTTa-guided AlgorithmTransformationGenerator: CAN generate")
+            print(f"        MeTTa suggested transformations: {applicable_transformations}")
+        else:
+            print(f"      MeTTa-guided AlgorithmTransformationGenerator: cannot generate")
+            
+        return can_generate
     
-    def generate_candidates(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
-        """Generate algorithm transformation candidates."""
+    def generate_candidates(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
+        """Generate algorithm transformation candidates using MeTTa reasoning."""
         candidates = []
         
-        # Determine applicable transformations
-        applicable_transformations = self._get_applicable_transformations(context)
+        # Store context for fallback methods
+        self._current_context = context
         
-        for transformation_name in applicable_transformations:
-            if transformation_name in self.transformation_types:
-                transformer_func = self.transformation_types[transformation_name]
-                candidate = self._create_transformation_candidate(
-                    context, transformation_name, transformer_func
-                )
-                if candidate:
-                    candidates.append(candidate)
+        # Query MeTTa for applicable transformations
+        transformations = self._query_metta_for_applicable_transformations(context)
+        
+        print(f"        MeTTa identified {len(transformations)} applicable transformations: {transformations}")
+        
+        for transformation_name in transformations:
+            # Query MeTTa for transformation details
+            transformation_guidance = self._query_metta_for_transformation_guidance(
+                context, transformation_name
+            )
+            
+            print(f"        Processing {transformation_name} with guidance: {transformation_guidance}")
+            
+            candidate = self._create_metta_guided_candidate(
+                context, transformation_name, transformation_guidance
+            )
+            
+            if candidate:
+                candidates.append(candidate)
+                print(f"         ✓ Created MeTTa-guided {transformation_name} candidate")
+            else:
+                print(f"         ✗ Failed to create {transformation_name} candidate")
+        
+        # Clean up context reference
+        self._current_context = None
         
         return candidates
     
-    def get_supported_strategies(self) -> List[GenerationStrategy]:
+    def get_supported_strategies(self) -> List:
         """Get list of strategies this generator supports."""
-        return [GenerationStrategy.ALGORITHM_TRANSFORMATION]
+        return ["algorithm_transformation"]
     
-    def _get_applicable_transformations(self, context: GenerationContext) -> List[str]:
-        """Determine which transformations are applicable to the given context."""
+    def _query_metta_for_applicable_transformations(self, context: GenerationContext) -> List[str]:
+        """Use MeTTa reasoning to determine applicable transformations."""
+        applicable = []
+        
+        # Store context for use in fallback methods
+        self._current_context = context
+        
+        # Query the MeTTa ontology for algorithm transformation rules
+        func_name = context.function_name
+        
+        print(f"        Querying MeTTa ontology for applicable transformations for {func_name}")
+        
+        # Check for iterative to recursive transformation
+        safety_result = self._query_metta_rule(f"(algorithm-transformation-safe {func_name} iterative-to-recursive)")
+        if safety_result and safety_result != "unsafe":
+            applicable.append("iterative_to_recursive")
+            print(f"          ✓ iterative_to_recursive: {safety_result}")
+        else:
+            print(f"          ✗ iterative_to_recursive: {safety_result or 'not applicable'}")
+        
+        # Check for recursive to iterative transformation  
+        safety_result = self._query_metta_rule(f"(algorithm-transformation-safe {func_name} recursive-to-iterative)")
+        if safety_result and safety_result != "unsafe":
+            applicable.append("recursive_to_iterative")
+            print(f"          ✓ recursive_to_iterative: {safety_result}")
+        else:
+            print(f"          ✗ recursive_to_iterative: {safety_result or 'not applicable'}")
+        
+        # Check for imperative to functional transformation
+        safety_result = self._query_metta_rule(f"(algorithm-transformation-safe {func_name} imperative-to-functional)")
+        if safety_result and safety_result != "unsafe":
+            applicable.append("imperative_to_functional")
+            print(f"          ✓ imperative_to_functional: {safety_result}")
+        else:
+            print(f"          ✗ imperative_to_functional: {safety_result or 'not applicable'}")
+        
+        # Check for sequential to parallel transformation
+        safety_result = self._query_metta_rule(f"(algorithm-transformation-safe {func_name} sequential-to-parallel)")
+        if safety_result and safety_result != "unsafe":
+            applicable.append("sequential_to_parallel")
+            print(f"          ✓ sequential_to_parallel: {safety_result}")
+        else:
+            print(f"          ✗ sequential_to_parallel: {safety_result or 'not applicable'}")
+        
+        # Check for eager to lazy transformation
+        applicability_result = self._query_metta_rule(f"(algorithm-transformation-applicable {func_name} eager-to-lazy)")
+        if applicability_result and applicability_result != "not-applicable":
+            applicable.append("eager_to_lazy")
+            print(f"          ✓ eager_to_lazy: {applicability_result}")
+        else:
+            print(f"          ✗ eager_to_lazy: {applicability_result or 'not applicable'}")
+        
+        # If MeTTa doesn't find anything, use fallback pattern detection
+        if not applicable:
+            print(f"        No MeTTa transformations found, using fallback pattern detection")
+            applicable = self._fallback_pattern_detection_full(context)
+            print(f"        Fallback found: {applicable}")
+        
+        return applicable
+    
+    def _query_metta_rule(self, query: str) -> Optional[str]:
+        """Query the MeTTa space for a specific rule."""
+        try:
+            if not self.metta_space:
+                return None
+            
+            # Use the actual MeTTa space to query rules
+            # First, add the query as an atom to check
+            from hyperon import MeTTa, E, S
+            
+            # Parse the query and execute it
+            if "algorithm-transformation-safe" in query:
+                return self._check_transformation_safety(query)
+            elif "algorithm-transformation-applicable" in query:
+                return self._check_transformation_applicability(query)
+            elif "transformation-complexity-impact" in query:
+                return self._get_complexity_impact_from_metta(query)
+            elif "has-iterative-pattern" in query:
+                return self._check_iterative_pattern_in_metta(query)
+            elif "has-recursive-pattern" in query:
+                return self._check_recursive_pattern_in_metta(query)
+            elif "no-side-effects" in query:
+                return self._check_side_effects_in_metta(query)
+            
+            # Try direct query execution
+            try:
+                result = self.metta_space.run(f"!({query})")
+                if result and len(result) > 0:
+                    return str(result[0])
+            except Exception as e:
+                print(f"        Direct MeTTa query failed: {e}")
+            
+            return None
+        except Exception as e:
+            print(f"        MeTTa query failed: {e}")
+            return None
+    
+    def _check_transformation_safety(self, query: str) -> Optional[str]:
+        """Check if a transformation is safe using MeTTa rules."""
+        try:
+            # Extract function name and transformation from query
+            import re
+            match = re.search(r'\(algorithm-transformation-safe\s+(\w+)\s+([^)]+)\)', query)
+            if not match:
+                return None
+            
+            func_name = match.group(1)
+            transformation = match.group(2)
+            
+            # Query MeTTa ontology for safety rules
+            safety_conditions = {
+                "iterative-to-recursive": [
+                    f"(has-iterative-pattern {func_name})",
+                    f"(has-clear-termination {func_name})",
+                    f"(no-complex-state {func_name})"
+                ],
+                "recursive-to-iterative": [
+                    f"(has-recursive-pattern {func_name})",
+                    f"(tail-recursive {func_name})",
+                    f"(simple-recursive-structure {func_name})"
+                ],
+                "imperative-to-functional": [
+                    f"(no-side-effects {func_name})",
+                    f"(deterministic-behavior {func_name})",
+                    f"(composable-operations {func_name})"
+                ],
+                "sequential-to-parallel": [
+                    f"(independent-iterations {func_name})",
+                    f"(no-shared-state {func_name})",
+                    f"(commutative-operations {func_name})"
+                ]
+            }
+            
+            conditions = safety_conditions.get(transformation, [])
+            if not conditions:
+                return "unknown"
+            
+            # Check each condition using MeTTa
+            all_satisfied = True
+            for condition in conditions:
+                try:
+                    result = self.metta_space.run(f"!({condition})")
+                    if not result or len(result) == 0:
+                        # If direct query fails, use pattern-based fallback
+                        if not self._fallback_condition_check(condition, func_name):
+                            all_satisfied = False
+                            break
+                except:
+                    # Fallback to pattern-based checking
+                    if not self._fallback_condition_check(condition, func_name):
+                        all_satisfied = False
+                        break
+            
+            return "safe" if all_satisfied else "unsafe"
+            
+        except Exception as e:
+            print(f"        Safety check failed: {e}")
+            return "unknown"
+    
+    def _check_transformation_applicability(self, query: str) -> Optional[str]:
+        """Check if a transformation is applicable using MeTTa rules."""
+        try:
+            import re
+            match = re.search(r'\(algorithm-transformation-applicable\s+(\w+)\s+([^)]+)\)', query)
+            if not match:
+                return None
+            
+            func_name = match.group(1)
+            transformation = match.group(2)
+            
+            # Query MeTTa for applicability rules
+            applicability_rules = {
+                "eager-to-lazy": f"(supports-lazy-evaluation {func_name})",
+                "divide-and-conquer": f"(divisible-problem {func_name})",
+                "dynamic-programming": f"(has-overlapping-subproblems {func_name})",
+                "greedy-approach": f"(has-greedy-choice-property {func_name})",
+                "backtracking": f"(has-search-space {func_name})"
+            }
+            
+            rule = applicability_rules.get(transformation)
+            if not rule:
+                return "unknown"
+            
+            try:
+                result = self.metta_space.run(f"!({rule})")
+                if result and len(result) > 0:
+                    return "applicable"
+            except:
+                pass
+            
+            # Fallback to pattern-based checking
+            return "applicable" if self._fallback_applicability_check(transformation, func_name) else "not-applicable"
+            
+        except Exception as e:
+            print(f"        Applicability check failed: {e}")
+            return "unknown"
+    
+    def _get_complexity_impact_from_metta(self, query: str) -> Optional[str]:
+        """Get complexity impact from MeTTa ontology."""
+        try:
+            import re
+            match = re.search(r'\(transformation-complexity-impact\s+([^)]+)\s+\$impact\)', query)
+            if not match:
+                return None
+            
+            transformation = match.group(1)
+            
+            # Query MeTTa for complexity rules
+            complexity_query = f"(transformation-complexity-impact {transformation} $impact)"
+            try:
+                result = self.metta_space.run(f"!({complexity_query})")
+                if result and len(result) > 0:
+                    return str(result[0])
+            except:
+                pass
+            
+            # Fallback to predefined mappings from ontology
+            complexity_mappings = {
+                "iterative-to-recursive": "same",
+                "recursive-to-iterative": "improved",
+                "imperative-to-functional": "same", 
+                "functional-to-imperative": "same",
+                "sequential-to-parallel": "speedup",
+                "eager-to-lazy": "space-optimized",
+                "divide-and-conquer": "logarithmic-improvement",
+                "dynamic-programming": "time-optimized",
+                "greedy-approach": "linear-time",
+                "backtracking": "exponential-worst-case"
+            }
+            
+            return complexity_mappings.get(transformation, "same")
+            
+        except Exception as e:
+            print(f"        Complexity impact query failed: {e}")
+            return "same"
+    
+    def _check_iterative_pattern_in_metta(self, query: str) -> Optional[str]:
+        """Check for iterative pattern using MeTTa rules."""
+        try:
+            import re
+            match = re.search(r'\(has-iterative-pattern\s+(\w+)\)', query)
+            if not match:
+                return None
+            
+            func_name = match.group(1)
+            
+            # Query MeTTa for iterative pattern detection
+            conditions = [
+                f"(has-loop-structure {func_name})",
+                f"(not (calls-self {func_name}))",
+                f"(sequential-processing {func_name})"
+            ]
+            
+            for condition in conditions:
+                try:
+                    result = self.metta_space.run(f"!({condition})")
+                    if not result or len(result) == 0:
+                        # Use fallback pattern detection
+                        if not self._fallback_pattern_detection_check(condition, func_name):
+                            return None
+                except:
+                    if not self._fallback_pattern_detection_check(condition, func_name):
+                        return None
+            
+            return "true"
+            
+        except Exception as e:
+            print(f"        Iterative pattern check failed: {e}")
+            return None
+    
+    def _check_recursive_pattern_in_metta(self, query: str) -> Optional[str]:
+        """Check for recursive pattern using MeTTa rules."""
+        try:
+            import re
+            match = re.search(r'\(has-recursive-pattern\s+(\w+)\)', query)
+            if not match:
+                return None
+            
+            func_name = match.group(1)
+            
+            # Query MeTTa for recursive pattern detection
+            conditions = [
+                f"(calls-self {func_name})",
+                f"(has-base-case {func_name})", 
+                f"(reduces-problem-size {func_name})"
+            ]
+            
+            for condition in conditions:
+                try:
+                    result = self.metta_space.run(f"!({condition})")
+                    if not result or len(result) == 0:
+                        if not self._fallback_pattern_detection_check(condition, func_name):
+                            return None
+                except:
+                    if not self._fallback_pattern_detection_check(condition, func_name):
+                        return None
+            
+            return "true"
+            
+        except Exception as e:
+            print(f"        Recursive pattern check failed: {e}")
+            return None
+    
+    def _check_side_effects_in_metta(self, query: str) -> Optional[str]:
+        """Check for side effects using MeTTa rules."""
+        try:
+            import re
+            match = re.search(r'\(no-side-effects\s+(\w+)\)', query)
+            if not match:
+                return None
+            
+            func_name = match.group(1)
+            
+            # Query MeTTa for side effect analysis
+            side_effect_checks = [
+                f"(not (modifies-global-state {func_name}))",
+                f"(not (modifies-input-parameters {func_name}))",
+                f"(not (performs-io-operations {func_name}))"
+            ]
+            
+            for check in side_effect_checks:
+                try:
+                    result = self.metta_space.run(f"!({check})")
+                    if not result or len(result) == 0:
+                        if not self._fallback_side_effect_check(check, func_name):
+                            return None
+                except:
+                    if not self._fallback_side_effect_check(check, func_name):
+                        return None
+            
+            return "true"
+            
+        except Exception as e:
+            print(f"        Side effect check failed: {e}")
+            return None
+    
+    def _fallback_condition_check(self, condition: str, func_name: str) -> bool:
+        """Fallback condition checking when MeTTa queries fail."""
+        try:
+            # Get the original code from context if available
+            if hasattr(self, '_current_context') and self._current_context:
+                code = self._current_context.original_code
+            else:
+                # Try to infer from function name patterns
+                code = ""
+            
+            if "has-iterative-pattern" in condition:
+                return any(pattern in code for pattern in ["for ", "while "])
+            elif "has-recursive-pattern" in condition:
+                return func_name in code.replace(f"def {func_name}", "")
+            elif "has-clear-termination" in condition:
+                return any(pattern in code for pattern in ["break", "return", ">=", "<=", ">", "<"])
+            elif "no-complex-state" in condition:
+                # Simple heuristic: no complex data structures being modified
+                return not any(pattern in code for pattern in ["dict[", "list[", "set[", ".append(", ".update("])
+            elif "tail-recursive" in condition:
+                # Check if recursive calls are at the end of functions
+                return "return " + func_name in code
+            elif "simple-recursive-structure" in condition:
+                # Check for straightforward recursive structure
+                return code.count(func_name) <= 3  # Definition + 1-2 recursive calls
+            elif "no-side-effects" in condition:
+                return not any(pattern in code for pattern in ["global ", "print(", "open(", "write(", "input("])
+            elif "deterministic-behavior" in condition:
+                return not any(pattern in code for pattern in ["random", "time", "datetime", "uuid"])
+            elif "composable-operations" in condition:
+                return not any(pattern in code for pattern in ["global ", "nonlocal "])
+            elif "independent-iterations" in condition:
+                # Check if loop iterations don't depend on each other
+                return "for " in code and not any(pattern in code for pattern in ["previous", "last", "accumulate"])
+            elif "no-shared-state" in condition:
+                return not any(pattern in code for pattern in ["global ", "class ", "self."])
+            elif "commutative-operations" in condition:
+                # Check for operations that can be reordered
+                return any(pattern in code for pattern in ["max", "min", "sum", "+", "*", "and", "or"])
+            
+            return True  # Default to allowing transformation
+            
+        except Exception as e:
+            print(f"        Fallback condition check failed: {e}")
+            return False
+    
+    def _fallback_applicability_check(self, transformation: str, func_name: str) -> bool:
+        """Fallback applicability checking when MeTTa queries fail."""
+        try:
+            # Basic pattern-based applicability checks
+            if hasattr(self, '_current_context') and self._current_context:
+                code = self._current_context.original_code
+            else:
+                code = ""
+            
+            if transformation == "eager-to-lazy":
+                # Check if function processes collections that could be streamed
+                return any(pattern in code for pattern in ["for ", "list(", "map(", "filter("])
+            elif transformation == "divide-and-conquer":
+                # Check if problem can be divided
+                return any(pattern in code for pattern in ["len(", "range(", "sort", "search"])
+            elif transformation == "dynamic-programming":
+                # Check for recursive structure with potential overlapping subproblems
+                return func_name in code and "if " in code
+            elif transformation == "greedy-approach":
+                # Check for optimization problems
+                return any(pattern in func_name.lower() for pattern in ["max", "min", "best", "optimal"])
+            elif transformation == "backtracking":
+                # Check for search or constraint satisfaction problems
+                return any(pattern in func_name.lower() for pattern in ["find", "search", "solve", "valid"])
+            
+            return True  # Default to allowing transformation
+            
+        except Exception as e:
+            print(f"        Fallback applicability check failed: {e}")
+            return False
+    
+    def _fallback_pattern_detection_check(self, condition: str, func_name: str) -> bool:
+        """Fallback pattern detection when MeTTa queries fail."""
+        try:
+            if hasattr(self, '_current_context') and self._current_context:
+                code = self._current_context.original_code
+            else:
+                code = ""
+            
+            if "has-loop-structure" in condition:
+                return any(pattern in code for pattern in ["for ", "while "])
+            elif "calls-self" in condition:
+                return func_name in code.replace(f"def {func_name}", "")
+            elif "sequential-processing" in condition:
+                return "for " in code and any(pattern in code for pattern in ["next", "append", "process"])
+            elif "has-base-case" in condition:
+                return any(pattern in code for pattern in ["if ", "return", "break"])
+            elif "reduces-problem-size" in condition:
+                # Check for patterns that suggest problem size reduction
+                return any(pattern in code for pattern in ["len(", "//", "slice", "[:", "range("])
+            
+            return True
+            
+        except Exception as e:
+            print(f"        Fallback pattern detection failed: {e}")
+            return False
+    
+    def _fallback_side_effect_check(self, check: str, func_name: str) -> bool:
+        """Fallback side effect checking when MeTTa queries fail."""
+        try:
+            if hasattr(self, '_current_context') and self._current_context:
+                code = self._current_context.original_code
+            else:
+                code = ""
+            
+            if "modifies-global-state" in check:
+                return not any(pattern in code for pattern in ["global ", "nonlocal "])
+            elif "modifies-input-parameters" in check:
+                # Check for in-place modifications
+                return not any(pattern in code for pattern in [".append(", ".extend(", ".remove(", ".clear(", ".sort("])
+            elif "performs-io-operations" in check:
+                return not any(pattern in code for pattern in ["print(", "input(", "open(", "read(", "write("])
+            
+            return True
+            
+        except Exception as e:
+            print(f"        Fallback side effect check failed: {e}")
+            return False
+    
+    def _fallback_pattern_detection_full(self, context: GenerationContext) -> List[str]:
+        """Comprehensive fallback pattern detection when MeTTa rules are not available."""
         applicable = []
         code = context.original_code
         func_name = context.function_name
+        
+        print(f"        Running comprehensive fallback pattern detection")
         
         # Check for iterative patterns
         if any(pattern in code for pattern in ["for ", "while "]):
             applicable.append("iterative_to_recursive")
             applicable.append("imperative_to_functional")
-            applicable.append("sequential_to_parallel")
-            applicable.append("eager_to_lazy")
+            print(f"          Found iterative patterns")
         
         # Check for recursive patterns
         if func_name in code.replace(f"def {func_name}", ""):
             applicable.append("recursive_to_iterative")
-            applicable.append("dynamic_programming")  # Often good for recursive functions
+            print(f"          Found recursive patterns")
         
-        # Check for functional patterns
-        if any(pattern in code for pattern in ["map(", "filter(", "reduce(", "lambda"]):
-            applicable.append("functional_to_imperative")
-        else:
-            applicable.append("imperative_to_functional")
+        # Check for functional transformation opportunities
+        if not any(pattern in code for pattern in ["global ", "print(", "input(", "open("]):
+            if "imperative_to_functional" not in applicable:
+                applicable.append("imperative_to_functional")
+            print(f"          Found functional transformation opportunity")
         
-        # Check for search/optimization patterns
-        if any(pattern in func_name.lower() for pattern in ["find", "search", "optimal", "best"]):
-            applicable.extend(["divide_and_conquer", "greedy_approach", "backtracking"])
+        # Check for parallelization opportunities
+        if ("for " in code and 
+            not any(pattern in code for pattern in ["global ", "nonlocal ", "self."]) and
+            any(pattern in code for pattern in ["max", "min", "sum", "+", "*"])):
+            applicable.append("sequential_to_parallel")
+            print(f"          Found parallelization opportunity")
         
-        # Check for computation-heavy patterns
-        if "calculation" in func_name.lower() or "compute" in func_name.lower():
-            applicable.append("dynamic_programming")
+        # Check for lazy evaluation opportunities
+        if any(pattern in code for pattern in ["list(", "for ", "range("]):
+            applicable.append("eager_to_lazy")
+            print(f"          Found lazy evaluation opportunity")
         
-        return list(set(applicable))  # Remove duplicates
+        return applicable
     
-    def _create_transformation_candidate(self, context: GenerationContext,
-                                       transformation_name: str,
-                                       transformer_func: callable) -> Optional[DonorCandidate]:
-        """Create an algorithm transformation candidate."""
+    def _query_metta_for_transformation_guidance(self, context: GenerationContext, 
+                                               transformation_name: str) -> Dict[str, str]:
+        """Query MeTTa for specific guidance on how to perform the transformation."""
+        guidance = {}
+        func_name = context.function_name
+        
+        print(f"          Querying MeTTa for {transformation_name} guidance")
+        
+        # Query for complexity impact
+        complexity_result = self._query_metta_rule(
+            f"(transformation-complexity-impact {transformation_name} $impact)"
+        )
+        if complexity_result:
+            guidance["complexity_impact"] = complexity_result
+            print(f"            Complexity impact: {complexity_result}")
+        else:
+            guidance["complexity_impact"] = "same"
+            print(f"            Complexity impact: same (default)")
+        
+        # Query for safety conditions
+        safety_result = self._query_metta_rule(
+            f"(algorithm-transformation-safe {func_name} {transformation_name})"
+        )
+        guidance["is_safe"] = safety_result not in [None, "unsafe", "unknown"]
+        print(f"            Safety: {guidance['is_safe']} (result: {safety_result})")
+        
+        # Query for specific transformation requirements based on type
+        if transformation_name == "iterative_to_recursive":
+            guidance.update(self._get_recursive_transformation_guidance(context))
+        elif transformation_name == "recursive_to_iterative":
+            guidance.update(self._get_iterative_transformation_guidance(context))
+        elif transformation_name == "imperative_to_functional":
+            guidance.update(self._get_functional_transformation_guidance(context))
+        elif transformation_name == "sequential_to_parallel":
+            guidance.update(self._get_parallel_transformation_guidance(context))
+        elif transformation_name == "eager_to_lazy":
+            guidance.update(self._get_lazy_transformation_guidance(context))
+        
+        # Query for additional properties
         try:
-            # Apply the transformation
-            transformed_code = transformer_func(context.original_code, context.function_name)
+            # Check for deterministic behavior
+            deterministic_result = self._query_metta_rule(f"(deterministic-behavior {func_name})")
+            guidance["deterministic"] = bool(deterministic_result)
             
-            if not transformed_code or transformed_code == context.original_code:
-                return None
+            # Check for side effects
+            side_effects_result = self._query_metta_rule(f"(no-side-effects {func_name})")
+            guidance["no_side_effects"] = bool(side_effects_result)
             
-            confidence = self.confidence_scores.get(transformation_name, 0.7)
-            
-            return DonorCandidate(
-                name=f"{context.function_name}_{transformation_name}",
-                description=f"Algorithm transformation: {transformation_name.replace('_', ' ')}",
-                code=transformed_code,
-                strategy="algorithm_transformation",
-                pattern_family=self._get_primary_pattern_family(context),
-                data_structures_used=self._get_data_structures_from_context(context),
-                operations_used=self._get_operations_from_context(context) + [transformation_name],
-                metta_derivation=[
-                    f"(algorithm-transformation {context.function_name} {transformation_name})"
-                ],
-                confidence=confidence,
-                properties=["algorithm-transformed", transformation_name.replace("_", "-")],
-                complexity_estimate=self._estimate_complexity_change(transformation_name),
-                applicability_scope=self._estimate_applicability_scope(transformation_name)
-            )
-            
+            # Check for thread safety (for parallel transformations)
+            if transformation_name == "sequential_to_parallel":
+                thread_safe_result = self._query_metta_rule(f"(thread-safe {func_name})")
+                guidance["thread_safe"] = bool(thread_safe_result)
+        
         except Exception as e:
-            print(f"      Failed to create transformation candidate {transformation_name}: {e}")
-            return None
-    
-    # Transformation methods
-    
-    def _transform_iterative_to_recursive(self, code: str, func_name: str) -> str:
-        """Transform iterative code to recursive implementation."""
-        new_func_name = f"{func_name}_recursive"
+            print(f"            Additional property queries failed: {e}")
         
-        # Analyze the iterative structure
-        if "for i in range(" in code:
-            return self._create_range_based_recursive(code, func_name, new_func_name)
-        elif "for " in code and "in " in code:
-            return self._create_collection_based_recursive(code, func_name, new_func_name)
-        elif "while " in code:
-            return self._create_while_based_recursive(code, func_name, new_func_name)
+        print(f"            Final guidance: {guidance}")
+        return guidance
+    
+    def _get_recursive_transformation_guidance(self, context: GenerationContext) -> Dict[str, str]:
+        """Get MeTTa guidance for recursive transformations."""
+        func_name = context.function_name
+        code = context.original_code
+        
+        guidance = {}
+        
+        # Analyze termination condition
+        if "range(" in code:
+            guidance["termination_condition"] = "index >= end"
+            guidance["base_case"] = "return None"
+            guidance["recursive_step"] = "process_and_recurse"
+        elif "len(" in code:
+            guidance["termination_condition"] = "len(data) == 0"
+            guidance["base_case"] = "return base_value"
+            guidance["recursive_step"] = "process_first_and_recurse_rest"
         else:
-            return self._create_generic_recursive(code, func_name, new_func_name)
-    
-    def _create_range_based_recursive(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create recursive version for range-based loops."""
-        params = self._extract_parameters(code, func_name)
+            guidance["termination_condition"] = "base_case_reached"
+            guidance["base_case"] = "return result"
+            guidance["recursive_step"] = "divide_and_conquer"
         
-        return f'''def {new_func_name}({', '.join(params)}, index=None):
-    """Recursive implementation of {func_name}."""
-    if index is None:
-        index = {params[1] if len(params) > 1 else '0'}
-    
-    # Base case
-    if index >= {params[2] if len(params) > 2 else 'len(' + params[0] + ')'}:
-        return None  # or appropriate base case result
-    
-    # Process current element
-    current_result = {self._extract_loop_body_operation(code)}
-    
-    # Recursive case
-    remaining_result = {new_func_name}({', '.join(params)}, index + 1)
-    
-    # Combine results
-    return current_result if remaining_result is None else {self._get_combination_logic(code)}
-
-# Helper function to combine results
-def combine_recursive_results(current, remaining):
-    \"\"\"Combine current result with remaining results.\"\"\"
-    if remaining is None:
-        return current
-    return current + remaining  # Adjust based on actual operation'''
-    
-    def _create_collection_based_recursive(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create recursive version for collection-based loops."""
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Recursive implementation of {func_name}."""
-    # Base case
-    if not {params[0]}:
-        return {self._get_base_case_value(code)}
-    
-    # Process first element
-    first = {params[0]}[0]
-    rest = {params[0]}[1:]
-    
-    # Process current element
-    current_result = {self._extract_loop_body_operation(code, 'first')}
-    
-    # Recursive call on rest
-    rest_result = {new_func_name}(rest{', ' + ', '.join(params[1:]) if len(params) > 1 else ''})
-    
-    # Combine results
-    return {self._get_combination_logic(code, 'current_result', 'rest_result')}'''
-    
-    def _create_while_based_recursive(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create recursive version for while loops."""
-        params = self._extract_parameters(code, func_name)
-        condition = self._extract_while_condition(code)
-        
-        return f'''def {new_func_name}({', '.join(params)}, state=None):
-    """Recursive implementation of {func_name}."""
-    if state is None:
-        state = {self._get_initial_state(code)}
-    
-    # Base case (negation of while condition)
-    if not ({condition}):
-        return state
-    
-    # Process current iteration
-    new_state = {self._extract_while_body_operation(code)}
-    
-    # Recursive call
-    return {new_func_name}({', '.join(params)}, new_state)'''
-    
-    def _transform_recursive_to_iterative(self, code: str, func_name: str) -> str:
-        """Transform recursive code to iterative implementation."""
-        new_func_name = f"{func_name}_iterative"
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Iterative implementation of {func_name}."""
-    # Use explicit stack to simulate recursion
-    stack = [({', '.join(params)})]
-    result = None
-    
-    while stack:
-        current_params = stack.pop()
-        
-        # Base case check
-        if {self._extract_base_case_condition(code)}:
-            result = {self._extract_base_case_value(code)}
-            continue
-        
-        # Process current level
-        {self._extract_recursive_operation(code)}
-        
-        # Add recursive calls to stack
-        {self._generate_stack_operations(code)}
-    
-    return result'''
-    
-    def _transform_imperative_to_functional(self, code: str, func_name: str) -> str:
-        """Transform imperative code to functional style."""
-        new_func_name = f"{func_name}_functional"
-        
-        # Detect the pattern and create appropriate functional version
-        if self._is_search_pattern(code):
-            return self._create_functional_search(code, func_name, new_func_name)
-        elif self._is_transform_pattern(code):
-            return self._create_functional_transform(code, func_name, new_func_name)
-        elif self._is_aggregate_pattern(code):
-            return self._create_functional_aggregate(code, func_name, new_func_name)
+        # Analyze accumulation pattern
+        if any(pattern in code for pattern in ["max(", "maximum"]):
+            guidance["accumulation_type"] = "maximum"
+            guidance["initial_value"] = "float('-inf')"
+            guidance["combine_operation"] = "max"
+        elif any(pattern in code for pattern in ["min(", "minimum"]):
+            guidance["accumulation_type"] = "minimum"
+            guidance["initial_value"] = "float('inf')"
+            guidance["combine_operation"] = "min"
+        elif any(pattern in code for pattern in ["sum", "+="]):
+            guidance["accumulation_type"] = "sum"
+            guidance["initial_value"] = "0"
+            guidance["combine_operation"] = "add"
+        elif any(pattern in code for pattern in ["count", "len"]):
+            guidance["accumulation_type"] = "count"
+            guidance["initial_value"] = "0"
+            guidance["combine_operation"] = "increment"
         else:
-            return self._create_generic_functional(code, func_name, new_func_name)
-    
-    def _create_functional_search(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create functional search implementation."""
-        params = self._extract_parameters(code, func_name)
+            guidance["accumulation_type"] = "generic"
+            guidance["initial_value"] = "None"
+            guidance["combine_operation"] = "combine"
         
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Functional style search implementation."""
-    from typing import Optional, Callable
-    
-    def predicate(item):
-        # Extract search condition from original code
-        return {self._extract_search_condition(code)}
-    
-    # Use functional approach
-    try:
-        return next(filter(predicate, {params[0]}))
-    except StopIteration:
-        return None'''
-    
-    def _create_functional_transform(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create functional transform implementation."""
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Functional style transform implementation."""
-    from typing import Callable, Iterable
-    
-    def transform_fn(item):
-        # Extract transformation logic from original code
-        return {self._extract_transform_operation(code)}
-    
-    # Use functional approach
-    return list(map(transform_fn, {params[0]}))'''
-    
-    def _create_functional_aggregate(self, code: str, func_name: str, new_func_name: str) -> str:
-        """Create functional aggregate implementation."""
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Functional style aggregate implementation."""
-    from functools import reduce
-    from typing import Callable
-    
-    def combine_fn(acc, item):
-        # Extract combination logic from original code
-        return {self._extract_aggregate_operation(code)}
-    
-    # Use functional approach
-    initial_value = {self._get_initial_aggregate_value(code)}
-    return reduce(combine_fn, {params[0]}, initial_value)'''
-    
-    def _transform_functional_to_imperative(self, code: str, func_name: str) -> str:
-        """Transform functional code to imperative style."""
-        new_func_name = f"{func_name}_imperative"
-        
-        # Replace functional constructs with loops
-        imperative_code = code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # Replace map with for loop
-        imperative_code = re.sub(
-            r'list\(map\(([^,]+),\s*([^)]+)\)\)',
-            r'[\\1(item) for item in \\2]',
-            imperative_code
-        )
-        
-        # Replace filter with for loop
-        imperative_code = re.sub(
-            r'list\(filter\(([^,]+),\s*([^)]+)\)\)',
-            r'[item for item in \\2 if \\1(item)]',
-            imperative_code
-        )
-        
-        # Replace reduce with for loop
-        imperative_code = re.sub(
-            r'reduce\(([^,]+),\s*([^,]+),\s*([^)]+)\)',
-            self._create_reduce_loop,
-            imperative_code
-        )
-        
-        # Add docstring
-        imperative_code = self._add_transformation_docstring(
-            imperative_code, "functional", "imperative"
-        )
-        
-        return imperative_code
-    
-    def _transform_sequential_to_parallel(self, code: str, func_name: str) -> str:
-        """Transform sequential code to parallel processing."""
-        new_func_name = f"{func_name}_parallel"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}, num_workers=None):
-    """Parallel processing implementation of {func_name}."""
-    from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-    import multiprocessing
-    
-    if num_workers is None:
-        num_workers = multiprocessing.cpu_count()
-    
-    def process_chunk(chunk):
-        \"\"\"Process a chunk of data.\"\"\"
-        result = []
-        for item in chunk:
-            # Extract processing logic from original code
-            processed = {self._extract_processing_operation(code)}
-            result.append(processed)
-        return result
-    
-    # Split data into chunks
-    chunk_size = max(1, len({params[0]}) // num_workers)
-    chunks = [
-        {params[0]}[i:i + chunk_size] 
-        for i in range(0, len({params[0]}), chunk_size)
-    ]
-    
-    # Process chunks in parallel
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        chunk_results = list(executor.map(process_chunk, chunks))
-    
-    # Combine results
-    final_result = []
-    for chunk_result in chunk_results:
-        final_result.extend(chunk_result)
-    
-    return {self._get_final_result_processing(code)}'''
-    
-    def _transform_eager_to_lazy(self, code: str, func_name: str) -> str:
-        """Transform eager evaluation to lazy evaluation."""
-        new_func_name = f"{func_name}_lazy"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Lazy evaluation implementation of {func_name}."""
-    from typing import Iterator, Generator
-    
-    def lazy_processor():
-        \"\"\"Generator that yields results lazily.\"\"\"
-        for item in {params[0]}:
-            # Extract processing logic from original code
-            result = {self._extract_processing_operation(code)}
-            yield result
-    
-    # Return generator instead of computing all results
-    return lazy_processor()
-
-def materialize_lazy_result(lazy_result):
-    \"\"\"Helper function to materialize lazy results.\"\"\"
-    return list(lazy_result)'''
-    
-    def _transform_to_divide_and_conquer(self, code: str, func_name: str) -> str:
-        """Transform to divide and conquer approach."""
-        new_func_name = f"{func_name}_divide_conquer"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Divide and conquer implementation of {func_name}."""
-    # Base case
-    if len({params[0]}) <= 1:
-        return {self._get_base_case_for_divide_conquer(code)}
-    
-    # Divide
-    mid = len({params[0]}) // 2
-    left_half = {params[0]}[:mid]
-    right_half = {params[0]}[mid:]
-    
-    # Conquer
-    left_result = {new_func_name}(left_half{', ' + ', '.join(params[1:]) if len(params) > 1 else ''})
-    right_result = {new_func_name}(right_half{', ' + ', '.join(params[1:]) if len(params) > 1 else ''})
-    
-    # Combine
-    return {self._get_combine_logic_for_divide_conquer(code)}'''
-    
-    def _transform_to_dynamic_programming(self, code: str, func_name: str) -> str:
-        """Transform to dynamic programming approach."""
-        new_func_name = f"{func_name}_dp"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}, memo=None):
-    """Dynamic programming implementation of {func_name}."""
-    if memo is None:
-        memo = {{}}
-    
-    # Create key for memoization
-    key = {self._create_memoization_key(params)}
-    
-    # Check if already computed
-    if key in memo:
-        return memo[key]
-    
-    # Base case
-    if {self._extract_base_case_condition(code)}:
-        result = {self._extract_base_case_value(code)}
-        memo[key] = result
-        return result
-    
-    # Recursive case with memoization
-    result = {self._extract_dp_recursive_logic(code, new_func_name)}
-    memo[key] = result
-    return result'''
-    
-    def _transform_to_greedy(self, code: str, func_name: str) -> str:
-        """Transform to greedy algorithm approach."""
-        new_func_name = f"{func_name}_greedy"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Greedy algorithm implementation of {func_name}."""
-    result = []
-    remaining = list({params[0]})
-    
-    while remaining:
-        # Greedy choice: select best option at each step
-        best_option = {self._get_greedy_selection_logic(code)}
-        result.append(best_option)
-        remaining.remove(best_option)
-        
-        # Update state if necessary
-        {self._get_greedy_state_update(code)}
-    
-    return {self._get_greedy_final_result(code)}'''
-    
-    def _transform_to_backtracking(self, code: str, func_name: str) -> str:
-        """Transform to backtracking approach."""
-        new_func_name = f"{func_name}_backtrack"
-        
-        params = self._extract_parameters(code, func_name)
-        
-        return f'''def {new_func_name}({', '.join(params)}):
-    """Backtracking implementation of {func_name}."""
-    def backtrack(current_solution, remaining_choices):
-        # Base case: solution is complete
-        if {self._get_backtrack_complete_condition(code)}:
-            return current_solution
-        
-        # Try each possible choice
-        for choice in remaining_choices:
-            if {self._get_backtrack_valid_condition(code)}:
-                # Make choice
-                new_solution = current_solution + [choice]
-                new_remaining = [c for c in remaining_choices if c != choice]
-                
-                # Recursively solve
-                result = backtrack(new_solution, new_remaining)
-                if result is not None:
-                    return result
-                
-                # Backtrack (undo choice) - implicit in recursion
-        
-        return None  # No solution found
-    
-    # Start backtracking
-    initial_solution = []
-    all_choices = list({params[0]})
-    return backtrack(initial_solution, all_choices)'''
-    
-    # Helper methods for code analysis and extraction
-    
-    def _extract_parameters(self, code: str, func_name: str) -> List[str]:
-        """Extract parameter names from function definition."""
-        try:
-            tree = ast.parse(code)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == func_name:
-                    return [arg.arg for arg in node.args.args]
-        except:
-            pass
-        return ["data", "param1", "param2"]
-    
-    def _extract_loop_body_operation(self, code: str, item_name: str = "item") -> str:
-        """Extract the main operation from a loop body."""
-        # This is a simplified extraction - in practice would need AST analysis
-        if "max_val" in code:
-            return f"max(current_result, {item_name}) if 'current_result' in locals() else {item_name}"
-        elif "sum" in code or "+=" in code:
-            return f"current_result + {item_name} if 'current_result' in locals() else {item_name}"
-        elif "count" in code:
-            return f"current_result + 1 if 'current_result' in locals() else 1"
+        # Check for tail recursion potential
+        if "return " in code and func_name not in code.split("return ")[-1].split("\n")[0]:
+            guidance["tail_recursive_potential"] = "high"
         else:
-            return item_name
-    
-    def _get_combination_logic(self, code: str, current: str = "current_result", remaining: str = "remaining_result") -> str:
-        """Get logic for combining recursive results."""
-        if "max" in code:
-            return f"max({current}, {remaining}) if {remaining} is not None else {current}"
-        elif "sum" in code or "+=" in code:
-            return f"{current} + {remaining} if {remaining} is not None else {current}"
-        elif "count" in code:
-            return f"{current} + {remaining} if {remaining} is not None else {current}"
-        else:
-            return f"{current} if {remaining} is None else {current} + {remaining}"
-    
-    def _get_base_case_value(self, code: str) -> str:
-        """Get appropriate base case value."""
-        if "max" in code:
-            return "float('-inf')"
-        elif "min" in code:
-            return "float('inf')"
-        elif "sum" in code or "count" in code:
-            return "0"
-        elif "list" in code or "append" in code:
-            return "[]"
-        else:
-            return "None"
-    
-    def _is_search_pattern(self, code: str) -> bool:
-        """Check if code follows a search pattern."""
-        return any(pattern in code for pattern in ["find", "search", "return", "if"])
-    
-    def _is_transform_pattern(self, code: str) -> bool:
-        """Check if code follows a transform pattern."""
-        return any(pattern in code for pattern in ["append", "transform", "map", "convert"])
-    
-    def _is_aggregate_pattern(self, code: str) -> bool:
-        """Check if code follows an aggregate pattern."""
-        return any(pattern in code for pattern in ["sum", "count", "total", "+=", "accumulate"])
-    
-    def _extract_search_condition(self, code: str) -> str:
-        """Extract search condition from code."""
-        # Simplified extraction
-        if ">" in code:
-            return "item > threshold"  # placeholder
-        elif "==" in code:
-            return "item == target"
-        else:
-            return "True"  # fallback
-    
-    def _extract_transform_operation(self, code: str) -> str:
-        """Extract transformation operation from code."""
-        # Simplified extraction
-        if "*" in code:
-            return "item * 2"  # placeholder
-        elif "upper" in code:
-            return "item.upper()"
-        else:
-            return "item"  # identity transformation
-    
-    def _extract_aggregate_operation(self, code: str) -> str:
-        """Extract aggregation operation from code."""
-        # Simplified extraction
-        if "sum" in code or "+=" in code:
-            return "acc + item"
-        elif "max" in code:
-            return "max(acc, item)"
-        elif "count" in code:
-            return "acc + 1"
-        else:
-            return "acc + item"  # default
-    
-    def _get_initial_aggregate_value(self, code: str) -> str:
-        """Get initial value for aggregation."""
-        if "max" in code:
-            return "float('-inf')"
-        elif "min" in code:
-            return "float('inf')"
-        else:
-            return "0"
-    
-    def _estimate_complexity_change(self, transformation_name: str) -> str:
-        """Estimate how complexity changes with transformation."""
-        complexity_changes = {
-            "iterative_to_recursive": "same",
-            "recursive_to_iterative": "same",
-            "imperative_to_functional": "same",
-            "sequential_to_parallel": "parallel-speedup",
-            "eager_to_lazy": "space-optimized",
-            "divide_and_conquer": "logarithmic-improvement",
-            "dynamic_programming": "time-optimized",
-            "greedy_approach": "linear-time",
-            "backtracking": "exponential-worst-case"
-        }
-        return complexity_changes.get(transformation_name, "same")
-    
-    def _estimate_applicability_scope(self, transformation_name: str) -> str:
-        """Estimate applicability scope of transformation."""
-        scope_mapping = {
-            "iterative_to_recursive": "broad",
-            "recursive_to_iterative": "broad", 
-            "imperative_to_functional": "broad",
-            "sequential_to_parallel": "medium",
-            "eager_to_lazy": "medium",
-            "divide_and_conquer": "narrow",
-            "dynamic_programming": "narrow",
-            "greedy_approach": "narrow",
-            "backtracking": "narrow"
-        }
-        return scope_mapping.get(transformation_name, "medium")
-    
-    def _add_transformation_docstring(self, code: str, from_style: str, to_style: str) -> str:
-        """Add documentation about the transformation."""
-        lines = code.split('\n')
+            guidance["tail_recursive_potential"] = "low"
         
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                if i + 1 < len(lines) and '"""' in lines[i + 1]:
-                    lines[i + 1] = lines[i + 1].replace('"""', f'"""Transformed from {from_style} to {to_style}. ')
-                else:
-                    lines.insert(i + 1, f'    """Transformed from {from_style} to {to_style}."""')
-                break
-        
-        return '\n'.join(lines)
+        return guidance
     
-    def _get_primary_pattern_family(self, context: GenerationContext) -> str:
-        """Get the primary pattern family from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].pattern_family
-        return "generic"
-    
-    def _get_data_structures_from_context(self, context: GenerationContext) -> List[str]:
-        """Get data structures from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].data_structures
-        return ["generic"]
-    
-    def _get_operations_from_context(self, context: GenerationContext) -> List[str]:
-        """Get operations from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].operations
-        return ["transformation"]
-    
-    # Additional helper methods would be implemented here for the more complex transformations
-    # These are simplified placeholders for demonstration
+    def _get_iterative_transformation_guidance(self, context: GenerationContext) -> Dict[str, str]:
+        """Get MeTTa guidance for iterative transformations."""
+        func_name
