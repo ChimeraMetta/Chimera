@@ -14,9 +14,6 @@ from dataclasses import dataclass
 from enum import Enum
 import ast
 import inspect
-from metta_generator.operation_substitution import OperationSubstitutionGenerator
-from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator
-from metta_generator.algo_transformation import AlgorithmTransformationGenerator
 
 DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 
@@ -388,17 +385,12 @@ class StrategyManager:
     
     def get_applicable_strategies(self, context: GenerationContext, 
                                 requested_strategies: Optional[List[GenerationStrategy]] = None) -> List[GenerationStrategy]:
-        """Determine which strategies are applicable for the given context."""
-        applicable = []
-        strategies_to_check = requested_strategies or list(GenerationStrategy)
-        
-        for strategy in strategies_to_check:
-            if self._is_strategy_applicable(context, strategy):
-                # Check if any generator can handle this strategy
-                if any(gen.can_generate(context, strategy) for gen in self.generators):
-                    applicable.append(strategy)
-        
-        return applicable
+        """All strategies are applicable - let generators decide."""
+        if requested_strategies is None:
+            # Return all strategies
+            return list(GenerationStrategy)
+        else:
+            return requested_strategies
     
     def _is_strategy_applicable(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
         """Check if a strategy is applicable based on context."""
@@ -524,30 +516,6 @@ class ModularMettaDonorGenerator:
         self.monitor = monitor
         
         print("  Initializing Modular MeTTa Donor Generator...")
-        
-        # Register default generators (these would be implemented in separate files)
-        self._register_default_generators()
-    
-    def _register_default_generators(self):
-        """Register the default set of generators - NOW IMPLEMENTED"""
-        print("  Registering default generators...")
-            
-        # Register operation substitution generator
-        op_sub_generator = OperationSubstitutionGenerator()
-        self.registry.register_generator(op_sub_generator)
-        print("     OperationSubstitutionGenerator registered")
-            
-        # Register data structure adaptation generator
-        data_adapt_generator = DataStructureAdaptationGenerator()
-        self.registry.register_generator(data_adapt_generator)
-        print("     DataStructureAdaptationGenerator registered")
-            
-        # Register algorithm transformation generator
-        algo_transform_generator = AlgorithmTransformationGenerator()
-        self.registry.register_generator(algo_transform_generator)
-        print("     AlgorithmTransformationGenerator registered")
-
-        print(f"     Successfully registered {len(self.registry.generators)} generators")
         
     def load_ontology(self, ontology_file: str = DONOR_GENERATION_ONTOLOGY) -> bool:
         """Load MeTTa ontology for modular generation."""
