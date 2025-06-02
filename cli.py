@@ -22,7 +22,6 @@ from executors.export_importer import (
     verify_export,
     export_from_metta_generation
 )
-from visualizer import DonorGenerationVisualizer
 from metta_generator.base import ModularMettaDonorGenerator
 from metta_generator.op_sub import OperationSubstitutionGenerator
 from metta_generator.ds_adapt import DataStructureAdaptationGenerator  
