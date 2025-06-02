@@ -119,7 +119,7 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
     
     def get_supported_strategies(self) -> List:
         """Get list of strategies this generator supports."""
-        return ["algorithm_transformation"]
+        return [GenerationStrategy.ALGORITHM_TRANSFORMATION]
     
     def _query_metta_for_applicable_transformations(self, context: GenerationContext) -> List[str]:
         """Use MeTTa symbolic reasoning to determine applicable transformations."""

@@ -18,6 +18,7 @@ from metta_generator.base import (
 from metta_generator.operation_substitution import OperationSubstitutionGenerator
 from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
 from metta_generator.algo_transformation import AlgorithmTransformationGenerator
+from metta_generator.structure_preservation import StructurePreservationGenerator
 
 def find_max_in_range(numbers, start_idx, end_idx):
     """Find the maximum value in a list within a specific range."""
@@ -89,6 +90,11 @@ class RealModularIntegration:
         algo_transform_generator = AlgorithmTransformationGenerator()
         self.generator.registry.register_generator(algo_transform_generator)
         print("     AlgorithmTransformationGenerator registered")
+        
+        # Register structure preservation generator
+        structure_pres_generator = StructurePreservationGenerator()
+        self.generator.registry.register_generator(structure_pres_generator)
+        print("     StructurePreservationGenerator registered")
         
         print(f"    Total generators registered: {len(self.generator.registry.generators)}")
         print(f"    Supported strategies: {len(self.generator.registry.get_supported_strategies())}")
