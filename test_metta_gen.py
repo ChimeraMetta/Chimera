@@ -456,9 +456,9 @@ def test_code_execution():
                     for test_input in test_cases:
                         try:
                             result = generated_func(*test_input)
-                            test_results.append(f" {test_input} → {result}")
+                            test_results.append(f" {test_input} : {result}")
                         except Exception as e:
-                            test_results.append(f" {test_input} → Error: {e}")
+                            test_results.append(f" {test_input} : Error: {e}")
                     
                     execution_results.append({
                         'name': func_name,
