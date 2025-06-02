@@ -148,7 +148,7 @@ class RealModularIntegration:
         if ">=" in code or "max" in func_name.lower():
             candidates.append({
                 "name": f"{func_name}_min_substitution",
-                "description": "Real OperationSubstitutionGenerator: max → min",
+                "description": "Real OperationSubstitutionGenerator: max : min",
                 "code": self._create_real_max_to_min_variant(code, func_name),
                 "strategy": "operation_substitution",
                 "pattern_family": "search",
@@ -167,7 +167,7 @@ class RealModularIntegration:
         if "[" in code or "list" in code.lower():
             candidates.append({
                 "name": f"{func_name}_set_adapted",
-                "description": "Real DataStructureAdaptationGenerator: list → set",
+                "description": "Real DataStructureAdaptationGenerator: list : set",
                 "code": self._create_real_list_to_set_adaptation(code, func_name),
                 "strategy": "data_structure_adaptation",
                 "pattern_family": "generic",
@@ -203,7 +203,7 @@ class RealModularIntegration:
         if "for " in code or "while " in code:
             candidates.append({
                 "name": f"{func_name}_recursive",
-                "description": "Real AlgorithmTransformationGenerator: iterative → recursive",
+                "description": "Real AlgorithmTransformationGenerator: iterative : recursive",
                 "code": self._create_real_recursive_variant(code, func_name),
                 "strategy": "algorithm_transformation",
                 "pattern_family": "search",
@@ -220,7 +220,7 @@ class RealModularIntegration:
             
             candidates.append({
                 "name": f"{func_name}_functional",
-                "description": "Real AlgorithmTransformationGenerator: imperative → functional",
+                "description": "Real AlgorithmTransformationGenerator: imperative : functional",
                 "code": self._create_real_functional_variant(code, func_name),
                 "strategy": "algorithm_transformation",
                 "pattern_family": "transform",

@@ -1035,7 +1035,7 @@ def analyze_function_call_relationships(file_path):
     if call_chains:
         logger.info(f"Found {len(call_chains)} significant call chains:")
         for i, chain in enumerate(call_chains[:10], 1):  # Show top 10
-            logger.info(f"{i}. {' → '.join(chain)}")
+            logger.info(f"{i}. {' : '.join(chain)}")
     else:
         logger.info("No significant call chains found")
 

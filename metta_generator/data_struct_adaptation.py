@@ -109,9 +109,9 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
                         )
                         if candidate:
                             candidates.append(candidate)
-                            print(f"         Created {source_structure}→{target_structure} candidate")
+                            print(f"         Created {source_structure}:{target_structure} candidate")
                     except Exception as e:
-                        print(f"         Failed {source_structure}→{target_structure}: {e}")
+                        print(f"         Failed {source_structure}: {target_structure}: {e}")
         
         # Always add generic adaptations
         generic_candidates = self._generate_generic_adaptations(context)
@@ -186,7 +186,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
             )
             
         except Exception as e:
-            print(f"        Error creating adaptation candidate {source_structure}→{target_structure}: {e}")
+            print(f"        Error creating adaptation candidate {source_structure}:{target_structure}: {e}")
             return None
     
     def _generate_generic_adaptations(self, context: GenerationContext) -> List[DonorCandidate]:
