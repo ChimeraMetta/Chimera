@@ -54,6 +54,7 @@ class DonorCandidate:
     properties: List[str]
     complexity_estimate: str
     applicability_scope: str
+    generator_used: str = "UnknownGenerator"
 
 class GenerationStrategy(Enum):
     """Available generation strategies."""
@@ -72,6 +73,8 @@ class GenerationStrategy(Enum):
 
 class BaseDonorGenerator(ABC):
     """Abstract base class for donor generators."""
+    def __init__(self):
+        self.generator_name = self.__class__.__name__ 
     
     @abstractmethod
     def can_generate(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
@@ -81,6 +84,18 @@ class BaseDonorGenerator(ABC):
     @abstractmethod
     def generate_candidates(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
         """Generate donor candidates for the given context and strategy."""
+        candidates = self._generate_candidates_impl(context, strategy)
+        
+        # Ensure all candidates have proper generator attribution
+        for candidate in candidates:
+            if not hasattr(candidate, 'generator_used') or candidate.generator_used == "UnknownGenerator":
+                candidate.generator_used = self.generator_name
+        
+        return candidates
+    
+    @abstractmethod
+    def _generate_candidates_impl(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
+        """Implementation method to be overridden by subclasses."""
         pass
     
     @abstractmethod
@@ -385,10 +400,51 @@ class StrategyManager:
     
     def get_applicable_strategies(self, context: GenerationContext, 
                                 requested_strategies: Optional[List[GenerationStrategy]] = None) -> List[GenerationStrategy]:
-        """All strategies are applicable - let generators decide."""
+        """Get applicable strategies with improved logic."""
+        
         if requested_strategies is None:
-            # Return all strategies
-            return list(GenerationStrategy)
+            # Determine applicable strategies based on context analysis
+            applicable = []
+            
+            code = context.original_code.lower()
+            func_name = context.function_name
+            
+            # Check operation substitution
+            if any(op in code for op in [">", "<", ">=", "<=", "+", "-", "*", "/", "==", "!=", "max", "min"]):
+                applicable.append(GenerationStrategy.OPERATION_SUBSTITUTION)
+            
+            # Check data structure adaptation
+            if any(pattern in code for pattern in ["[", "list(", "dict(", "set(", ".append", ".keys"]):
+                applicable.append(GenerationStrategy.DATA_STRUCTURE_ADAPTATION)
+            
+            # Check algorithm transformation
+            if any(pattern in code for pattern in ["for ", "while ", "range("]) or func_name in code.replace(f"def {func_name}", ""):
+                applicable.append(GenerationStrategy.ALGORITHM_TRANSFORMATION)
+            
+            # Check type generalization
+            if any(pattern in code for pattern in ["list", "dict", "str", "int", "isinstance"]):
+                applicable.append(GenerationStrategy.TYPE_GENERALIZATION)
+            
+            # Check functional composition
+            if code.count("(") > 2 or any(pattern in code for pattern in ["map(", "filter(", "lambda"]):
+                applicable.append(GenerationStrategy.FUNCTIONAL_COMPOSITION)
+            
+            # Check error handling enhancement
+            if (any(pattern in code for pattern in ["[", "/", "range("]) and 
+                "try:" not in code and "except:" not in code):
+                applicable.append(GenerationStrategy.ERROR_HANDLING_ENHANCEMENT)
+            
+            # Always add these basic strategies
+            applicable.extend([
+                GenerationStrategy.STRUCTURE_PRESERVATION,
+                GenerationStrategy.PROPERTY_GUIDED
+            ])
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            applicable = [x for x in applicable if not (x in seen or seen.add(x))]
+            
+            return applicable
         else:
             return requested_strategies
     
@@ -481,16 +537,34 @@ class GeneratorRegistry:
             self._update_strategy_manager()
         
         applicable_strategies = self.strategy_manager.get_applicable_strategies(context, strategies)
+        print(f"    Applicable strategies: {[s.value if hasattr(s, 'value') else str(s) for s in applicable_strategies]}")  
+        
         all_candidates = []
         
         for strategy in applicable_strategies:
+            strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
+            print(f"    Processing strategy: {strategy_name}")  
+            
             strategy_generators = self.get_generators_for_strategy(strategy)
+            print(f"      Found {len(strategy_generators)} generators for {strategy_name}")  
             
             for generator in strategy_generators:
+                print(f"      Checking {generator.generator_name}")  
+                
                 if generator.can_generate(context, strategy):
-                    candidates = generator.generate_candidates(context, strategy)
-                    all_candidates.extend(candidates)
+                    print(f"        {generator.generator_name} can generate")  
+                    try:
+                        candidates = generator.generate_candidates(context, strategy)
+                        print(f"        Generated {len(candidates)} candidates")  
+                        all_candidates.extend(candidates)
+                    except Exception as e:
+                        print(f"        Error generating candidates: {e}")  
+                        import traceback
+                        traceback.print_exc()  
+                else:
+                    print(f"        {generator.generator_name} cannot generate")  
         
+        print(f"    Total candidates generated: {len(all_candidates)}")  
         return all_candidates
     
     def get_supported_strategies(self) -> List[GenerationStrategy]:

@@ -15,6 +15,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
     
     def __init__(self):
         print("    Initializing Complete Data Structure Adaptation Generator...")
+        super().__init__() 
         
         # Only include mappings for methods that are actually implemented
         self.structure_mappings = {
@@ -79,7 +80,7 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
         
         return len(detected_structures) > 0  # Can always try generic adaptations
     
-    def generate_candidates(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
+    def _generate_candidates_impl(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
         """Generate data structure adaptation candidates."""
         candidates = []
         
@@ -169,7 +170,8 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
                 confidence=compatibility,
                 properties=["structure-adapted", f"{source_structure}-to-{target_structure}"],
                 complexity_estimate="same" if compatibility > 0.8 else "slightly-higher",
-                applicability_scope="broad" if compatibility > 0.8 else "medium"
+                applicability_scope="broad" if compatibility > 0.8 else "medium",
+                generator_used=self.generator_name
             )
             
         except Exception as e:
@@ -505,7 +507,8 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
                 confidence=0.85,
                 properties=["generic", "iterable-compatible"],
                 complexity_estimate="same",
-                applicability_scope="broad"
+                applicability_scope="broad",
+                generator_used=self.generator_name
             )
         except Exception as e:
             print(f"        Error creating generic iterable candidate: {e}")
