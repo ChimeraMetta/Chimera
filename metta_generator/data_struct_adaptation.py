@@ -80,6 +80,17 @@ class DataStructureAdaptationGenerator(BaseDonorGenerator):
         
         return len(detected_structures) > 0  # Can always try generic adaptations
     
+    def generate_candidates(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
+        """Generate donor candidates for the given context and strategy."""
+        candidates = self._generate_candidates_impl(context, strategy)
+        
+        # Ensure all candidates have proper generator attribution
+        for candidate in candidates:
+            if not hasattr(candidate, 'generator_used') or candidate.generator_used == "UnknownGenerator":
+                candidate.generator_used = self.generator_name
+        
+        return candidates
+    
     def _generate_candidates_impl(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
         """Generate data structure adaptation candidates."""
         candidates = []
