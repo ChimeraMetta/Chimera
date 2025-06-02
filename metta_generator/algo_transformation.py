@@ -108,9 +108,9 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             
             if candidate:
                 candidates.append(candidate)
-                print(f"         ✓ Created MeTTa-reasoned {transformation_name} candidate")
+                print(f"          Created MeTTa-reasoned {transformation_name} candidate")
             else:
-                print(f"         ✗ Failed to create {transformation_name} candidate")
+                print(f"          Failed to create {transformation_name} candidate")
         
         # Clean up context reference
         self._current_context = None
@@ -137,9 +137,9 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             
             if result and result not in ["unsafe", "not-applicable", "unknown"]:
                 applicable.append(transformation)
-                print(f"            ✓ {transformation}: {result}")
+                print(f"             {transformation}: {result}")
             else:
-                print(f"            ✗ {transformation}: {result or 'not applicable'}")
+                print(f"             {transformation}: {result or 'not applicable'}")
         
         # If MeTTa doesn't find transformations, use pattern-based reasoning as fallback
         if not applicable:
@@ -204,20 +204,20 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
                         # Use pattern-based fallback with symbolic reasoning
                         if not self._symbolic_condition_check(condition_query, func_name):
                             all_satisfied = False
-                            print(f"                ✗ Failed: {condition_query}")
+                            print(f"                 Failed: {condition_query}")
                             break
                         else:
-                            print(f"                ✓ Passed (fallback): {condition_query}")
+                            print(f"                 Passed (fallback): {condition_query}")
                     else:
-                        print(f"                ✓ Passed (MeTTa): {condition_query}")
+                        print(f"                 Passed (MeTTa): {condition_query}")
                 except:
                     # Fallback to symbolic pattern-based checking
                     if not self._symbolic_condition_check(condition_query, func_name):
                         all_satisfied = False
-                        print(f"                ✗ Failed (fallback): {condition_query}")
+                        print(f"                 Failed (fallback): {condition_query}")
                         break
                     else:
-                        print(f"                ✓ Passed (fallback): {condition_query}")
+                        print(f"                 Passed (fallback): {condition_query}")
             
             return "safe" if all_satisfied else "unsafe"
             
@@ -282,7 +282,7 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             try:
                 result = self.metta_space.run(f"!({query_to_check})")
                 if result and len(result) > 0:
-                    print(f"                ✓ MeTTa result: {result}")
+                    print(f"                 MeTTa result: {result}")
                     return "applicable"
             except:
                 pass
@@ -306,7 +306,7 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             try:
                 result = self.metta_space.run(f"!({query})")
                 if result and len(result) > 0:
-                    print(f"                ✓ MeTTa pattern result: {result}")
+                    print(f"                 MeTTa pattern result: {result}")
                     return str(result[0])
             except:
                 pass

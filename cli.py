@@ -150,15 +150,15 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             logger.info("Registering specialized donor generators for fallback...")
             op_sub_gen = OperationSubstitutionGenerator()
             metta_donor_generator_instance.registry.register_generator(op_sub_gen)
-            logger.info("  ✓ OperationSubstitutionGenerator registered for fallback")
+            logger.info("   OperationSubstitutionGenerator registered for fallback")
 
             ds_adapt_gen = DataStructureAdaptationGenerator()
             metta_donor_generator_instance.registry.register_generator(ds_adapt_gen)
-            logger.info("  ✓ DataStructureAdaptationGenerator registered for fallback")
+            logger.info("   DataStructureAdaptationGenerator registered for fallback")
 
             algo_transform_gen = AlgorithmTransformationGenerator()
             metta_donor_generator_instance.registry.register_generator(algo_transform_gen)
-            logger.info("  ✓ AlgorithmTransformationGenerator registered for fallback")
+            logger.info("   AlgorithmTransformationGenerator registered for fallback")
 
             total_gens = len(metta_donor_generator_instance.registry.generators)
             supported_strats = len(metta_donor_generator_instance.registry.get_supported_strategies())
@@ -168,7 +168,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             if os.path.exists(ontology_file_path):
                 ontology_loaded = metta_donor_generator_instance.load_ontology(ontology_file_path)
                 if ontology_loaded:
-                    logger.info("  ✓ MeTTa ontology loaded successfully for fallback generator.")
+                    logger.info("   MeTTa ontology loaded successfully for fallback generator.")
                 else:
                     logger.warning("  ⚠ Fallback MeTTa ontology could not be loaded, continuing with defaults.")
             else:
@@ -768,17 +768,17 @@ def run_metta_generate_command(target_path: str):
         # Register operation substitution generator
         op_sub_generator = OperationSubstitutionGenerator()
         metta_generator.registry.register_generator(op_sub_generator)
-        logger.info("  ✓ OperationSubstitutionGenerator registered")
+        logger.info("   OperationSubstitutionGenerator registered")
         
         # Register data structure adaptation generator
         data_adapt_generator = DataStructureAdaptationGenerator()
         metta_generator.registry.register_generator(data_adapt_generator)
-        logger.info("  ✓ DataStructureAdaptationGenerator registered")
+        logger.info("   DataStructureAdaptationGenerator registered")
         
         # Register algorithm transformation generator
         algo_transform_generator = AlgorithmTransformationGenerator()
         metta_generator.registry.register_generator(algo_transform_generator)
-        logger.info("  ✓ AlgorithmTransformationGenerator registered")
+        logger.info("   AlgorithmTransformationGenerator registered")
         
         total_generators = len(metta_generator.registry.generators)
         supported_strategies = len(metta_generator.registry.get_supported_strategies())
@@ -788,7 +788,7 @@ def run_metta_generate_command(target_path: str):
         # Load ontology
         ontology_loaded = metta_generator.load_ontology(ontology_file_path)
         if ontology_loaded:
-            logger.info("  ✓ MeTTa ontology loaded successfully")
+            logger.info("   MeTTa ontology loaded successfully")
         else:
             logger.warning("  ⚠ MeTTa ontology not found, continuing with defaults")
             
@@ -816,7 +816,7 @@ def run_metta_generate_command(target_path: str):
             metta_candidates = metta_generator.generate_donors_from_function(func_source)
             
             if metta_candidates:
-                logger.info(f"  ✓ Generated {len(metta_candidates)} MeTTa donor candidates")
+                logger.info(f"   Generated {len(metta_candidates)} MeTTa donor candidates")
                 
                 # Store results with generator attribution
                 all_results[func_name] = {
@@ -841,7 +841,7 @@ def run_metta_generate_command(target_path: str):
                 
                 successful_generations += 1
             else:
-                logger.warning(f"  ✗ No MeTTa donor candidates generated for '{func_name}'")
+                logger.warning(f"   No MeTTa donor candidates generated for '{func_name}'")
                 all_results[func_name] = {
                     "function_info": func_info,
                     "candidates": [],
@@ -849,7 +849,7 @@ def run_metta_generate_command(target_path: str):
                 }
                 
         except Exception as e:
-            logger.error(f"  ✗ Error generating candidates for '{func_name}': {e}")
+            logger.error(f"   Error generating candidates for '{func_name}': {e}")
             logger.exception("Full traceback for candidate generation error:")
             all_results[func_name] = {
                 "function_info": func_info,
@@ -902,7 +902,7 @@ def run_metta_generate_command(target_path: str):
         if result["generation_success"]:
             candidates = result["candidates"]
             generators_used = set(result.get("generators_used", []))
-            logger.info(f"  ✓ {len(candidates)} candidates generated")
+            logger.info(f"   {len(candidates)} candidates generated")
             logger.info(f"  Generators used: {', '.join(generators_used)}")
             if candidates:
                 best_candidate = candidates[0]
@@ -910,9 +910,9 @@ def run_metta_generate_command(target_path: str):
                 logger.info(f"  Strategy: {best_candidate['strategy']}")
         else:
             if "error" in result:
-                logger.info(f"  ✗ Error: {result['error']}")
+                logger.info(f"   Error: {result['error']}")
             else:
-                logger.info(f"  ✗ No candidates generated")
+                logger.info(f"   No candidates generated")
 
     # Save detailed results to file with generator information
     try:
