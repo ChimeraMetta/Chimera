@@ -584,7 +584,7 @@ class ModularMettaDonorGenerator:
     def __init__(self, metta_space=None):
         from reflectors.dynamic_monitor import monitor
         
-        self.metta_space = metta_space or monitor.metta_space
+        self.metta_space = metta_space or monitor
         self.pattern_detector = PatternDetector(self.metta_space)
         self.registry = GeneratorRegistry()
         self.monitor = monitor

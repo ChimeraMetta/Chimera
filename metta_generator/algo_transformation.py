@@ -156,7 +156,6 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
                 return None
             
             # Parse and execute the MeTTa query for symbolic reasoning
-            # This uses MeTTa's symbolic logic capabilities
             if "algorithm-transformation-safe" in query:
                 return self._check_transformation_safety_with_metta(query)
             elif "algorithm-transformation-applicable" in query:
@@ -164,15 +163,42 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             elif any(pattern in query for pattern in self.pattern_detection_queries.values()):
                 return self._check_pattern_with_metta(query)
             
-            # Try direct MeTTa symbolic execution
-            try:
-                result = self.metta_space.run(f"!({query})")
-                if result and len(result) > 0:
-                    return str(result[0])
-            except Exception as e:
-                print(f"        Direct MeTTa symbolic query failed: {e}")
+            # Check if metta_space is a DynamicMonitor instance
+            if hasattr(self.metta_space, 'query') and callable(self.metta_space.query):
+                try:
+                    print(f"        Executing MeTTa query using monitor: {query}")
+                    # Use the monitor's query method
+                    query_pattern = f"(match &self {query} True)"
+                    result = self.metta_space.query(query_pattern)
+                    if result and len(result) > 0:
+                        print(f"        MeTTa query successful: {result}")
+                        return str(result[0])
+                    else:
+                        print(f"        MeTTa query returned no results")
+                        return None
+                except Exception as e:
+                    print(f"        MeTTa monitor query failed: {e}")
             
+            # Check if metta_space has a metta_space attribute (nested structure)
+            elif hasattr(self.metta_space, 'metta_space') and hasattr(self.metta_space.metta_space, 'query'):
+                try:
+                    print(f"        Executing MeTTa query using nested space: {query}")
+                    query_pattern = f"(match &self {query} True)"
+                    result = self.metta_space.metta_space.query(query_pattern)
+                    if result and len(result) > 0:
+                        print(f"        Nested MeTTa query successful: {result}")
+                        return str(result[0])
+                    else:
+                        print(f"        Nested MeTTa query returned no results")
+                        return None
+                except Exception as e:
+                    print(f"        Nested MeTTa query failed: {e}")
+            
+            # If it's a raw hyperon space, we can't easily query it
+            # Just return None to use symbolic fallback
+            print(f"        Unable to execute MeTTa query, using symbolic fallback")
             return None
+            
         except Exception as e:
             print(f"        MeTTa symbolic reasoning failed: {e}")
             return None
