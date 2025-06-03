@@ -132,6 +132,30 @@ chimera import your_atomspace.metta --overwrite # Overwrite flag is optional
 The `--overwrite` flag is optional and should be used with caution, since it will completely overwrite the current Atomspace 
 your Chimera instance is using. This is useful for resetting your environment or for ensuring parity with someone else's environment.
 
+### Generate
+
+You can ask Chimera to generate alternative implementations for functions in your Python code using MeTTa-based reasoning only (without LLMs).
+
+```sh
+chimera generate path/to/your/file.py
+```
+
+This command will parse the specified Python file, identify functions, and then employ the modular MeTTa Donor Generator to create and suggest alternative code versions. The results, including the generated Python files for each alternative and a summary report, will be saved into a `metta_generation_results` directory in your project root. If you run the command without a file path, it will use a set of predefined internal functions as a demonstration.
+
+[![Generate](./assets/generate.png)](./assets/generate.png)
+
+### Visualize (Demonstration)
+
+Chimera includes a command to visually demonstrate the donor generation and evolution process. This is primarily a tool for understanding how Chimera works internally.
+
+```sh
+chimera visualize
+```
+
+This command runs the donor generation process on a predefined example function (`find_max_in_range`). It will output logs detailing the steps, strategies used, and how candidates are evaluated. Additionally, it saves plots and detailed evolution data to an `evolution_plots` directory in your project root, allowing you to inspect the decision-making process.
+
+[![Visualize](./assets/visualize.png)](./assets/visualize.png)
+
 -- 
 
 ## Next Phase
