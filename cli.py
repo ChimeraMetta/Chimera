@@ -697,11 +697,15 @@ def run_visualize_command(target_path: str):
 
     logger.info(f"Enhanced 'visualize' command for {target_path} complete.")
 
-def run_metta_generate_command():
+def run_metta_generate_command(target_path: str = None):
     """
-    Run MeTTa donor generation using the real modular system with test functions.
+    Run MeTTa donor generation using the real modular system.
+    Uses predefined test functions if no target_path, or parses functions from target file.
     """
-    logger.info(f"Running 'generate' command using real modular MeTTa system")
+    if target_path:
+        logger.info(f"Running 'generate' command using real modular MeTTa system on file: {target_path}")
+    else:
+        logger.info(f"Running 'generate' command using real modular MeTTa system with predefined test functions")
     
     # Initialize local monitor for this command
     local_monitor = DynamicMonitor()
@@ -712,53 +716,102 @@ def run_metta_generate_command():
     else:
         local_monitor.load_metta_rules(ontology_file_path)
 
-    # Define the test functions from test_metta_gen_full.py
-    def find_max_in_range(numbers, start_idx, end_idx):
-        """Find the maximum value in a list within a specific range."""
-        if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
-            return None
-                
-        max_val = numbers[start_idx]
-        for i in range(start_idx + 1, end_idx):
-            if numbers[i] > max_val:
-                max_val = numbers[i]
-                
-        return max_val
-
-    def clean_and_normalize_text(text):
-        """Clean and normalize text input."""
-        if not text or not isinstance(text, str):
-            return ""
-                
-        # Remove extra whitespace and convert to lowercase
-        cleaned = text.strip().lower()
-                
-        # Replace multiple spaces with single space
-        import re
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-                
-        return cleaned
-
-    def calculate_moving_average(numbers, window_size):
-        """Calculate moving average with specified window size."""
-        if not numbers or window_size <= 0 or window_size > len(numbers):
-            return []
-                
-        averages = []
-        for i in range(len(numbers) - window_size + 1):
-            window_sum = sum(numbers[i:i + window_size])
-            averages.append(window_sum / window_size)
-                
-        return averages
-
-    # Test functions with descriptions
-    test_functions = [
-        ("Search Function with Real Generators", find_max_in_range),
-        ("String Processing with Real Adapters", clean_and_normalize_text),  
-        ("Numeric Calculation with Real Transformers", calculate_moving_average)
-    ]
+    # Determine which functions to process
+    test_functions = []
     
-    logger.info(f"Testing with {len(test_functions)} predefined functions from modular system")
+    if target_path:
+        # Parse functions from the target file
+        logger.info(f"Parsing functions from target file: {target_path}")
+        
+        try:
+            with open(target_path, 'r', encoding='utf-8') as source_file:
+                file_content = source_file.read()
+                tree = ast.parse(file_content, filename=target_path)
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    # Get function source code
+                    func_start_line = node.lineno - 1
+                    func_end_line = node.end_lineno if hasattr(node, 'end_lineno') else func_start_line + 10
+                    
+                    source_lines = file_content.split('\n')
+                    
+                    # Find actual end of function by looking for next function or end of file
+                    actual_end = len(source_lines)
+                    for i, line in enumerate(source_lines[func_end_line:], func_end_line):
+                        if line.strip() and not line.startswith(' ') and not line.startswith('\t'):
+                            actual_end = i
+                            break
+                    
+                    func_source = '\n'.join(source_lines[func_start_line:actual_end])
+                    
+                    # Create a description for the function
+                    description = f"Function from {os.path.basename(target_path)}"
+                    if node.args.args:
+                        params = [arg.arg for arg in node.args.args]
+                        description += f" with parameters: {', '.join(params)}"
+                    
+                    test_functions.append((description, func_source, node.name))
+                    
+            logger.info(f"Found {len(test_functions)} functions in {target_path}")
+            
+        except Exception as e:
+            logger.error(f"Error parsing Python file {target_path}: {e}")
+            logger.info("Falling back to predefined test functions")
+            target_path = None  # Fall back to predefined functions
+    
+    if not target_path or not test_functions:
+        # Use predefined test functions from test_metta_gen_full.py
+        logger.info("Using predefined test functions from modular system")
+        
+        def find_max_in_range(numbers, start_idx, end_idx):
+            """Find the maximum value in a list within a specific range."""
+            if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+                return None
+                    
+            max_val = numbers[start_idx]
+            for i in range(start_idx + 1, end_idx):
+                if numbers[i] > max_val:
+                    max_val = numbers[i]
+                    
+            return max_val
+
+        def clean_and_normalize_text(text):
+            """Clean and normalize text input."""
+            if not text or not isinstance(text, str):
+                return ""
+                    
+            # Remove extra whitespace and convert to lowercase
+            cleaned = text.strip().lower()
+                    
+            # Replace multiple spaces with single space
+            import re
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+                    
+            return cleaned
+
+        def calculate_moving_average(numbers, window_size):
+            """Calculate moving average with specified window size."""
+            if not numbers or window_size <= 0 or window_size > len(numbers):
+                return []
+                    
+            averages = []
+            for i in range(len(numbers) - window_size + 1):
+                window_sum = sum(numbers[i:i + window_size])
+                averages.append(window_sum / window_size)
+                    
+            return averages
+
+        # Convert predefined functions to the same format
+        predefined_functions = [
+            ("Search Function with Real Generators", find_max_in_range, find_max_in_range.__name__),
+            ("String Processing with Real Adapters", clean_and_normalize_text, clean_and_normalize_text.__name__),  
+            ("Numeric Calculation with Real Transformers", calculate_moving_average, calculate_moving_average.__name__)
+        ]
+        
+        test_functions = predefined_functions
+    
+    logger.info(f"Testing with {len(test_functions)} functions using real modular MeTTa system")
     
     # Initialize MeTTa donor generator with proper registry setup
     try:
@@ -812,28 +865,53 @@ def run_metta_generate_command():
         logger.exception("Full traceback for MeTTa generator initialization error:")
         return
 
-    # Process each test function
+    # Process each function
     all_results = {}
     successful_generations = 0
     best_alternatives = {}  # Store best alternative for each function
     
-    for test_name, test_func in test_functions:
-        func_name = test_func.__name__
+    for test_data in test_functions:
+        if len(test_data) == 3:
+            test_name, func_or_source, func_name = test_data
+            
+            # Handle both callable functions and source code strings
+            if callable(func_or_source):
+                func_to_process = func_or_source
+                try:
+                    import inspect
+                    func_source = inspect.getsource(func_or_source)
+                except:
+                    func_source = f"# Source not available for {func_name}"
+            else:
+                # func_or_source is already source code
+                func_source = func_or_source
+                func_to_process = func_source
+        else:
+            # Handle legacy format (test_name, func)
+            test_name, func_to_process = test_data
+            func_name = func_to_process.__name__ if callable(func_to_process) else "unknown_function"
+            try:
+                import inspect
+                func_source = inspect.getsource(func_to_process) if callable(func_to_process) else str(func_to_process)
+            except:
+                func_source = f"# Source not available for {func_name}"
         
-        logger.info(f"\nProcessing test function: {test_name}")
+        logger.info(f"\nProcessing function: {test_name}")
         logger.info(f"  Function name: {func_name}")
-        logger.info(f"  Description: {test_func.__doc__.strip() if test_func.__doc__ else 'No description'}")
+        
+        # Get description - try from docstring if callable, otherwise use test_name
+        if callable(func_to_process) and func_to_process.__doc__:
+            description = func_to_process.__doc__.strip()
+        else:
+            description = test_name
+        logger.info(f"  Description: {description}")
         
         try:
-            # Get function source code
-            import inspect
-            func_source = inspect.getsource(test_func)
-            
             # Generate MeTTa donor candidates using the real modular system
             logger.info(f"  Generating MeTTa donor candidates for '{func_name}' using real modular system...")
             
             # Use the real generation system
-            metta_candidates = metta_generator.generate_donors_from_function(test_func)
+            metta_candidates = metta_generator.generate_donors_from_function(func_to_process)
             
             if metta_candidates:
                 logger.info(f"   Generated {len(metta_candidates)} MeTTa donor candidates")
@@ -891,9 +969,12 @@ def run_metta_generate_command():
 
     # Generate enhanced summary report with generator statistics
     logger.info(f"\n" + "="*60)
-    logger.info(f"REAL MODULAR METTA DONOR GENERATION SUMMARY")
+    if target_path:
+        logger.info(f"REAL MODULAR METTA DONOR GENERATION SUMMARY (FILE: {os.path.basename(target_path)})")
+    else:
+        logger.info(f"REAL MODULAR METTA DONOR GENERATION SUMMARY (PREDEFINED FUNCTIONS)")
     logger.info(f"="*60)
-    logger.info(f"Test functions processed: {len(test_functions)}")
+    logger.info(f"Functions processed: {len(test_functions)}")
     logger.info(f"Successful generations: {successful_generations}")
     logger.info(f"Failed generations: {len(test_functions) - successful_generations}")
     
@@ -982,12 +1063,19 @@ def run_metta_generate_command():
         os.makedirs(output_dir, exist_ok=True)
         
         # Save enhanced summary report
-        summary_file = os.path.join(output_dir, f"real_modular_metta_summary.txt")
+        if target_path:
+            summary_file = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(target_path))[0]}_real_modular_metta_summary.txt")
+        else:
+            summary_file = os.path.join(output_dir, f"predefined_functions_real_modular_metta_summary.txt")
         with open(summary_file, 'w') as f:
             f.write(f"Real Modular MeTTa Donor Generation Summary\n")
             f.write(f"{'='*60}\n")
+            if target_path:
+                f.write(f"Source file: {target_path}\n")
+            else:
+                f.write(f"Source: Predefined test functions\n")
             f.write(f"Generated on: {time.ctime()}\n")
-            f.write(f"Test functions processed: {len(test_functions)}\n")
+            f.write(f"Functions processed: {len(test_functions)}\n")
             f.write(f"Successful generations: {successful_generations}\n")
             f.write(f"Total candidates: {total_candidates}\n\n")
             
