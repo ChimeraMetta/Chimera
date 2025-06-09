@@ -145,7 +145,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
         analyzer_instance_for_complexity = None # Ensure it's None for MeTTa path
         try:
             logger.info("Initializing Modular MeTTa Donor Generator for fallback...")
-            metta_donor_generator_instance = ModularMettaDonorGenerator(metta_space=local_monitor.metta_space)
+            metta_donor_generator_instance = MeTTaPoweredModularDonorGenerator(metta_space=local_monitor.metta_space)
 
             logger.info("Registering specialized donor generators for fallback...")
             op_sub_gen = OperationSubstitutionGenerator()
