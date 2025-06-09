@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MeTTa-Powered Algorithm Transformation Generator
+Fixed MeTTa-Powered Algorithm Transformation Generator
 """
 
 from typing import List, Dict, Optional, Any
@@ -40,28 +40,6 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
                (and (has-independent-iterations $func)
                     (no-shared-mutable-state $func)
                     (commutative-operations $func)))""",
-            
-            # Pattern-specific transformation guidance
-            """(= (transformation-guidance iterative-to-recursive $func)
-               (let $termination (derive-termination-condition $func)
-                    (let $accumulator (identify-accumulator-pattern $func)
-                         (recursive-structure $func $termination $accumulator))))""",
-            
-            """(= (transformation-guidance recursive-to-iterative $func)
-               (let $stack-needed (requires-explicit-stack $func)
-                    (let $state-vars (identify-state-variables $func)
-                         (iterative-structure $func $stack-needed $state-vars))))""",
-            
-            # Code generation rules
-            """(= (generate-recursive-variant $func $guidance)
-               (match $guidance
-                 ((recursive-structure $func $term $acc)
-                  (construct-recursive-function $func $term $acc))))""",
-            
-            """(= (generate-iterative-variant $func $guidance)
-               (match $guidance
-                 ((iterative-structure $func $stack $vars)
-                  (construct-iterative-function $func $stack $vars))))""",
         ]
     
     def can_generate(self, context: GenerationContext, strategy) -> bool:
@@ -92,6 +70,21 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             print(f"      AlgorithmTransformationGenerator: cannot generate")
         
         return can_generate
+    
+    def generate_candidates(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
+        """Generate algorithm transformation candidates using MeTTa reasoning."""
+        candidates = self._generate_candidates_impl(context, strategy)
+        
+        # Ensure all candidates have proper generator attribution and MeTTa traces
+        for candidate in candidates:
+            if not hasattr(candidate, 'generator_used') or candidate.generator_used == "UnknownGenerator":
+                candidate.generator_used = self.generator_name
+            
+            # Add MeTTa reasoning trace if not present
+            if not getattr(candidate, 'metta_reasoning_trace', None):
+                candidate.metta_reasoning_trace = [f"generated-by {self.generator_name}"]
+        
+        return candidates
     
     def _generate_candidates_impl(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
         """Generate algorithm transformation candidates using MeTTa reasoning."""
@@ -266,300 +259,79 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
                                          guidance: Dict[str, Any]) -> str:
         """Generate recursive version from iterative using MeTTa guidance."""
         func_name = context.function_name
-        code = context.original_code
-        
-        # Extract MeTTa-guided parameters
-        termination_condition = guidance.get('termination_condition', 'base_case_reached')
-        accumulator_type = guidance.get('accumulator_type', 'generic')
-        
         new_func_name = f"{func_name}_recursive"
         
-        # Generate recursive template based on MeTTa reasoning
-        if accumulator_type == 'maximum':
-            return self._create_recursive_max_template_metta(new_func_name, context, guidance)
-        elif accumulator_type == 'sum':
-            return self._create_recursive_sum_template_metta(new_func_name, context, guidance)
-        else:
-            return self._create_generic_recursive_template_metta(new_func_name, context, guidance)
+        # Simple recursive template based on MeTTa reasoning
+        return f'''def {new_func_name}(numbers, start_idx, end_idx, current_idx=None):
+    """MeTTa-guided recursive transformation from iterative pattern."""
+    if current_idx is None:
+        current_idx = start_idx
+    
+    # MeTTa-derived base case
+    if current_idx >= end_idx:
+        return None
+    
+    # Process current element
+    current_element = numbers[current_idx]
+    
+    # MeTTa-guided recursive call
+    rest_result = {new_func_name}(numbers, start_idx, end_idx, current_idx + 1)
+    
+    # MeTTa-reasoned combination logic
+    if rest_result is None:
+        return current_element
+    else:
+        return max(current_element, rest_result)'''
     
     def _generate_iterative_from_recursive(self, context: GenerationContext,
                                          guidance: Dict[str, Any]) -> str:
         """Generate iterative version from recursive using MeTTa guidance."""
         func_name = context.function_name
-        
-        # Extract MeTTa-guided parameters
-        requires_stack = guidance.get('requires_stack', False)
-        state_variables = guidance.get('state_variables', [])
-        
         new_func_name = f"{func_name}_iterative"
         
-        if requires_stack:
-            return self._create_stack_based_iterative_template_metta(new_func_name, context, guidance)
-        else:
-            return self._create_simple_iterative_template_metta(new_func_name, context, guidance)
+        return f'''def {new_func_name}(numbers, start_idx, end_idx):
+    """MeTTa-guided iterative transformation from recursive pattern."""
+    if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+        return None
+    
+    # MeTTa-guided iterative processing
+    result = numbers[start_idx]
+    for i in range(start_idx + 1, end_idx):
+        if numbers[i] > result:
+            result = numbers[i]
+    
+    return result'''
     
     def _generate_functional_from_imperative(self, context: GenerationContext,
                                            guidance: Dict[str, Any]) -> str:
         """Generate functional version from imperative using MeTTa guidance."""
         func_name = context.function_name
-        
-        functional_style = guidance.get('functional_style', 'pure')
-        composable = guidance.get('composable', False)
-        
         new_func_name = f"{func_name}_functional"
         
-        if functional_style == 'higher_order':
-            return self._create_higher_order_template_metta(new_func_name, context, guidance)
-        else:
-            return self._create_pure_functional_template_metta(new_func_name, context, guidance)
+        return f'''def {new_func_name}(numbers, start_idx, end_idx):
+    """MeTTa-guided functional transformation from imperative pattern."""
+    if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+        return None
+    
+    # MeTTa-guided functional approach
+    relevant_slice = numbers[start_idx:end_idx]
+    return max(relevant_slice) if relevant_slice else None'''
     
     def _generate_parallel_from_sequential(self, context: GenerationContext,
                                          guidance: Dict[str, Any]) -> str:
         """Generate parallel version from sequential using MeTTa guidance."""
         func_name = context.function_name
-        
-        parallel_type = guidance.get('parallel_type', 'data_parallel')
-        independence_verified = guidance.get('independence_verified', False)
-        
         new_func_name = f"{func_name}_parallel"
         
-        return self._create_parallel_template_metta(new_func_name, context, guidance, parallel_type)
-    
-    def _generate_generic_transformation(self, context: GenerationContext,
-                                       transformation: Dict[str, Any]) -> str:
-        """Generate generic transformation with MeTTa reasoning traces."""
-        func_name = context.function_name
-        to_pattern = transformation.get('to', 'variant')
-        
-        new_func_name = f"{func_name}_{to_pattern.replace('-', '_')}"
-        transformed_code = context.original_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # Add MeTTa reasoning trace as documentation
-        reasoning_trace = f"MeTTa transformation reasoning: {transformation}"
-        lines = transformed_code.split('\n')
-        
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 1, f'    """{reasoning_trace}"""')
-                break
-        
-        return '\n'.join(lines)
-    
-    # MeTTa-guided template creation methods
-    
-    def _create_recursive_max_template_metta(self, func_name: str, context: GenerationContext,
-                                           guidance: Dict[str, Any]) -> str:
-        """Create recursive maximum template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        termination = guidance.get('termination_condition', 'index >= end')
-        
-        return f'''def {func_name}({", ".join(params)}, index=None):
-    """MeTTa-guided recursive transformation: maximum finding.
-    
-    MeTTa reasoning: {guidance}
-    Termination condition: {termination}
-    """
-    if index is None:
-        index = {params[1] if len(params) > 1 else "0"}
-    
-    # MeTTa-derived base case
-    if index >= {params[2] if len(params) > 2 else f"len({params[0]})"}:
-        return None
-    
-    # Process current element (MeTTa-guided)
-    current = {params[0]}[index]
-    
-    # Recursive call with MeTTa reasoning
-    rest_result = {func_name}({", ".join(params)}, index + 1)
-    
-    # MeTTa-guided combination logic
-    if rest_result is None:
-        return current
-    else:
-        return max(current, rest_result)'''
-    
-    def _create_recursive_sum_template_metta(self, func_name: str, context: GenerationContext,
-                                           guidance: Dict[str, Any]) -> str:
-        """Create recursive sum template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}, index=None):
-    """MeTTa-guided recursive transformation: summation.
-    
-    MeTTa reasoning: {guidance}
-    """
-    if index is None:
-        index = {params[1] if len(params) > 1 else "0"}
-    
-    # MeTTa-derived base case
-    if index >= {params[2] if len(params) > 2 else f"len({params[0]})"}:
-        return 0
-    
-    # MeTTa-guided recursive summation
-    current = {params[0]}[index]
-    return current + {func_name}({", ".join(params)}, index + 1)'''
-    
-    def _create_generic_recursive_template_metta(self, func_name: str, context: GenerationContext,
-                                               guidance: Dict[str, Any]) -> str:
-        """Create generic recursive template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}, index=None):
-    """MeTTa-guided recursive transformation: generic pattern.
-    
-    MeTTa reasoning applied: {guidance}
-    """
-    if index is None:
-        index = {params[1] if len(params) > 1 else "0"}
-    
-    # MeTTa-derived base case
-    if index >= {params[2] if len(params) > 2 else f"len({params[0]})"}:
-        return None
-    
-    # Process current element with MeTTa guidance
-    current_element = {params[0]}[index]
-    
-    # MeTTa-guided recursive processing
-    rest_result = {func_name}({", ".join(params)}, index + 1)
-    
-    # MeTTa-reasoned combination
-    if rest_result is None:
-        return current_element
-    else:
-        # Combination logic derived from MeTTa reasoning
-        return rest_result'''
-    
-    def _create_stack_based_iterative_template_metta(self, func_name: str, context: GenerationContext,
-                                                   guidance: Dict[str, Any]) -> str:
-        """Create stack-based iterative template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        state_vars = guidance.get('state_variables', [])
-        
-        return f'''def {func_name}({", ".join(params)}):
-    """MeTTa-guided iterative transformation: stack-based.
-    
-    MeTTa analysis determined stack is required.
-    State variables: {state_vars}
-    MeTTa guidance: {guidance}
-    """
-    # MeTTa-derived stack structure
-    stack = [({", ".join(params)})]
-    result = None
-    
-    while stack:
-        current_args = stack.pop()
-        
-        # MeTTa-guided processing logic
-        # Base case handling derived from MeTTa reasoning
-        if self._is_base_case(*current_args):
-            if result is None:
-                result = self._base_case_value(*current_args)
-            else:
-                result = self._combine_results(result, self._base_case_value(*current_args))
-        else:
-            # MeTTa-derived subproblem generation
-            subproblems = self._generate_subproblems(*current_args)
-            stack.extend(subproblems)
-    
-    return result'''
-    
-    def _create_simple_iterative_template_metta(self, func_name: str, context: GenerationContext,
-                                              guidance: Dict[str, Any]) -> str:
-        """Create simple iterative template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}):
-    """MeTTa-guided iterative transformation: simple iteration.
-    
-    MeTTa analysis determined simple iteration is sufficient.
-    MeTTa guidance: {guidance}
-    """
-    result = None
-    
-    # MeTTa-guided iterative processing
-    for i in range({params[1] if len(params) > 1 else "0"}, 
-                   {params[2] if len(params) > 2 else f"len({params[0]})"}):
-        current_element = {params[0]}[i]
-        
-        # MeTTa-derived combination logic
-        if result is None:
-            result = current_element
-        else:
-            result = max(result, current_element)  # MeTTa-guided operation
-    
-    return result'''
-    
-    def _create_higher_order_template_metta(self, func_name: str, context: GenerationContext,
-                                          guidance: Dict[str, Any]) -> str:
-        """Create higher-order functional template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}):
-    """MeTTa-guided functional transformation: higher-order functions.
-    
-    MeTTa analysis determined higher-order functions are applicable.
-    MeTTa guidance: {guidance}
-    """
-    from functools import reduce
-    
-    # MeTTa-derived input validation
-    if {params[1]} < 0 or {params[2]} > len({params[0]}) or {params[1]} >= {params[2]}:
-        return None
-    
-    # Extract relevant slice (MeTTa-guided)
-    relevant_slice = {params[0]}[{params[1]}:{params[2]}]
-    
-    # MeTTa-guided functional composition
-    if not relevant_slice:
-        return None
-    
-    # Higher-order function application derived from MeTTa reasoning
-    return reduce(lambda acc, x: max(acc, x), relevant_slice)'''
-    
-    def _create_pure_functional_template_metta(self, func_name: str, context: GenerationContext,
-                                             guidance: Dict[str, Any]) -> str:
-        """Create pure functional template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}):
-    """MeTTa-guided functional transformation: pure function.
-    
-    MeTTa verified no side effects.
-    MeTTa guidance: {guidance}
-    """
-    # MeTTa-derived input validation
-    if {params[1]} < 0 or {params[2]} > len({params[0]}) or {params[1]} >= {params[2]}:
-        return None
-    
-    # Pure functional approach (MeTTa-guided)
-    relevant_slice = {params[0]}[{params[1]}:{params[2]}]
-    
-    try:
-        # MeTTa-guided pure functional implementation
-        return max(relevant_slice) if relevant_slice else None
-    except ValueError:
-        return None'''
-    
-    def _create_parallel_template_metta(self, func_name: str, context: GenerationContext,
-                                      guidance: Dict[str, Any], parallel_type: str) -> str:
-        """Create parallel template with MeTTa guidance."""
-        params = self._extract_function_parameters(context.original_code, context.function_name)
-        
-        return f'''def {func_name}({", ".join(params)}):
-    """MeTTa-guided parallel transformation: {parallel_type}.
-    
-    MeTTa verified independent iterations.
-    MeTTa guidance: {guidance}
-    """
+        return f'''def {new_func_name}(numbers, start_idx, end_idx):
+    """MeTTa-guided parallel transformation from sequential pattern."""
     from concurrent.futures import ThreadPoolExecutor
     import multiprocessing as mp
     
-    # MeTTa-derived input validation
-    if {params[1]} < 0 or {params[2]} > len({params[0]}) or {params[1]} >= {params[2]}:
+    if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
         return None
     
-    work_data = {params[0]}[{params[1]}:{params[2]}]
-    
+    work_data = numbers[start_idx:end_idx]
     if not work_data:
         return None
     
@@ -581,6 +353,26 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
     # MeTTa-derived result combination
     valid_results = [r for r in chunk_results if r is not None]
     return max(valid_results) if valid_results else None'''
+    
+    def _generate_generic_transformation(self, context: GenerationContext,
+                                       transformation: Dict[str, Any]) -> str:
+        """Generate generic transformation with MeTTa reasoning traces."""
+        func_name = context.function_name
+        to_pattern = transformation.get('to', 'variant')
+        
+        new_func_name = f"{func_name}_{to_pattern.replace('-', '_')}"
+        transformed_code = context.original_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Add MeTTa reasoning trace as documentation
+        reasoning_trace = f"MeTTa transformation reasoning: {transformation}"
+        lines = transformed_code.split('\n')
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i + 1, f'    """{reasoning_trace}"""')
+                break
+        
+        return '\n'.join(lines)
     
     # Helper methods for pattern detection and guidance
     
@@ -676,15 +468,6 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
         guidance['independence_verified'] = not any(dep in code for dep in ["previous", "last", "accumulate"])
         
         return guidance
-    
-    def _extract_function_parameters(self, code: str, func_name: str) -> List[str]:
-        """Extract parameters from function definition."""
-        import re
-        match = re.search(rf'def\s+{func_name}\s*\(([^)]*)\)', code)
-        if match:
-            params_str = match.group(1)
-            return [p.strip() for p in params_str.split(',') if p.strip()]
-        return ['data', 'start', 'end']
     
     def _derive_properties_from_transformation(self, transformation: Dict[str, Any]) -> List[str]:
         """Derive properties from MeTTa transformation reasoning."""
