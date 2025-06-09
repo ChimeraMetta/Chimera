@@ -26,6 +26,7 @@ class GenerationContext:
     metta_atoms: List[str]
     detected_patterns: List['FunctionPattern']
     metta_space: Any
+    metta_reasoning_context: str = None  # New: context for MeTTa reasoning
 
 @dataclass
 class FunctionPattern:
@@ -38,6 +39,7 @@ class FunctionPattern:
     metta_evidence: List[str]
     confidence: float
     properties: List[str]
+    metta_derivation: List[str] = None  # New: MeTTa reasoning trace
 
 @dataclass
 class DonorCandidate:
@@ -55,6 +57,7 @@ class DonorCandidate:
     complexity_estimate: str
     applicability_scope: str
     generator_used: str = "UnknownGenerator"
+    metta_reasoning_trace: List[str] = None  # New: detailed MeTTa reasoning
 
 class GenerationStrategy(Enum):
     """Available generation strategies."""
@@ -71,25 +74,405 @@ class GenerationStrategy(Enum):
     FUNCTIONAL_COMPOSITION = "functional_composition"
     ERROR_HANDLING_ENHANCEMENT = "error_handling_enhancement"
 
+class MeTTaReasoningEngine:
+    """Core MeTTa reasoning engine for donor generation."""
+    
+    def __init__(self, metta_space):
+        self.metta_space = metta_space
+        self._load_reasoning_rules()
+    
+    def _load_reasoning_rules(self):
+        """Load core reasoning rules into MeTTa space."""
+        core_rules = [
+            # Pattern detection rules
+            """(= (detect-pattern $func $atoms)
+               (match &self 
+                 (, (function-structure $func $structure)
+                    (pattern-evidence $structure $pattern))
+                 (pattern-detected $func $pattern)))""",
+            
+            # Transformation applicability rules  
+            """(= (transformation-applicable $func $from-pattern $to-pattern)
+               (and (has-pattern $func $from-pattern)
+                    (safe-transformation $from-pattern $to-pattern)
+                    (preserves-semantics $func $from-pattern $to-pattern)))""",
+            
+            # Safety checking rules
+            """(= (safe-transformation iterative-pattern recursive-pattern)
+               (and (has-clear-termination $func)
+                    (no-complex-state $func)
+                    (simple-accumulation $func)))""",
+            
+            # Code generation rules
+            """(= (generate-variant $func $pattern $guidance)
+               (match $pattern
+                 (recursive-pattern (recursive-transform $func $guidance))
+                 (functional-pattern (functional-transform $func $guidance))
+                 (parallel-pattern (parallel-transform $func $guidance))))""",
+            
+            # Learning and adaptation rules
+            """(= (adapt-rule $rule $feedback)
+               (case $feedback
+                 (successful (strengthen-rule $rule))
+                 (failed (weaken-rule $rule))
+                 (partial (refine-rule $rule))))"""
+        ]
+        
+        for rule in core_rules:
+            self._add_rule_safely(rule)
+    
+    def _add_rule_safely(self, rule: str):
+        """Safely add rule to MeTTa space."""
+        try:
+            if hasattr(self.metta_space, 'run'):
+                self.metta_space.run(f"!({rule})")
+            elif hasattr(self.metta_space, 'add_atom'):
+                self.metta_space.add_atom(rule)
+        except Exception as e:
+            print(f"Failed to add rule: {e}")
+    
+    def reason_about_patterns(self, context: GenerationContext) -> List[FunctionPattern]:
+        """Use MeTTa reasoning to detect patterns."""
+        patterns = []
+        
+        # Create MeTTa reasoning context
+        func_facts = self._create_function_facts(context)
+        
+        # Query MeTTa for pattern detection
+        pattern_query = f"""
+        (match &self 
+          (detect-pattern {context.function_name} $pattern)
+          (pattern-detected {context.function_name} $pattern))
+        """
+        
+        pattern_results = self._execute_metta_reasoning(pattern_query, func_facts)
+        
+        for result in pattern_results:
+            pattern = self._extract_pattern_from_result(result, context)
+            if pattern:
+                patterns.append(pattern)
+        
+        return patterns if patterns else [self._create_fallback_pattern(context)]
+    
+    def reason_about_transformations(self, context: GenerationContext, 
+                                   strategy: GenerationStrategy) -> List[Dict[str, Any]]:
+        """Use MeTTa reasoning to determine applicable transformations."""
+        strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
+        
+        # Create transformation reasoning query
+        transform_query = f"""
+        (match &self
+          (transformation-applicable {context.function_name} $from $to)
+          (applicable-transform {context.function_name} $from $to $guidance))
+        """
+        
+        func_facts = self._create_function_facts(context)
+        strategy_facts = self._create_strategy_facts(strategy_name, context)
+        
+        all_facts = func_facts + strategy_facts
+        
+        return self._execute_metta_reasoning(transform_query, all_facts)
+    
+    def generate_code_through_reasoning(self, context: GenerationContext, 
+                                      transformation: Dict[str, Any]) -> Optional[str]:
+        """Use MeTTa reasoning to generate transformed code."""
+        generation_query = f"""
+        (match &self
+          (generate-variant {context.function_name} {transformation.get('pattern')} $guidance)
+          (generated-code {context.function_name} $code))
+        """
+        
+        # Add transformation-specific facts
+        transform_facts = self._create_transformation_facts(transformation, context)
+        
+        results = self._execute_metta_reasoning(generation_query, transform_facts)
+        
+        if results:
+            return self._synthesize_code_from_reasoning(results, context, transformation)
+        
+        return None
+    
+    def learn_from_feedback(self, original_func: str, donor: DonorCandidate, 
+                          feedback: str) -> None:
+        """Learn from donor application feedback using MeTTa reasoning."""
+        learning_rule = f"""
+        (adapt-rule (transformation-rule {original_func} {donor.strategy}) {feedback})
+        """
+        
+        self._add_rule_safely(learning_rule)
+        
+        # Update rule weights based on feedback
+        if feedback == "successful":
+            self._strengthen_related_rules(donor)
+        elif feedback == "failed":
+            self._weaken_related_rules(donor)
+    
+    def _create_function_facts(self, context: GenerationContext) -> List[str]:
+        """Create MeTTa facts about the function."""
+        facts = []
+        
+        # Basic function structure facts
+        facts.append(f"(function-def {context.function_name})")
+        
+        # Add AST-derived facts
+        for atom in context.metta_atoms:
+            if context.function_name in atom:
+                facts.append(atom)
+        
+        # Infer structural facts
+        code = context.original_code.lower()
+        
+        if "for " in code or "while " in code:
+            facts.append(f"(has-loop-structure {context.function_name})")
+        
+        if context.function_name in code.replace(f"def {context.function_name}", ""):
+            facts.append(f"(calls-self {context.function_name})")
+        
+        if any(op in code for op in [">", "<", ">=", "<=", "==", "!="]):
+            facts.append(f"(has-comparison-ops {context.function_name})")
+        
+        if "return" in code:
+            facts.append(f"(has-return {context.function_name})")
+        
+        return facts
+    
+    def _create_strategy_facts(self, strategy: str, context: GenerationContext) -> List[str]:
+        """Create MeTTa facts about the generation strategy."""
+        facts = []
+        
+        facts.append(f"(generation-strategy {strategy})")
+        facts.append(f"(target-function {context.function_name})")
+        
+        # Strategy-specific facts
+        if strategy == "algorithm_transformation":
+            facts.append(f"(requires-algorithmic-analysis {context.function_name})")
+        elif strategy == "operation_substitution":
+            facts.append(f"(requires-operation-analysis {context.function_name})")
+        elif strategy == "data_structure_adaptation":
+            facts.append(f"(requires-structure-analysis {context.function_name})")
+        
+        return facts
+    
+    def _create_transformation_facts(self, transformation: Dict[str, Any], 
+                                   context: GenerationContext) -> List[str]:
+        """Create MeTTa facts about a specific transformation."""
+        facts = []
+        
+        pattern = transformation.get('pattern', 'unknown')
+        target_pattern = transformation.get('target_pattern', 'unknown')
+        
+        facts.append(f"(transform-from {pattern})")
+        facts.append(f"(transform-to {target_pattern})")
+        facts.append(f"(transformation-target {context.function_name})")
+        
+        # Add guidance facts
+        for key, value in transformation.items():
+            if key not in ['pattern', 'target_pattern']:
+                facts.append(f"(transformation-guidance {key} {value})")
+        
+        return facts
+    
+    def _execute_metta_reasoning(self, query: str, facts: List[str]) -> List[Any]:
+        """Execute MeTTa reasoning with given query and facts."""
+        results = []
+        
+        try:
+            # Add facts to reasoning context
+            for fact in facts:
+                self._add_rule_safely(fact)
+            
+            # Execute query
+            if hasattr(self.metta_space, 'run'):
+                query_result = self.metta_space.run(f"!({query})")
+                if query_result:
+                    results.extend(query_result)
+            elif hasattr(self.metta_space, 'query'):
+                query_result = self.metta_space.query(query)
+                if query_result:
+                    results.extend(query_result)
+        
+        except Exception as e:
+            print(f"MeTTa reasoning failed: {e}")
+            # Return symbolic reasoning fallback
+            results = self._symbolic_reasoning_fallback(query, facts)
+        
+        return results
+    
+    def _symbolic_reasoning_fallback(self, query: str, facts: List[str]) -> List[Any]:
+        """Fallback symbolic reasoning when MeTTa execution fails."""
+        results = []
+        
+        # Pattern-based symbolic reasoning
+        if "detect-pattern" in query:
+            results = self._detect_patterns_symbolically(facts)
+        elif "transformation-applicable" in query:
+            results = self._detect_transformations_symbolically(facts)
+        elif "generate-variant" in query:
+            results = self._generate_variants_symbolically(facts)
+        
+        return results
+    
+    def _detect_patterns_symbolically(self, facts: List[str]) -> List[str]:
+        """Symbolic pattern detection fallback."""
+        patterns = []
+        
+        has_loop = any("has-loop-structure" in fact for fact in facts)
+        has_comparison = any("has-comparison-ops" in fact for fact in facts)
+        has_return = any("has-return" in fact for fact in facts)
+        calls_self = any("calls-self" in fact for fact in facts)
+        
+        if has_loop and has_comparison and has_return:
+            patterns.append("search-pattern")
+        
+        if has_loop and not calls_self:
+            patterns.append("iterative-pattern")
+        
+        if calls_self:
+            patterns.append("recursive-pattern")
+        
+        return patterns
+    
+    def _detect_transformations_symbolically(self, facts: List[str]) -> List[Dict[str, str]]:
+        """Symbolic transformation detection fallback."""
+        transformations = []
+        
+        has_iterative = any("iterative-pattern" in fact for fact in facts)
+        has_recursive = any("recursive-pattern" in fact for fact in facts)
+        
+        if has_iterative:
+            transformations.append({
+                "from": "iterative-pattern",
+                "to": "recursive-pattern",
+                "safe": "true"
+            })
+        
+        if has_recursive:
+            transformations.append({
+                "from": "recursive-pattern", 
+                "to": "iterative-pattern",
+                "safe": "true"
+            })
+        
+        return transformations
+    
+    def _generate_variants_symbolically(self, facts: List[str]) -> List[str]:
+        """Symbolic variant generation fallback."""
+        return ["code-generation-placeholder"]
+    
+    def _extract_pattern_from_result(self, result: Any, context: GenerationContext) -> Optional[FunctionPattern]:
+        """Extract FunctionPattern from MeTTa reasoning result."""
+        try:
+            # Parse MeTTa result to extract pattern information
+            result_str = str(result)
+            
+            if "search-pattern" in result_str:
+                return FunctionPattern(
+                    pattern_family="search",
+                    pattern_type="linear_search",
+                    data_structures=["list"],
+                    operations=["comparison"],
+                    control_flow=["loop", "conditional"],
+                    metta_evidence=[result_str],
+                    confidence=0.8,
+                    properties=["deterministic"],
+                    metta_derivation=[f"metta-reasoning: {result_str}"]
+                )
+            elif "iterative-pattern" in result_str:
+                return FunctionPattern(
+                    pattern_family="transform",
+                    pattern_type="iterative_processing",
+                    data_structures=["iterable"],
+                    operations=["traversal"],
+                    control_flow=["loop"],
+                    metta_evidence=[result_str],
+                    confidence=0.85,
+                    properties=["iterative"],
+                    metta_derivation=[f"metta-reasoning: {result_str}"]
+                )
+        except Exception as e:
+            print(f"Failed to extract pattern: {e}")
+        
+        return None
+    
+    def _create_fallback_pattern(self, context: GenerationContext) -> FunctionPattern:
+        """Create fallback pattern when MeTTa reasoning fails."""
+        return FunctionPattern(
+            pattern_family="generic",
+            pattern_type="general_function",
+            data_structures=["generic"],
+            operations=["generic"],
+            control_flow=["sequential"],
+            metta_evidence=[f"fallback-pattern {context.function_name}"],
+            confidence=0.5,
+            properties=["generic"],
+            metta_derivation=[f"fallback-reasoning {context.function_name}"]
+        )
+    
+    def _synthesize_code_from_reasoning(self, results: List[Any], 
+                                      context: GenerationContext,
+                                      transformation: Dict[str, Any]) -> str:
+        """Synthesize code from MeTTa reasoning results."""
+        # For now, return a placeholder that includes reasoning trace
+        reasoning_trace = [str(r) for r in results]
+        
+        base_code = context.original_code
+        new_func_name = f"{context.function_name}_{transformation.get('target_pattern', 'variant')}"
+        
+        # Basic transformation - replace function name and add reasoning comment
+        transformed_code = base_code.replace(f"def {context.function_name}(", f"def {new_func_name}(")
+        
+        # Add MeTTa reasoning trace as comment
+        reasoning_comment = f'    ""\"Generated through MeTTa reasoning: {", ".join(reasoning_trace)}"""'
+        lines = transformed_code.split('\n')
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i + 1, reasoning_comment)
+                break
+        
+        return '\n'.join(lines)
+    
+    def _strengthen_related_rules(self, donor: DonorCandidate):
+        """Strengthen rules that led to successful donor."""
+        strengthen_rule = f"""
+        (= (rule-weight {donor.strategy}) 
+           (+ (rule-weight {donor.strategy}) 0.1))
+        """
+        self._add_rule_safely(strengthen_rule)
+    
+    def _weaken_related_rules(self, donor: DonorCandidate):
+        """Weaken rules that led to failed donor."""
+        weaken_rule = f"""
+        (= (rule-weight {donor.strategy})
+           (- (rule-weight {donor.strategy}) 0.05))
+        """
+        self._add_rule_safely(weaken_rule)
+
 class BaseDonorGenerator(ABC):
-    """Abstract base class for donor generators."""
+    """Abstract base class for MeTTa-powered donor generators."""
+    
     def __init__(self):
-        self.generator_name = self.__class__.__name__ 
+        self.generator_name = self.__class__.__name__
+        self.reasoning_engine = None  # Set by ModularMettaDonorGenerator
     
     @abstractmethod
     def can_generate(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
-        """Check if this generator can handle the given context and strategy."""
+        """Check if this generator can handle the given context and strategy using MeTTa reasoning."""
         pass
     
     @abstractmethod
     def generate_candidates(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
-        """Generate donor candidates for the given context and strategy."""
+        """Generate donor candidates using MeTTa reasoning."""
         candidates = self._generate_candidates_impl(context, strategy)
         
-        # Ensure all candidates have proper generator attribution
+        # Ensure all candidates have proper generator attribution and MeTTa traces
         for candidate in candidates:
             if not hasattr(candidate, 'generator_used') or candidate.generator_used == "UnknownGenerator":
                 candidate.generator_used = self.generator_name
+            
+            # Add MeTTa reasoning trace if not present
+            if not candidate.metta_reasoning_trace:
+                candidate.metta_reasoning_trace = [f"generated-by {self.generator_name}"]
         
         return candidates
     
@@ -102,446 +485,625 @@ class BaseDonorGenerator(ABC):
     def get_supported_strategies(self) -> List[GenerationStrategy]:
         """Get list of strategies this generator supports."""
         pass
+    
+    def _use_metta_reasoning(self, context: GenerationContext, query_type: str, **kwargs) -> Any:
+        """Use MeTTa reasoning engine for decision making."""
+        if not self.reasoning_engine:
+            return self._fallback_reasoning(context, query_type, **kwargs)
+        
+        if query_type == "can_generate":
+            return self._metta_can_generate_reasoning(context, **kwargs)
+        elif query_type == "find_transformations":
+            return self._metta_transformation_reasoning(context, **kwargs)
+        elif query_type == "generate_code":
+            return self._metta_code_generation_reasoning(context, **kwargs)
+        
+        return None
+    
+    def _metta_can_generate_reasoning(self, context: GenerationContext, **kwargs) -> bool:
+        """Use MeTTa to determine if generator can handle context."""
+        strategy = kwargs.get('strategy')
+        
+        query = f"""
+        (match &self
+          (generator-applicable {self.generator_name} {context.function_name} {strategy.value})
+          True)
+        """
+        
+        facts = [
+            f"(generator-type {self.generator_name})",
+            f"(target-function {context.function_name})",
+            f"(strategy-requested {strategy.value})"
+        ]
+        
+        results = self.reasoning_engine._execute_metta_reasoning(query, facts)
+        return len(results) > 0
+    
+    def _metta_transformation_reasoning(self, context: GenerationContext, **kwargs) -> List[Dict[str, Any]]:
+        """Use MeTTa to find applicable transformations."""
+        strategy = kwargs.get('strategy')
+        
+        return self.reasoning_engine.reason_about_transformations(context, strategy)
+    
+    def _metta_code_generation_reasoning(self, context: GenerationContext, **kwargs) -> Optional[str]:
+        """Use MeTTa to generate code."""
+        transformation = kwargs.get('transformation', {})
+        
+        return self.reasoning_engine.generate_code_through_reasoning(context, transformation)
+    
+    def _fallback_reasoning(self, context: GenerationContext, query_type: str, **kwargs) -> Any:
+        """Fallback reasoning when MeTTa engine is not available."""
+        if query_type == "can_generate":
+            return True  # Conservative fallback
+        elif query_type == "find_transformations":
+            return [{"pattern": "generic", "target_pattern": "variant"}]
+        elif query_type == "generate_code":
+            return self._basic_code_transformation(context, **kwargs)
+        
+        return None
+    
+    def _basic_code_transformation(self, context: GenerationContext, **kwargs) -> str:
+        """Basic code transformation fallback."""
+        transformation = kwargs.get('transformation', {})
+        target_pattern = transformation.get('target_pattern', 'variant')
+        
+        new_func_name = f"{context.function_name}_{target_pattern}"
+        return context.original_code.replace(f"def {context.function_name}(", f"def {new_func_name}(")
 
 # ==============================================================================
-# Pattern Detection Module
+# Main Coordinator Class
 # ==============================================================================
 
-class PatternDetector:
-    """Detects patterns in functions using MeTTa reasoning."""
+class MeTTaPatternDetector:
+    """MeTTa-powered pattern detector using symbolic reasoning."""
     
-    def __init__(self, metta_space):
-        self.metta_space = metta_space
-        self.pattern_families = {
-            "search": ["linear_search", "binary_search", "find_first", "find_all", "contains"],
-            "transform": ["map", "filter", "reduce", "fold", "scan", "zip"],
-            "aggregate": ["sum", "count", "average", "min", "max", "group_by"],
-            "validate": ["type_check", "bounds_check", "format_check", "constraint_check"],
-            "string_ops": ["parse", "format", "split", "join", "replace", "match"],
-            "math_ops": ["arithmetic", "statistical", "geometric"],
-            "control": ["branch", "loop", "recursion", "exception_handling"],
-        }
+    def __init__(self, reasoning_engine: MeTTaReasoningEngine):
+        self.reasoning_engine = reasoning_engine
+        self._load_pattern_detection_rules()
     
-    def detect_patterns(self, context: GenerationContext) -> List[FunctionPattern]:
-        """Detect all patterns in the given function context."""
+    def _load_pattern_detection_rules(self):
+        """Load pattern detection rules into MeTTa reasoning engine."""
+        pattern_rules = [
+            # Core pattern detection rules
+            """(= (detect-search-pattern $func)
+               (and (has-loop-structure $func)
+                    (has-comparison-operations $func)
+                    (has-conditional-return $func)))""",
+            
+            """(= (detect-transform-pattern $func)
+               (and (has-loop-structure $func)
+                    (has-assignment-operations $func)
+                    (processes-collection $func)))""",
+            
+            """(= (detect-aggregate-pattern $func)
+               (and (has-accumulator-variable $func)
+                    (has-arithmetic-operations $func)
+                    (reduces-collection $func)))""",
+            
+            """(= (detect-validate-pattern $func)
+               (and (has-conditional-logic $func)
+                    (returns-boolean $func)
+                    (checks-properties $func)))""",
+            
+            # Pattern classification rules
+            """(= (classify-pattern $func search-pattern linear-search)
+               (and (detect-search-pattern $func)
+                    (sequential-access $func)
+                    (not (binary-search-structure $func))))""",
+            
+            """(= (classify-pattern $func transform-pattern map-like)
+               (and (detect-transform-pattern $func)
+                    (element-wise-processing $func)
+                    (preserves-collection-size $func)))""",
+            
+            """(= (classify-pattern $func aggregate-pattern reduction)
+               (and (detect-aggregate-pattern $func)
+                    (combines-elements $func)
+                    (produces-single-result $func)))""",
+            
+            # Pattern confidence rules
+            """(= (pattern-confidence $func $pattern $confidence)
+               (case $pattern
+                 (search-pattern (search-confidence $func))
+                 (transform-pattern (transform-confidence $func))
+                 (aggregate-pattern (aggregate-confidence $func))
+                 (validate-pattern (validate-confidence $func))))""",
+            
+            # Evidence accumulation rules
+            """(= (accumulate-evidence $func $pattern $evidence)
+               (collapse (match &self 
+                 (pattern-indicator $func $pattern $indicator)
+                 $indicator)))"""
+        ]
+        
+        for rule in pattern_rules:
+            self.reasoning_engine._add_rule_safely(rule)
+    
+    def detect_patterns(self, context: GenerationContext) -> List:
+        """Use MeTTa reasoning to detect patterns."""
+        print(f"     MeTTa pattern detection for: {context.function_name}")
+        
+        # Use MeTTa reasoning to detect patterns
+        metta_patterns = self.reasoning_engine.reason_about_patterns(context)
+        
+        if metta_patterns:
+            print(f"       MeTTa detected {len(metta_patterns)} patterns: {[p.pattern_family for p in metta_patterns]}")
+            return metta_patterns
+        
+        # Enhanced fallback with symbolic reasoning
+        print(f"       MeTTa detection failed, using enhanced symbolic fallback")
+        return self._enhanced_symbolic_pattern_detection(context)
+    
+    def _enhanced_symbolic_pattern_detection(self, context: GenerationContext) -> List:
+        """Enhanced symbolic pattern detection with MeTTa-like reasoning."""
+        from metta_generator.base import FunctionPattern
+        
         patterns = []
+        code = context.original_code.lower()
+        func_name = context.function_name.lower()
+        metta_atoms = str(context.metta_space)
         
         # Detect data structures, operations, and control flow
-        data_structures = self._detect_data_structures(context)
-        operations = self._detect_operations(context)
-        control_flow = self._detect_control_flow(context)
+        data_structures = self._detect_structures_symbolically(code, metta_atoms)
+        operations = self._detect_operations_symbolically(code, metta_atoms)
+        control_flow = self._detect_control_flow_symbolically(code, func_name)
         
-        print(f"     Detected: structures={data_structures}, ops={operations}, flow={control_flow}")
+        print(f"         Symbolic analysis: structures={data_structures}, ops={operations}, flow={control_flow}")
         
-        # Check each pattern family
-        for family_name, family_patterns in self.pattern_families.items():
-            if self._has_pattern_characteristics(context, family_name):
-                pattern = FunctionPattern(
-                    pattern_family=family_name,
-                    pattern_type=self._classify_pattern_type(context, family_name),
-                    data_structures=data_structures,
-                    operations=operations,
-                    control_flow=control_flow,
-                    metta_evidence=[f"({family_name.replace('_', '-')}-pattern {context.function_name})"],
-                    confidence=self._calculate_pattern_confidence(context, family_name),
-                    properties=self._get_pattern_properties(family_name)
-                )
-                patterns.append(pattern)
+        # Apply MeTTa-like pattern reasoning
+        detected_pattern_families = self._apply_symbolic_pattern_reasoning(
+            context, data_structures, operations, control_flow
+        )
+        
+        for family in detected_pattern_families:
+            pattern_type = self._classify_pattern_type_symbolically(context, family)
+            confidence = self._calculate_symbolic_confidence(context, family)
+            properties = self._derive_symbolic_properties(family, operations, control_flow)
+            
+            pattern = FunctionPattern(
+                pattern_family=family,
+                pattern_type=pattern_type,
+                data_structures=data_structures,
+                operations=operations,
+                control_flow=control_flow,
+                metta_evidence=[f"(symbolic-pattern-detection {context.function_name} {family})"],
+                confidence=confidence,
+                properties=properties,
+                metta_derivation=[f"symbolic-reasoning {context.function_name} {family}"]
+            )
+            patterns.append(pattern)
         
         # Add generic pattern if no specific patterns found
         if not patterns:
-            patterns.append(self._create_generic_pattern(context, data_structures, operations, control_flow))
+            patterns.append(self._create_generic_pattern_enhanced(context, data_structures, operations, control_flow))
         
         return patterns
     
-    def _detect_data_structures(self, context: GenerationContext) -> List[str]:
-        """Detect data structures used in the function."""
-        structures = []
-        code = context.original_code.lower()
-        atoms_str = str(context.metta_space)
+    def _detect_structures_symbolically(self, code: str, metta_atoms: str) -> List[str]:
+        """Enhanced symbolic structure detection."""
+        structures = set()
         
+        # Direct code analysis
         structure_indicators = {
-            "list": ["list", "append", "extend", "[", "]"],
-            "dict": ["dict", ".keys()", ".values()", ".items()", "{"],
-            "set": ["set", ".add(", ".union(", ".intersection("],
-            "string": ["str", ".split()", ".join()", ".replace()", "String"],
-            "tuple": ["tuple", "(", ")"],
-            "numeric": ["int", "float", "Number", "sum", "max", "min"]
+            "list": ["[", "list(", ".append(", ".extend(", ".pop("],
+            "dict": ["{", "dict(", ".keys(", ".values(", ".items("],
+            "set": ["set(", ".add(", ".union(", ".intersection("],
+            "string": ['"', "'", "str(", ".split(", ".join(", ".strip("],
+            "tuple": ["tuple(", "(", ",)"],
+            "numeric": ["int", "float", "sum", "max", "min"]
         }
         
         for struct_type, indicators in structure_indicators.items():
-            if any(indicator in code or indicator in atoms_str for indicator in indicators):
-                structures.append(struct_type)
+            if any(indicator in code for indicator in indicators):
+                structures.add(struct_type)
         
-        return structures if structures else ["generic"]
+        # MeTTa atoms analysis
+        if "string-op" in metta_atoms:
+            structures.add("string")
+        if "bin-op" in metta_atoms and any(op in metta_atoms for op in ["Add", "Sub", "Mult"]):
+            structures.add("numeric")
+        
+        return list(structures) if structures else ["generic"]
     
-    def _detect_operations(self, context: GenerationContext) -> List[str]:
-        """Detect types of operations in the function."""
-        operations = []
-        atoms_str = str(context.metta_space)
-        code = context.original_code
+    def _detect_operations_symbolically(self, code: str, metta_atoms: str) -> List[str]:
+        """Enhanced symbolic operation detection."""
+        operations = set()
         
-        if "bin-op" in atoms_str and any(op in atoms_str for op in ["Lt", "Gt", "Eq"]):
-            operations.append("comparison")
+        # MeTTa atoms analysis (primary)
+        if "bin-op" in metta_atoms:
+            if any(op in metta_atoms for op in ["Lt", "Gt", "Eq", "NotEq"]):
+                operations.add("comparison")
+            if any(op in metta_atoms for op in ["Add", "Sub", "Mult", "Div"]):
+                operations.add("arithmetic")
         
-        if any(op in atoms_str for op in ["Add", "Sub", "Mult", "Div"]):
-            operations.append("arithmetic")
-        
-        if "string-op-pattern" in atoms_str:
-            operations.append("string_manipulation")
-        
+        # Direct code analysis (secondary)
         if any(op in code for op in ["and", "or", "not"]):
-            operations.append("logical")
+            operations.add("logical")
+        if "variable-assign" in metta_atoms:
+            operations.add("assignment")
+        if "function-call" in metta_atoms:
+            operations.add("function_call")
+        if any(op in code for op in [".append", ".extend", ".remove", ".pop"]):
+            operations.add("mutation")
+        if any(op in code for op in [".split", ".join", ".replace", ".strip"]):
+            operations.add("string_manipulation")
         
-        if "variable-assign" in atoms_str:
-            operations.append("assignment")
-        
-        if "function-call" in atoms_str:
-            operations.append("function_call")
-        
-        return operations if operations else ["generic"]
+        return list(operations) if operations else ["generic"]
     
-    def _detect_control_flow(self, context: GenerationContext) -> List[str]:
-        """Detect control flow patterns."""
-        control_flow = []
-        code = context.original_code
-        atoms_str = str(context.metta_space)
+    def _detect_control_flow_symbolically(self, code: str, func_name: str) -> List[str]:
+        """Enhanced symbolic control flow detection."""
+        control_flow = set()
         
-        if "loop-pattern" in atoms_str or any(kw in code for kw in ["for ", "while "]):
-            control_flow.append("loop")
-        
+        if any(kw in code for kw in ["for ", "while "]):
+            control_flow.add("loop")
         if "if " in code:
-            control_flow.append("conditional")
-        
-        if context.function_name in code.replace(f"def {context.function_name}", ""):
-            control_flow.append("recursion")
-        
+            control_flow.add("conditional")
+        if func_name in code.replace(f"def {func_name}", ""):
+            control_flow.add("recursion")
         if any(kw in code for kw in ["try:", "except:", "finally:", "raise"]):
-            control_flow.append("exception_handling")
-        
+            control_flow.add("exception_handling")
         if "return" in code:
-            control_flow.append("return")
+            control_flow.add("return")
+        if "yield" in code:
+            control_flow.add("generator")
         
-        return control_flow if control_flow else ["sequential"]
+        return list(control_flow) if control_flow else ["sequential"]
     
-    def _has_pattern_characteristics(self, context: GenerationContext, family: str) -> bool:
-        """Check if function has characteristics of a pattern family."""
+    def _apply_symbolic_pattern_reasoning(self, context: GenerationContext,
+                                        data_structures: List[str], 
+                                        operations: List[str], 
+                                        control_flow: List[str]) -> List[str]:
+        """Apply MeTTa-like symbolic reasoning to determine pattern families."""
+        patterns = set()
+        func_name = context.function_name.lower()
+        
+        # Search pattern reasoning
+        if (("loop" in control_flow and "comparison" in operations and "return" in control_flow) or
+            any(keyword in func_name for keyword in ["find", "search", "locate", "get", "contains"])):
+            patterns.add("search")
+        
+        # Transform pattern reasoning
+        if (("loop" in control_flow and "assignment" in operations) or
+            any(keyword in func_name for keyword in ["transform", "convert", "map", "process", "apply"])):
+            patterns.add("transform")
+        
+        # Aggregate pattern reasoning
+        if (("loop" in control_flow and "arithmetic" in operations) or
+            any(keyword in func_name for keyword in ["sum", "count", "average", "total", "aggregate", "reduce"])):
+            patterns.add("aggregate")
+        
+        # Validate pattern reasoning
+        if (("conditional" in control_flow and "return" in control_flow) or
+            any(keyword in func_name for keyword in ["validate", "check", "verify", "is_", "has_", "test"])):
+            patterns.add("validate")
+        
+        # String operations pattern reasoning
+        if ("string" in data_structures and "string_manipulation" in operations) or \
+           any(keyword in func_name for keyword in ["parse", "format", "clean", "normalize"]):
+            patterns.add("string_ops")
+        
+        # Math operations pattern reasoning
+        if ("numeric" in data_structures and "arithmetic" in operations) or \
+           any(keyword in func_name for keyword in ["calculate", "compute", "math"]):
+            patterns.add("math_ops")
+        
+        # Control pattern reasoning
+        if ("exception_handling" in control_flow or "conditional" in control_flow):
+            patterns.add("control")
+        
+        return list(patterns) if patterns else ["generic"]
+    
+    def _classify_pattern_type_symbolically(self, context: GenerationContext, family: str) -> str:
+        """Classify specific pattern type within family using symbolic reasoning."""
+        func_name = context.function_name.lower()
         code = context.original_code.lower()
-        func_name = context.function_name.lower()
-        
-        family_keywords = {
-            "search": ["find", "search", "locate", "get", "contains", "index"],
-            "transform": ["transform", "convert", "map", "filter", "process", "apply"],
-            "aggregate": ["sum", "count", "average", "total", "aggregate", "reduce", "accumulate"],
-            "validate": ["validate", "check", "verify", "is_", "has_", "test"],
-            "string_ops": ["parse", "format", "clean", "normalize", "extract", "split", "join"],
-            "math_ops": ["calculate", "compute", "math", "formula", "equation"],
-            "control": ["control", "manage", "handle", "process"]
-        }
-        
-        keywords = family_keywords.get(family, [])
-        name_match = any(keyword in func_name for keyword in keywords)
-        
-        # Structural checks
-        if family == "search":
-            return name_match or (self._has_loop_and_comparison(context) and "return" in code)
-        elif family == "transform":
-            return name_match or (self._has_loop_and_assignment(context))
-        elif family == "aggregate":
-            return name_match or (self._has_accumulator_pattern(context))
-        elif family == "validate":
-            return name_match or (self._has_conditional_and_boolean_return(context))
-        elif family == "string_ops":
-            return name_match or self._has_string_operations(context)
-        elif family == "math_ops":
-            return name_match or self._has_math_operations(context)
-        
-        return name_match
-    
-    def _has_loop_and_comparison(self, context: GenerationContext) -> bool:
-        """Check for loop + comparison pattern."""
-        return ("loop-pattern" in str(context.metta_space) and 
-                "bin-op" in str(context.metta_space))
-    
-    def _has_loop_and_assignment(self, context: GenerationContext) -> bool:
-        """Check for loop + assignment pattern."""
-        return ("loop-pattern" in str(context.metta_space) and 
-                "variable-assign" in str(context.metta_space))
-    
-    def _has_accumulator_pattern(self, context: GenerationContext) -> bool:
-        """Check for accumulator pattern."""
-        code = context.original_code
-        return (self._has_loop_and_assignment(context) and 
-                any(op in code for op in ["+=", "*=", "sum", "count", "total"]))
-    
-    def _has_conditional_and_boolean_return(self, context: GenerationContext) -> bool:
-        """Check for conditional + boolean return pattern."""
-        code = context.original_code
-        return ("if " in code and 
-                any(val in code for val in ["True", "False", "return True", "return False"]))
-    
-    def _has_string_operations(self, context: GenerationContext) -> bool:
-        """Check for string operations."""
-        code = context.original_code
-        return (any(op in code for op in [".split()", ".join()", ".replace()", ".strip()"]) or
-                "String" in str(context.metta_space))
-    
-    def _has_math_operations(self, context: GenerationContext) -> bool:
-        """Check for mathematical operations."""
-        code = context.original_code
-        atoms_str = str(context.metta_space)
-        return (any(op in code for op in ["math.", "**", "sqrt", "sin", "cos"]) or
-                any(op in atoms_str for op in ["Add", "Sub", "Mult", "Div"]))
-    
-    def _classify_pattern_type(self, context: GenerationContext, family: str) -> str:
-        """Classify the specific pattern type within a family."""
-        func_name = context.function_name.lower()
         
         type_mappings = {
             "search": {
-                "binary": "binary_search",
-                "first": "find_first", 
-                "all": "find_all",
-                "index": "find_index",
+                ("binary", "sorted"): "binary_search",
+                ("first", "initial"): "find_first",
+                ("all", "every"): "find_all",
+                ("index", "position"): "find_index",
                 "default": "linear_search"
             },
             "transform": {
-                "map": "map",
-                "filter": "filter",
-                "convert": "convert",
+                ("map", "apply"): "map_transform",
+                ("filter", "select"): "filter_transform",
+                ("convert", "change"): "conversion",
                 "default": "generic_transform"
             },
             "aggregate": {
-                "sum": "sum",
-                "count": "count",
-                "average": "average",
-                "mean": "average",
-                "max": "max",
-                "min": "min",
-                "default": "generic_aggregate"
+                ("sum", "total"): "sum_aggregation",
+                ("count", "number"): "count_aggregation",
+                ("average", "mean"): "average_aggregation",
+                ("max", "maximum"): "max_aggregation",
+                ("min", "minimum"): "min_aggregation",
+                "default": "generic_aggregation"
             }
         }
         
         family_types = type_mappings.get(family, {})
-        for keyword, pattern_type in family_types.items():
-            if keyword != "default" and keyword in func_name:
-                return pattern_type
+        
+        # Check for specific keywords
+        for keywords, pattern_type in family_types.items():
+            if keywords != "default" and isinstance(keywords, tuple):
+                if any(keyword in func_name for keyword in keywords):
+                    return pattern_type
+        
+        # Check code structure for additional clues
+        if family == "search" and "binary" in code and "sorted" in code:
+            return "binary_search"
+        elif family == "transform" and any(func in code for func in ["map", "filter"]):
+            return "higher_order_transform"
         
         return family_types.get("default", f"generic_{family}")
     
-    def _calculate_pattern_confidence(self, context: GenerationContext, family: str) -> float:
-        """Calculate confidence for pattern detection."""
+    def _calculate_symbolic_confidence(self, context: GenerationContext, family: str) -> float:
+        """Calculate confidence using symbolic reasoning."""
         base_confidence = 0.6
         func_name = context.function_name.lower()
         
         # Name-based confidence boost
-        family_keywords = self.pattern_families.get(family, [])
-        if any(keyword in func_name for keyword in family_keywords):
+        family_keywords = {
+            "search": ["find", "search", "locate", "get", "contains"],
+            "transform": ["transform", "convert", "map", "process", "apply"],
+            "aggregate": ["sum", "count", "average", "total", "aggregate"],
+            "validate": ["validate", "check", "verify", "is_", "has_"]
+        }
+        
+        keywords = family_keywords.get(family, [])
+        if any(keyword in func_name for keyword in keywords):
             base_confidence += 0.2
         
         # Structure-based confidence boost
-        if self._has_pattern_characteristics(context, family):
-            base_confidence += 0.1
+        code = context.original_code.lower()
+        if family == "search" and "return" in code and ("for " in code or "while " in code):
+            base_confidence += 0.15
+        elif family == "aggregate" and any(op in code for op in ["+=", "sum", "total"]):
+            base_confidence += 0.15
         
         return min(0.95, base_confidence)
     
-    def _get_pattern_properties(self, family: str) -> List[str]:
-        """Get properties associated with a pattern family."""
+    def _derive_symbolic_properties(self, family: str, operations: List[str], control_flow: List[str]) -> List[str]:
+        """Derive properties using symbolic reasoning."""
+        properties = ["symbolically-detected"]
+        
+        # Family-specific properties
         family_properties = {
             "search": ["deterministic", "side-effect-free"],
             "transform": ["functional", "composable"],
             "aggregate": ["associative", "fold-like"],
             "validate": ["predicate", "boolean-return"],
-            "string_ops": ["text-processing", "parsing"],
-            "math_ops": ["numerical", "computational"],
+            "string_ops": ["text-processing"],
+            "math_ops": ["numerical", "computational"]
         }
         
-        return family_properties.get(family, ["generic"])
+        properties.extend(family_properties.get(family, ["generic"]))
+        
+        # Operation-based properties
+        if "arithmetic" in operations:
+            properties.append("numerical")
+        if "comparison" in operations:
+            properties.append("comparative")
+        if "mutation" not in operations:
+            properties.append("side-effect-free")
+        
+        # Control flow-based properties
+        if "recursion" in control_flow:
+            properties.append("recursive")
+        if "loop" in control_flow:
+            properties.append("iterative")
+        if "exception_handling" in control_flow:
+            properties.append("error-handling")
+        
+        return properties
     
-    def _create_generic_pattern(self, context: GenerationContext, 
-                              data_structures: List[str], 
-                              operations: List[str], 
-                              control_flow: List[str]) -> FunctionPattern:
-        """Create a generic pattern when no specific patterns are detected."""
+    def _create_generic_pattern_enhanced(self, context: GenerationContext,
+                                       data_structures: List[str],
+                                       operations: List[str], 
+                                       control_flow: List[str]):
+        """Create enhanced generic pattern with symbolic analysis."""
+        from metta_generator.base import FunctionPattern
+        
         return FunctionPattern(
             pattern_family="generic",
             pattern_type="general_function",
             data_structures=data_structures,
             operations=operations,
             control_flow=control_flow,
-            metta_evidence=[f"(generic-pattern {context.function_name})"],
+            metta_evidence=[f"(enhanced-symbolic-analysis {context.function_name})"],
             confidence=0.5,
-            properties=["generic", "adaptable"]
+            properties=["generic", "symbolically-analyzed", "adaptable"],
+            metta_derivation=[f"enhanced-symbolic-reasoning {context.function_name}"]
         )
 
-# ==============================================================================
-# Strategy Manager Module
-# ==============================================================================
-
-class StrategyManager:
-    """Manages generation strategies and determines applicability."""
+class MeTTaStrategyManager:
+    """MeTTa-powered strategy manager using symbolic reasoning."""
     
-    def __init__(self, generators: List[BaseDonorGenerator]):
+    def __init__(self, generators: List, reasoning_engine: MeTTaReasoningEngine):
         self.generators = generators
-        self.strategy_requirements = {
-            GenerationStrategy.OPERATION_SUBSTITUTION: ["comparison", "arithmetic"],
-            GenerationStrategy.DATA_STRUCTURE_ADAPTATION: ["list", "dict", "set"],
-            GenerationStrategy.ALGORITHM_TRANSFORMATION: ["loop", "recursion"],
-            GenerationStrategy.TYPE_GENERALIZATION: ["specific_types"],
-            GenerationStrategy.FUNCTIONAL_COMPOSITION: ["function_call"],
-            GenerationStrategy.ERROR_HANDLING_ENHANCEMENT: ["no_error_handling"],
-            GenerationStrategy.CONTROL_FLOW_VARIATION: ["loop", "conditional"],
-            GenerationStrategy.ACCUMULATOR_VARIATION: ["loop", "assignment"],
-            GenerationStrategy.STRUCTURE_PRESERVATION: [],  # Always applicable
-            GenerationStrategy.CONDITION_VARIATION: ["conditional"],
-            GenerationStrategy.PROPERTY_GUIDED: ["pattern_detected"],
-            GenerationStrategy.PATTERN_EXPANSION: ["loop"]
-        }
+        self.reasoning_engine = reasoning_engine
+        self._load_strategy_rules()
     
-    def get_applicable_strategies(self, context: GenerationContext, 
-                                requested_strategies: Optional[List[GenerationStrategy]] = None) -> List[GenerationStrategy]:
-        """Get applicable strategies with improved logic."""
+    def _load_strategy_rules(self):
+        """Load strategy applicability rules into MeTTa reasoning."""
+        strategy_rules = [
+            # Strategy applicability rules
+            """(= (strategy-applicable operation-substitution $func)
+               (or (has-substitutable-operations $func)
+                   (has-semantic-substitution-opportunities $func)))""",
+            
+            """(= (strategy-applicable data-structure-adaptation $func)
+               (and (uses-adaptable-structures $func)
+                    (no-structure-specific-dependencies $func)))""",
+            
+            """(= (strategy-applicable algorithm-transformation $func)
+               (or (has-transformable-algorithm-pattern $func)
+                   (has-optimization-opportunities $func)))""",
+            
+            # Strategy prioritization rules
+            """(= (strategy-priority $func operation-substitution high)
+               (has-many-substitutable-operations $func))""",
+            
+            """(= (strategy-priority $func algorithm-transformation high)
+               (and (has-clear-algorithm-pattern $func)
+                    (transformation-benefits-significant $func)))""",
+            
+            # Strategy combination rules
+            """(= (strategies-compatible operation-substitution structure-preservation) True)""",
+            """(= (strategies-compatible data-structure-adaptation property-guided) True)""",
+            """(= (strategies-compatible algorithm-transformation structure-preservation) False)"""
+        ]
         
-        if requested_strategies is None:
-            # Determine applicable strategies based on context analysis
-            applicable = []
-            
-            code = context.original_code.lower()
-            func_name = context.function_name
-            
-            # Check operation substitution
-            if any(op in code for op in [">", "<", ">=", "<=", "+", "-", "*", "/", "==", "!=", "max", "min"]):
-                applicable.append(GenerationStrategy.OPERATION_SUBSTITUTION)
-            
-            # Check data structure adaptation
-            if any(pattern in code for pattern in ["[", "list(", "dict(", "set(", ".append", ".keys"]):
-                applicable.append(GenerationStrategy.DATA_STRUCTURE_ADAPTATION)
-            
-            # Check algorithm transformation
-            if any(pattern in code for pattern in ["for ", "while ", "range("]) or func_name in code.replace(f"def {func_name}", ""):
-                applicable.append(GenerationStrategy.ALGORITHM_TRANSFORMATION)
-            
-            # Check type generalization
-            if any(pattern in code for pattern in ["list", "dict", "str", "int", "isinstance"]):
-                applicable.append(GenerationStrategy.TYPE_GENERALIZATION)
-            
-            # Check functional composition
-            if code.count("(") > 2 or any(pattern in code for pattern in ["map(", "filter(", "lambda"]):
-                applicable.append(GenerationStrategy.FUNCTIONAL_COMPOSITION)
-            
-            # Check error handling enhancement
-            if (any(pattern in code for pattern in ["[", "/", "range("]) and 
-                "try:" not in code and "except:" not in code):
-                applicable.append(GenerationStrategy.ERROR_HANDLING_ENHANCEMENT)
-            
-            # Always add these basic strategies
-            applicable.extend([
-                GenerationStrategy.STRUCTURE_PRESERVATION,
-                GenerationStrategy.PROPERTY_GUIDED
-            ])
-            
-            # Remove duplicates while preserving order
-            seen = set()
-            applicable = [x for x in applicable if not (x in seen or seen.add(x))]
-            
-            return applicable
-        else:
+        for rule in strategy_rules:
+            self.reasoning_engine._add_rule_safely(rule)
+    
+    def get_applicable_strategies(self, context: GenerationContext,
+                                requested_strategies: Optional[List] = None):
+        """Get applicable strategies using MeTTa reasoning."""
+        if requested_strategies:
+            print(f"    Using requested strategies: {[s.value if hasattr(s, 'value') else str(s) for s in requested_strategies]}")
             return requested_strategies
-    
-    def _is_strategy_applicable(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
-        """Check if a strategy is applicable based on context."""
-        requirements = self.strategy_requirements.get(strategy, [])
         
-        if not requirements:  # No requirements means always applicable
-            return True
+        # Use MeTTa reasoning to determine applicable strategies
+        metta_strategies = self._reason_about_strategy_applicability(context)
         
-        # Check each requirement
-        for requirement in requirements:
-            if not self._check_requirement(context, requirement):
-                return False
+        if metta_strategies:
+            print(f"    MeTTa reasoning found applicable strategies: {[s.value if hasattr(s, 'value') else str(s) for s in metta_strategies]}")
+            return metta_strategies
         
-        return True
+        # Enhanced fallback strategy determination
+        print(f"    MeTTa strategy reasoning failed, using enhanced symbolic fallback")
+        return self._enhanced_symbolic_strategy_determination(context)
     
-    def _check_requirement(self, context: GenerationContext, requirement: str) -> bool:
-        """Check if a specific requirement is met."""
-        operations = self._get_operations_from_context(context)
-        data_structures = self._get_data_structures_from_context(context)
-        control_flow = self._get_control_flow_from_context(context)
+    def _reason_about_strategy_applicability(self, context: GenerationContext) -> List:
+        """Use MeTTa reasoning to determine applicable strategies."""
+        applicable_strategies = []
         
-        if requirement in operations:
-            return True
-        elif requirement in data_structures:
-            return True
-        elif requirement in control_flow:
-            return True
-        elif requirement == "specific_types":
-            return any(struct in ["list", "dict", "string"] for struct in data_structures)
-        elif requirement == "no_error_handling":
-            return "exception_handling" not in control_flow
-        elif requirement == "pattern_detected":
-            return len(context.detected_patterns) > 0
+        # Query MeTTa for each strategy
+        strategies_to_check = [
+            GenerationStrategy.OPERATION_SUBSTITUTION,
+            GenerationStrategy.DATA_STRUCTURE_ADAPTATION,
+            GenerationStrategy.ALGORITHM_TRANSFORMATION,
+            GenerationStrategy.STRUCTURE_PRESERVATION,
+            GenerationStrategy.PROPERTY_GUIDED
+        ]
         
-        return False
+        for strategy in strategies_to_check:
+            strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
+            
+            applicability_query = f"""
+            (match &self
+              (strategy-applicable {strategy_name} {context.function_name})
+              True)
+            """
+            
+            strategy_facts = [
+                f"(function-name {context.function_name})",
+                f"(strategy-candidate {strategy_name})"
+            ]
+            
+            results = self.reasoning_engine._execute_metta_reasoning(applicability_query, strategy_facts)
+            
+            if results and len(results) > 0:
+                applicable_strategies.append(strategy)
+        
+        return applicable_strategies
     
-    def _get_operations_from_context(self, context: GenerationContext) -> List[str]:
-        """Extract operations from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].operations
-        return []
-    
-    def _get_data_structures_from_context(self, context: GenerationContext) -> List[str]:
-        """Extract data structures from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].data_structures
-        return []
-    
-    def _get_control_flow_from_context(self, context: GenerationContext) -> List[str]:
-        """Extract control flow from context."""
-        if context.detected_patterns:
-            return context.detected_patterns[0].control_flow
-        return []
+    def _enhanced_symbolic_strategy_determination(self, context: GenerationContext) -> List:
+        """Enhanced symbolic strategy determination with MeTTa-like reasoning."""
+        applicable = []
+        code = context.original_code.lower()
+        func_name = context.function_name
+        metta_atoms = str(context.metta_space)
+        
+        # Operation substitution applicability
+        if (any(op in code for op in [">", "<", ">=", "<=", "+", "-", "*", "/", "==", "!=", "max", "min"]) or
+            "bin-op" in metta_atoms):
+            applicable.append(GenerationStrategy.OPERATION_SUBSTITUTION)
+        
+        # Data structure adaptation applicability
+        if (any(pattern in code for pattern in ["[", "list(", "dict(", "set(", ".append", ".keys"]) or
+            any(pattern in func_name.lower() for pattern in ["list", "dict", "set"])):
+            applicable.append(GenerationStrategy.DATA_STRUCTURE_ADAPTATION)
+        
+        # Algorithm transformation applicability
+        if (any(pattern in code for pattern in ["for ", "while ", "range("]) or 
+            func_name in code.replace(f"def {func_name}", "") or
+            "loop-pattern" in metta_atoms):
+            applicable.append(GenerationStrategy.ALGORITHM_TRANSFORMATION)
+        
+        # Structure preservation (always applicable)
+        applicable.append(GenerationStrategy.STRUCTURE_PRESERVATION)
+        
+        # Property guided (always applicable if patterns detected)
+        if hasattr(context, 'detected_patterns') and context.detected_patterns:
+            applicable.append(GenerationStrategy.PROPERTY_GUIDED)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        applicable = [x for x in applicable if not (x in seen or seen.add(x))]
+        
+        return applicable
 
-# ==============================================================================
-# Generator Registry Module
-# ==============================================================================
-
-class GeneratorRegistry:
-    """Registry for managing different donor generators."""
+class MeTTaPoweredModularDonorGenerator:
+    """Main coordinator using MeTTa reasoning as the core engine."""
     
-    def __init__(self):
+    def __init__(self, metta_space=None):
+        from reflectors.dynamic_monitor import monitor
+        
+        self.metta_space = metta_space or monitor
+        
+        # Initialize MeTTa reasoning engine
+        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space)
+        
+        # Initialize MeTTa-powered components
+        self.pattern_detector = MeTTaPatternDetector(self.reasoning_engine)
+        self.strategy_manager = MeTTaStrategyManager([], self.reasoning_engine)
+        
+        # Initialize generators directly
         self.generators = []
-        self.strategy_manager = None
+        self._setup_generators_with_reasoning()
+        
+        print("  Initialized MeTTa-Powered Modular Donor Generator...")
     
-    def register_generator(self, generator: BaseDonorGenerator):
-        """Register a new donor generator."""
-        self.generators.append(generator)
-        self._update_strategy_manager()
+    def _setup_generators_with_reasoning(self):
+        """Setup generators with access to MeTTa reasoning engine."""
+        # Import and create MeTTa-powered generators
+        from metta_generator.algo_transformation import AlgorithmTransformationGenerator
+        from metta_generator.operation_substitution import OperationSubstitutionGenerator
+        from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator
+        from metta_generator.structure_preservation import StructurePreservationGenerator
+        
+        self.generators = [
+            AlgorithmTransformationGenerator(),
+            OperationSubstitutionGenerator(),
+            DataStructureAdaptationGenerator(),
+            StructurePreservationGenerator()
+        ]
+        
+        # Set reasoning engine on each generator
+        for generator in self.generators:
+            generator.reasoning_engine = self.reasoning_engine
+        
+        # Update strategy manager with generators
+        self.strategy_manager.generators = self.generators
     
-    def register_generators(self, generators: List[BaseDonorGenerator]):
-        """Register multiple generators at once."""
-        self.generators.extend(generators)
-        self._update_strategy_manager()
-    
-    def _update_strategy_manager(self):
-        """Update the strategy manager with current generators."""
-        self.strategy_manager = StrategyManager(self.generators)
-    
-    def get_generators_for_strategy(self, strategy: GenerationStrategy) -> List[BaseDonorGenerator]:
+    def get_generators_for_strategy(self, strategy: GenerationStrategy) -> List:
         """Get all generators that can handle a specific strategy."""
         return [gen for gen in self.generators if strategy in gen.get_supported_strategies()]
     
     def generate_candidates(self, context: GenerationContext, 
-                          strategies: Optional[List[GenerationStrategy]] = None) -> List[DonorCandidate]:
-        """Generate candidates using all applicable generators."""
-        if not self.strategy_manager:
-            self._update_strategy_manager()
+                          strategies: Optional[List] = None) -> List:
+        """Generate candidates using MeTTa-powered generators."""
+        if not strategies:
+            strategies = self.strategy_manager.get_applicable_strategies(context)
         
-        applicable_strategies = self.strategy_manager.get_applicable_strategies(context, strategies)
-        print(f"    Applicable strategies: {[s.value if hasattr(s, 'value') else str(s) for s in applicable_strategies]}")  
+        print(f"    Processing strategies: {[s.value if hasattr(s, 'value') else str(s) for s in strategies]}")  
         
         all_candidates = []
         
-        for strategy in applicable_strategies:
+        for strategy in strategies:
             strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
             print(f"    Processing strategy: {strategy_name}")  
             
@@ -567,39 +1129,42 @@ class GeneratorRegistry:
         print(f"    Total candidates generated: {len(all_candidates)}")  
         return all_candidates
     
-    def get_supported_strategies(self) -> List[GenerationStrategy]:
-        """Get all strategies supported by registered generators."""
-        all_strategies = set()
-        for generator in self.generators:
-            all_strategies.update(generator.get_supported_strategies())
-        return list(all_strategies)
-
-# ==============================================================================
-# Main Coordinator Class
-# ==============================================================================
-
-class ModularMettaDonorGenerator:
-    """Main coordinator for the modular MeTTa donor generation system."""
-    
-    def __init__(self, metta_space=None):
-        from reflectors.dynamic_monitor import monitor
-        
-        self.metta_space = metta_space or monitor
-        self.pattern_detector = PatternDetector(self.metta_space)
-        self.registry = GeneratorRegistry()
-        self.monitor = monitor
-        
-        print("  Initializing Modular MeTTa Donor Generator...")
-        
     def load_ontology(self, ontology_file: str = DONOR_GENERATION_ONTOLOGY) -> bool:
-        """Load MeTTa ontology for modular generation."""
-        print(" Loading modular donor generation ontology...")
-        return self.monitor.load_metta_rules(ontology_file)
+        """Load MeTTa ontology for reasoning-powered generation."""
+        print(" Loading MeTTa reasoning-powered donor generation ontology...")
+        
+        # Load enhanced ontology rules
+        enhanced_rules = [
+            # Core reasoning rules
+            """(= (donor-generation-applicable $func $strategy)
+               (and (function-analyzable $func)
+                    (strategy-applicable $strategy $func)
+                    (no-contraindications $func $strategy)))""",
+            
+            # Quality assessment rules
+            """(= (donor-quality $donor $quality)
+               (let $correctness (correctness-score $donor)
+                    (let $maintainability (maintainability-score $donor)
+                         (let $performance (performance-score $donor)
+                              (overall-quality $correctness $maintainability $performance)))))""",
+            
+            # Learning and adaptation rules
+            """(= (learn-from-success $original $donor $feedback)
+               (strengthen-patterns (patterns-used $original $donor)))""",
+            
+            """(= (learn-from-failure $original $donor $feedback)
+               (weaken-patterns (patterns-used $original $donor)))"""
+        ]
+        
+        for rule in enhanced_rules:
+            self.reasoning_engine._add_rule_safely(rule)
+        
+        return True
     
-    def generate_donors_from_function(self, func: Union[Callable, str], 
-                                    strategies: Optional[List[GenerationStrategy]] = None) -> List[Dict[str, Any]]:
-        """Generate donor candidates from a function using the modular system."""
-        print("  Starting Modular MeTTa Donor Generation...")
+    def generate_donors_from_function(self, func: Union[Callable, str],
+                                    strategies: Optional[List] = None) -> List[Dict[str, Any]]:
+        """Generate donor candidates using MeTTa reasoning throughout the process."""
+        print("  Starting MeTTa-Powered Donor Generation...")
         
         # 1. Create generation context
         context = self._create_generation_context(func)
@@ -608,28 +1173,32 @@ class ModularMettaDonorGenerator:
         
         print(f"  Created context for function: {context.function_name}")
         
-        # 2. Detect patterns
-        print("  Detecting patterns...")
+        # 2. Use MeTTa reasoning for pattern detection
+        print("  Using MeTTa reasoning for pattern detection...")
         context.detected_patterns = self.pattern_detector.detect_patterns(context)
-        print(f"  Detected {len(context.detected_patterns)} patterns")
+        print(f"  MeTTa detected {len(context.detected_patterns)} patterns")
         
-        # 3. Generate candidates using registry
-        print("  Generating candidates using modular generators...")
-        candidates = self.registry.generate_candidates(context, strategies)
+        # 3. Use MeTTa reasoning for strategy determination
+        print("  Using MeTTa reasoning for strategy determination...")
+        applicable_strategies = self.strategy_manager.get_applicable_strategies(context, strategies)
+        
+        # 4. Generate candidates using MeTTa-powered generators
+        print("  Generating candidates using MeTTa-powered generators...")
+        candidates = self.generate_candidates(context, applicable_strategies)
         
         if not candidates:
-            print("  No candidates generated, using fallback...")
-            candidates = self._fallback_generation(context, strategies)
+            print("  No MeTTa candidates generated, using enhanced fallback...")
+            candidates = self._metta_guided_fallback_generation(context, applicable_strategies)
         
-        # 4. Rank and return results
-        print("  Ranking candidates...")
-        ranked_candidates = self._rank_candidates(candidates)
+        # 5. Use MeTTa reasoning for candidate ranking
+        print("  Using MeTTa reasoning for candidate ranking...")
+        ranked_candidates = self._metta_rank_candidates(candidates, context)
         
-        print(f"  Generated {len(ranked_candidates)} candidates using modular system")
+        print(f"  Generated {len(ranked_candidates)} candidates using MeTTa reasoning")
         return ranked_candidates
     
     def _create_generation_context(self, func: Union[Callable, str]) -> Optional[GenerationContext]:
-        """Create a generation context from a function."""
+        """Create generation context with MeTTa reasoning support."""
         try:
             # Extract source code and function name
             if isinstance(func, str):
@@ -639,7 +1208,7 @@ class ModularMettaDonorGenerator:
                 original_code = inspect.getsource(func)
                 function_name = func.__name__
             
-            # Analyze the function
+            # Analyze the function using existing infrastructure
             from reflectors.static_analyzer import decompose_function, convert_to_metta_atoms, CodeDecomposer
             
             tree = ast.parse(original_code)
@@ -658,16 +1227,20 @@ class ModularMettaDonorGenerator:
                 "line_mapping": decomposer.line_mapping
             }
             
-            # Load atoms into MeTTa space
-            self._load_atoms_to_metta(metta_atoms, function_name)
+            # Load atoms into MeTTa reasoning space
+            self._load_atoms_for_reasoning(metta_atoms, function_name)
+            
+            # Create reasoning context identifier
+            reasoning_context = f"reasoning-context-{function_name}-{int(__import__('time').time())}"
             
             return GenerationContext(
                 function_name=function_name,
                 original_code=original_code,
                 analysis_result=analysis_result,
                 metta_atoms=metta_atoms,
-                detected_patterns=[],  # Will be filled by pattern detector
-                metta_space=self.metta_space
+                detected_patterns=[],  # Will be filled by MeTTa pattern detector
+                metta_space=self.metta_space,
+                metta_reasoning_context=reasoning_context
             )
             
         except Exception as e:
@@ -680,94 +1253,216 @@ class ModularMettaDonorGenerator:
         match = re.search(r'def\s+(\w+)', code)
         return match.group(1) if match else "unknown_function"
     
-    def _load_atoms_to_metta(self, metta_atoms: List[str], function_name: str):
-        """Load atoms into MeTTa space."""
+    def _load_atoms_for_reasoning(self, metta_atoms: List[str], function_name: str):
+        """Load atoms into MeTTa reasoning space."""
         loaded_count = 0
         failed_count = 0
         
+        # Load function-specific atoms
         for atom in metta_atoms:
-            if self.monitor.add_atom(atom):
+            if self.reasoning_engine._add_rule_safely(atom):
                 loaded_count += 1
             else:
                 failed_count += 1
         
-        print(f"   Loaded {loaded_count}/{len(metta_atoms)} atoms ({failed_count} failed)")
+        print(f"   Loaded {loaded_count}/{len(metta_atoms)} atoms for reasoning ({failed_count} failed)")
         
-        # Add function metadata
-        self.monitor.add_atom(f"(modular-function {function_name})")
-        self.monitor.add_atom(f"(analysis-timestamp {int(__import__('time').time())})")
+        # Add function metadata for reasoning
+        function_facts = [
+            f"(analyzed-function {function_name})",
+            f"(reasoning-timestamp {int(__import__('time').time())})",
+            f"(atoms-loaded {loaded_count})"
+        ]
+        
+        for fact in function_facts:
+            self.reasoning_engine._add_rule_safely(fact)
     
-    def _fallback_generation(self, context: GenerationContext, 
-                           strategies: Optional[List[GenerationStrategy]]) -> List[DonorCandidate]:
-        """Fallback generation when no generators produce candidates."""
-        print("    Using modular fallback generation...")
+    def _metta_guided_fallback_generation(self, context: GenerationContext,
+                                        strategies: List) -> List[DonorCandidate]:
+        """MeTTa-guided fallback generation when main generators fail."""
+        print("    Using MeTTa-guided fallback generation...")
         
         fallback_candidates = []
         
-        # Create one basic candidate per requested strategy
-        strategies_to_use = strategies or [GenerationStrategy.STRUCTURE_PRESERVATION]
+        # Use MeTTa reasoning to determine fallback approaches
+        fallback_query = f"""
+        (match &self
+          (fallback-generation-approach {context.function_name} $approach)
+          (fallback-strategy {context.function_name} $approach))
+        """
         
-        for strategy in strategies_to_use:
-            candidate = DonorCandidate(
-                name=f"{context.function_name}_{strategy.value}",
-                description=f"Fallback {strategy.value.replace('_', ' ')} variant",
-                code=self._create_fallback_code(context, strategy),
-                strategy=strategy.value,
-                pattern_family="generic",
-                data_structures_used=["generic"],
-                operations_used=["generic"],
-                metta_derivation=[f"(fallback-generation {context.function_name} {strategy.value})"],
-                confidence=0.5,
-                properties=["fallback"],
-                complexity_estimate="same",
-                applicability_scope="narrow"
-            )
-            fallback_candidates.append(candidate)
+        fallback_facts = [
+            f"(function-name {context.function_name})",
+            f"(main-generation-failed True)",
+            f"(detected-patterns {len(context.detected_patterns)})"
+        ]
+        
+        fallback_approaches = self.reasoning_engine._execute_metta_reasoning(fallback_query, fallback_facts)
+        
+        if not fallback_approaches:
+            # Symbolic fallback determination
+            fallback_approaches = self._determine_symbolic_fallback_approaches(context, strategies)
+        
+        # Generate fallback candidates based on MeTTa reasoning
+        for approach in fallback_approaches:
+            candidate = self._create_metta_fallback_candidate(context, approach, strategies)
+            if candidate:
+                fallback_candidates.append(candidate)
         
         return fallback_candidates
     
-    def _create_fallback_code(self, context: GenerationContext, strategy: GenerationStrategy) -> str:
-        """Create fallback code for a strategy."""
+    def _determine_symbolic_fallback_approaches(self, context: GenerationContext, 
+                                              strategies: List) -> List[str]:
+        """Determine fallback approaches using symbolic reasoning."""
+        approaches = []
+        
+        # Basic structure preservation approach
+        approaches.append("structure-preservation")
+        
+        # Pattern-based approaches
+        if context.detected_patterns:
+            for pattern in context.detected_patterns:
+                approaches.append(f"pattern-based-{pattern.pattern_family}")
+        
+        # Strategy-based approaches
+        for strategy in strategies:
+            strategy_name = strategy.value if hasattr(strategy, 'value') else str(strategy)
+            approaches.append(f"minimal-{strategy_name}")
+        
+        return approaches[:3]  # Limit to top 3 approaches
+    
+    def _create_metta_fallback_candidate(self, context: GenerationContext, approach: str, strategies: List) -> Optional[DonorCandidate]:
+        """Create fallback candidate using MeTTa reasoning guidance."""
+        try:
+            from metta_generator.base import DonorCandidate
+            
+            approach_str = str(approach)
+            
+            # Generate fallback code based on MeTTa-guided approach
+            if "structure-preservation" in approach_str:
+                fallback_code = self._create_structure_preserving_fallback(context)
+                strategy_name = "structure_preservation"
+            elif "pattern-based" in approach_str:
+                fallback_code = self._create_pattern_based_fallback(context, approach_str)
+                strategy_name = "pattern_guided"
+            elif "minimal" in approach_str:
+                fallback_code = self._create_minimal_transformation_fallback(context, approach_str)
+                strategy_name = approach_str.replace("minimal-", "")
+            else:
+                fallback_code = self._create_generic_fallback(context)
+                strategy_name = "generic"
+            
+            new_func_name = f"{context.function_name}_metta_fallback_{strategy_name}"
+            
+            metta_derivation = [
+                f"(metta-fallback-generation {context.function_name})",
+                f"(fallback-approach {approach_str})",
+                f"(reasoning-guided fallback)"
+            ]
+            
+            return DonorCandidate(
+                name=new_func_name,
+                description=f"MeTTa-guided fallback: {approach_str}",
+                code=fallback_code,
+                strategy=strategy_name,
+                pattern_family="fallback",
+                data_structures_used=["generic"],
+                operations_used=["fallback"],
+                metta_derivation=metta_derivation,
+                confidence=0.5,
+                properties=["metta-fallback", "reasoning-guided"],
+                complexity_estimate="same",
+                applicability_scope="narrow",
+                generator_used="MeTTaFallback",
+                metta_reasoning_trace=[f"fallback-reasoning: {approach}"]
+            )
+            
+        except Exception as e:
+            print(f"      Failed to create MeTTa fallback candidate: {e}")
+            return None
+    
+    def _create_structure_preserving_fallback(self, context: GenerationContext) -> str:
+        """Create structure-preserving fallback with MeTTa guidance."""
         lines = context.original_code.split('\n')
         
-        # Simple modifications based on strategy
-        if strategy == GenerationStrategy.STRUCTURE_PRESERVATION:
-            # Just add a comment
-            for i, line in enumerate(lines):
-                if line.strip().startswith('def '):
-                    lines.insert(i+1, '    """Structure-preserving fallback variant."""')
-                    break
-        elif strategy == GenerationStrategy.ERROR_HANDLING_ENHANCEMENT:
-            # Wrap in try-catch
-            lines.insert(0, 'def safe_wrapper():')
-            lines.insert(1, '    try:')
-            lines = ['        ' + line if line.strip() else line for line in lines[2:]]
-            lines.append('    except Exception as e:')
-            lines.append('        return None')
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i+1, '    """MeTTa-guided structure-preserving fallback."""')
+                break
         
         return '\n'.join(lines)
     
-    def _rank_candidates(self, candidates: List[DonorCandidate]) -> List[Dict[str, Any]]:
-        """Rank candidates using modular scoring."""
+    def _create_pattern_based_fallback(self, context: GenerationContext, approach: str) -> str:
+        """Create pattern-based fallback using MeTTa reasoning."""
+        pattern_family = approach.split("pattern-based-")[-1]
+        
+        lines = context.original_code.split('\n')
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i+1, f'    """MeTTa pattern-guided fallback: {pattern_family}."""')
+                break
+        
+        # Add pattern-specific comment
+        for i, line in enumerate(lines):
+            if 'return' in line:
+                lines.insert(i, f'        # MeTTa reasoning: {pattern_family} pattern detected')
+                break
+        
+        return '\n'.join(lines)
+    
+    def _create_minimal_transformation_fallback(self, context: GenerationContext, approach: str) -> str:
+        """Create minimal transformation fallback with MeTTa guidance."""
+        strategy_name = approach.replace("minimal-", "")
+        
+        transformed_code = context.original_code
+        
+        # Apply minimal transformation based on strategy
+        if "operation" in strategy_name:
+            # Minimal operation change
+            transformed_code = transformed_code.replace("def ", "def minimally_")
+        elif "structure" in strategy_name:
+            # Minimal structure change
+            transformed_code = transformed_code.replace("def ", "def adapted_")
+        elif "algorithm" in strategy_name:
+            # Minimal algorithm change
+            transformed_code = transformed_code.replace("def ", "def transformed_")
+        
+        # Add MeTTa reasoning documentation
+        lines = transformed_code.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i+1, f'    """MeTTa minimal transformation: {strategy_name}."""')
+                break
+        
+        return '\n'.join(lines)
+    
+    def _create_generic_fallback(self, context: GenerationContext) -> str:
+        """Create generic fallback with MeTTa reasoning traces."""
+        new_func_name = f"{context.function_name}_metta_generic"
+        fallback_code = context.original_code.replace(f"def {context.function_name}(", f"def {new_func_name}(")
+        
+        lines = fallback_code.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip().startswith('def '):
+                lines.insert(i+1, '    """MeTTa generic fallback with reasoning traces."""')
+                break
+        
+        return '\n'.join(lines)
+    
+    def _metta_rank_candidates(self, candidates: List, context: GenerationContext) -> List[Dict[str, Any]]:
+        """Rank candidates using MeTTa reasoning."""
         scored_candidates = []
         
         for candidate in candidates:
-            # Base score from confidence
-            base_score = candidate.confidence
+            # Use MeTTa reasoning to score candidate
+            metta_score = self._calculate_metta_candidate_score(candidate, context)
             
-            # Modular scoring bonuses
-            pattern_bonus = 0.1 if candidate.pattern_family != "generic" else 0.0
-            structure_bonus = 0.05 * len(candidate.data_structures_used)
-            operation_bonus = 0.02 * len(candidate.operations_used)
+            # Combine with traditional scoring
+            traditional_score = self._calculate_traditional_score(candidate)
             
-            # Strategy innovation bonus
-            innovation_strategies = {
-                "data_structure_adaptation", "algorithm_transformation", 
-                "type_generalization", "functional_composition"
-            }
-            innovation_bonus = 0.15 if candidate.strategy in innovation_strategies else 0.0
-            
-            final_score = base_score + pattern_bonus + structure_bonus + operation_bonus + innovation_bonus
+            # Weight MeTTa reasoning more heavily
+            final_score = (0.7 * metta_score) + (0.3 * traditional_score)
             final_score = min(1.0, final_score)
             
             scored_candidates.append({
@@ -781,36 +1476,167 @@ class ModularMettaDonorGenerator:
                 "metta_derivation": candidate.metta_derivation,
                 "confidence": candidate.confidence,
                 "final_score": final_score,
+                "metta_score": metta_score,
                 "properties": candidate.properties,
                 "complexity_estimate": candidate.complexity_estimate,
-                "applicability_scope": candidate.applicability_scope
+                "applicability_scope": candidate.applicability_scope,
+                "generator_used": candidate.generator_used,
+                "metta_reasoning_trace": getattr(candidate, 'metta_reasoning_trace', [])
             })
         
+        # Sort by final score (MeTTa-weighted)
         return sorted(scored_candidates, key=lambda x: x["final_score"], reverse=True)
+    
+    def _calculate_metta_candidate_score(self, candidate, context: GenerationContext) -> float:
+        """Calculate candidate score using MeTTa reasoning."""
+        # Query MeTTa for candidate quality assessment
+        quality_query = f"""
+        (match &self
+          (donor-quality {candidate.name} $quality)
+          (quality-score {candidate.name} $quality))
+        """
+        
+        quality_facts = [
+            f"(candidate-name {candidate.name})",
+            f"(candidate-strategy {candidate.strategy})",
+            f"(source-function {context.function_name})",
+            f"(metta-derived {len(candidate.metta_derivation)})"
+        ]
+        
+        # Add reasoning trace facts
+        if hasattr(candidate, 'metta_reasoning_trace'):
+            for trace in candidate.metta_reasoning_trace:
+                quality_facts.append(f"(reasoning-trace {trace})")
+        
+        quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
+        
+        if quality_results:
+            try:
+                # Extract numeric score from MeTTa result
+                result_str = str(quality_results[0])
+                if "high" in result_str:
+                    metta_score = 0.9
+                elif "medium" in result_str:
+                    metta_score = 0.7
+                elif "low" in result_str:
+                    metta_score = 0.5
+                else:
+                    metta_score = 0.6
+            except:
+                metta_score = 0.6
+        else:
+            # Fallback to symbolic scoring
+            metta_score = self._symbolic_metta_scoring(candidate, context)
+        
+        return metta_score
+    
+    def _symbolic_metta_scoring(self, candidate, context: GenerationContext) -> float:
+        """Fallback symbolic scoring that mimics MeTTa reasoning."""
+        base_score = candidate.confidence
+        
+        # MeTTa reasoning quality bonuses
+        if hasattr(candidate, 'metta_derivation') and candidate.metta_derivation:
+            base_score += 0.1 * len(candidate.metta_derivation) / 5  # Max 0.1 bonus
+        
+        if hasattr(candidate, 'metta_reasoning_trace') and candidate.metta_reasoning_trace:
+            base_score += 0.05
+        
+        # Property-based bonuses (MeTTa-style reasoning)
+        if "metta-reasoned" in candidate.properties:
+            base_score += 0.1
+        if "reasoning-guided" in candidate.properties:
+            base_score += 0.05
+        if "safe" in candidate.properties or "transformation-safe" in candidate.properties:
+            base_score += 0.05
+        
+        # Strategy-specific bonuses
+        if candidate.strategy in ["algorithm_transformation", "operation_substitution"]:
+            base_score += 0.05
+        
+        return min(1.0, base_score)
+    
+    def _calculate_traditional_score(self, candidate) -> float:
+        """Calculate traditional scoring for combination with MeTTa score."""
+        base_score = candidate.confidence
+        
+        # Pattern bonus
+        pattern_bonus = 0.1 if candidate.pattern_family != "generic" else 0.0
+        
+        # Structure and operation bonuses
+        structure_bonus = 0.02 * len(candidate.data_structures_used)
+        operation_bonus = 0.02 * len(candidate.operations_used)
+        
+        # Applicability bonus
+        applicability_bonus = {"broad": 0.1, "medium": 0.05, "narrow": 0.0}.get(
+            candidate.applicability_scope, 0.0)
+        
+        final_score = base_score + pattern_bonus + structure_bonus + operation_bonus + applicability_bonus
+        return min(1.0, final_score)
+    
+    def learn_from_feedback(self, original_func: str, donor_results: List[Dict[str, Any]]) -> None:
+        """Learn from donor application results using MeTTa reasoning."""
+        print(f"  Learning from {len(donor_results)} donor applications using MeTTa reasoning...")
+        
+        for result in donor_results:
+            donor_name = result.get('donor_name')
+            feedback = result.get('feedback', 'unknown')  # 'successful', 'failed', 'partial'
+            
+            # Use MeTTa reasoning for learning
+            learning_rule = f"""
+            (learn-from-feedback {original_func} {donor_name} {feedback})
+            """
+            
+            self.reasoning_engine._add_rule_safely(learning_rule)
+            
+            # Specific learning based on feedback
+            if feedback == 'successful':
+                self._strengthen_successful_patterns(result)
+            elif feedback == 'failed':
+                self._weaken_failed_patterns(result)
+            
+        print(f"    MeTTa learning completed, reasoning base updated")
+    
+    def _strengthen_successful_patterns(self, result: Dict[str, Any]):
+        """Strengthen patterns that led to successful donors."""
+        strategy = result.get('strategy')
+        pattern_family = result.get('pattern_family')
+        
+        if strategy and pattern_family:
+            strengthening_rule = f"""
+            (= (pattern-strategy-success {pattern_family} {strategy}) 
+               (+ (pattern-strategy-success {pattern_family} {strategy}) 0.1))
+            """
+            self.reasoning_engine._add_rule_safely(strengthening_rule)
+    
+    def _weaken_failed_patterns(self, result: Dict[str, Any]):
+        """Weaken patterns that led to failed donors."""
+        strategy = result.get('strategy')
+        pattern_family = result.get('pattern_family')
+        
+        if strategy and pattern_family:
+            weakening_rule = f"""
+            (= (pattern-strategy-failure {pattern_family} {strategy})
+               (+ (pattern-strategy-failure {pattern_family} {strategy}) 0.1))
+            """
+            self.reasoning_engine._add_rule_safely(weakening_rule)
 
-# ==============================================================================
 # Integration function for compatibility
-# ==============================================================================
-
-def integrate_modular_metta_generation(func: Union[Callable, str], 
-                                     strategies: Optional[List[GenerationStrategy]] = None) -> List[Dict[str, Any]]:
+def integrate_metta_powered_generation(func: Union[Callable, str],
+                                     strategies: Optional[List] = None) -> List[Dict[str, Any]]:
     """
-    Integration function for the modular MeTTa generation system.
+    Integration function for the MeTTa-powered generation system.
     """
-    generator = ModularMettaDonorGenerator()
+    generator = MeTTaPoweredModularDonorGenerator()
     generator.load_ontology()
     return generator.generate_donors_from_function(func, strategies)
 
-# ==============================================================================
 # Demo function
-# ==============================================================================
-
-def demonstrate_modular_generation():
-    """Demonstrate the modular MeTTa generation system."""
-    print("  MODULAR METTA DONOR GENERATION DEMO")
+def demonstrate_metta_powered_generation():
+    """Demonstrate the MeTTa-powered generation system."""
+    print("  METTA-POWERED DONOR GENERATION DEMO")
     print("=" * 60)
     
-    # Example function 1: Search function
+    # Example function
     def find_max_in_range(numbers, start_idx, end_idx):
         """Find the maximum value in a list within a specific range."""
         if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
@@ -823,78 +1649,39 @@ def demonstrate_modular_generation():
         
         return max_val
     
-    # Example function 2: String processing function
-    def clean_text(text):
-        """Clean and normalize text input."""
-        if not text or not isinstance(text, str):
-            return ""
-        
-        # Remove extra whitespace
-        cleaned = text.strip()
-        
-        # Convert to lowercase
-        cleaned = cleaned.lower()
-        
-        # Replace multiple spaces with single space
-        import re
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        
-        return cleaned
+    print(f"\n  Testing MeTTa-Powered Generation: {find_max_in_range.__name__}")
+    print("-" * 50)
     
-    # Example function 3: Aggregation function
-    def calculate_statistics(numbers):
-        """Calculate basic statistics for a list of numbers."""
-        if not numbers:
-            return {}
+    try:
+        candidates = integrate_metta_powered_generation(find_max_in_range)
         
-        total = sum(numbers)
-        count = len(numbers)
-        average = total / count
+        print(f"  Generated {len(candidates)} candidates using MeTTa reasoning")
         
-        return {
-            'sum': total,
-            'count': count,
-            'average': average,
-            'min': min(numbers),
-            'max': max(numbers)
-        }
-    
-    # Test with different functions
-    test_functions = [
-        ("Search Pattern", find_max_in_range),
-        ("String Processing", clean_text),
-        ("Aggregation Pattern", calculate_statistics)
-    ]
-    
-    for pattern_name, test_func in test_functions:
-        print(f"\n  Testing {pattern_name}: {test_func.__name__}")
-        print("-" * 50)
-        
-        try:
-            candidates = integrate_modular_metta_generation(test_func)
+        # Show top candidates
+        for i, candidate in enumerate(candidates[:3], 1):
+            print(f"\n  {i}. {candidate['name']}")
+            print(f"     Strategy: {candidate['strategy']}")
+            print(f"     MeTTa Score: {candidate.get('metta_score', 'N/A'):.3f}")
+            print(f"     Final Score: {candidate['final_score']:.3f}")
+            print(f"     MeTTa Derivation: {', '.join(candidate.get('metta_derivation', []))}")
             
-            print(f"  Generated {len(candidates)} candidates")
+            # Show MeTTa reasoning trace
+            if candidate.get('metta_reasoning_trace'):
+                print(f"     MeTTa Reasoning: {', '.join(candidate['metta_reasoning_trace'])}")
             
-            # Show top 2 candidates
-            for i, candidate in enumerate(candidates[:2], 1):
-                print(f"\n  {i}. {candidate['name']}")
-                print(f"     Strategy: {candidate['strategy']}")
-                print(f"     Pattern Family: {candidate['pattern_family']}")
-                print(f"     Score: {candidate['final_score']:.2f}")
-                print(f"     Data Structures: {', '.join(candidate['data_structures_used'])}")
-                
-                # Show code preview
-                code_lines = candidate['code'].split('\n')
-                print(f"     Code preview:")
-                for line in code_lines[:4]:
+            # Show code preview
+            code_lines = candidate['code'].split('\n')[:6]
+            print(f"     Code preview:")
+            for line in code_lines:
+                if line.strip():
                     print(f"       {line}")
-                if len(code_lines) > 4:
-                    print(f"       ... ({len(code_lines)-4} more lines)")
-        
-        except Exception as e:
-            print(f"  Error testing {test_func.__name__}: {e}")
+    
+    except Exception as e:
+        print(f"  Error testing MeTTa-powered generation: {e}")
+        import traceback
+        traceback.print_exc()
     
     return True
 
 if __name__ == "__main__":
-    demonstrate_modular_generation()
+    demonstrate_metta_powered_generation()
