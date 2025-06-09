@@ -1,744 +1,685 @@
 #!/usr/bin/env python3
 """
-MeTTa-Powered Data Structure Adaptation Generator
-Refactored to use MeTTa's symbolic reasoning for data structure transformations
+MeTTa-Powered Operation Substitution Generator
+Refactored to use MeTTa's symbolic reasoning for operation substitutions
 """
 
-from typing import List, Dict, Any, Optional
-import re
-
+from typing import List, Dict, Optional, Any
 from metta_generator.base import BaseDonorGenerator, GenerationContext, DonorCandidate, GenerationStrategy
 
-class DataStructureAdaptationGenerator(BaseDonorGenerator):
-    """Generator that uses MeTTa reasoning for data structure adaptations."""
+class OperationSubstitutionGenerator(BaseDonorGenerator):
+    """Generator that uses MeTTa reasoning for operation substitutions."""
     
     def __init__(self):
         super().__init__()
-        self._load_adaptation_rules()
+        self._load_substitution_rules()
     
-    def _load_adaptation_rules(self):
-        """Load data structure adaptation rules into MeTTa reasoning."""
-        self.adaptation_rules = [
-            # Data structure compatibility rules
-            """(= (structure-compatible list tuple) 0.9)""",
-            """(= (structure-compatible list set) 0.8)""", 
-            """(= (structure-compatible list dict) 0.7)""",
-            """(= (structure-compatible list generator) 0.8)""",
-            """(= (structure-compatible dict namedtuple) 0.9)""",
-            """(= (structure-compatible set frozenset) 0.95)""",
-            """(= (structure-compatible string list) 0.8)""",
-            """(= (structure-compatible string bytes) 0.9)""",
-            """(= (structure-compatible tuple namedtuple) 0.9)""",
+    def _load_substitution_rules(self):
+        """Load operation substitution rules into MeTTa reasoning."""
+        self.substitution_rules = [
+            # Operation compatibility rules
+            """(= (operation-substitutable > <) semantic-inverse)""",
+            """(= (operation-substitutable < >) semantic-inverse)""",
+            """(= (operation-substitutable >= <=) semantic-inverse)""",
+            """(= (operation-substitutable <= >=) semantic-inverse)""",
+            """(= (operation-substitutable == !=) logical-inverse)""",
+            """(= (operation-substitutable != ==) logical-inverse)""",
+            """(= (operation-substitutable + -) arithmetic-inverse)""",
+            """(= (operation-substitutable - +) arithmetic-inverse)""",
+            """(= (operation-substitutable * /) arithmetic-inverse)""",
+            """(= (operation-substitutable / *) arithmetic-inverse)""",
+            """(= (operation-substitutable and or) logical-inverse)""",
+            """(= (operation-substitutable or and) logical-inverse)""",
+            """(= (operation-substitutable max min) semantic-inverse)""",
+            """(= (operation-substitutable min max) semantic-inverse)""",
             
-            # Bidirectional compatibility
-            """(= (structure-compatible $a $b) (structure-compatible $b $a))""",
+            # Context-based substitution safety
+            """(= (substitution-safe $func $op1 $op2)
+               (and (operation-substitutable $op1 $op2)
+                    (preserves-function-semantics $func $op1 $op2)
+                    (no-side-effect-conflicts $func $op1 $op2)))""",
             
-            # Adaptation safety rules
-            """(= (adaptation-safe $func list set)
-               (and (no-indexing-operations $func)
-                    (no-ordering-dependent-operations $func)
-                    (uses-data-structure $func list)))""",
-                    
-            """(= (adaptation-safe $func list tuple)
-               (and (no-mutation-operations $func)
-                    (uses-data-structure $func list)))""",
-                    
-            """(= (adaptation-safe $func dict namedtuple)
-               (and (fixed-key-structure $func)
-                    (uses-data-structure $func dict)))""",
-            
-            # Operation constraint rules
-            """(= (no-indexing-operations $func)
-               (not (match &self (array-access $func $index $line) True)))""",
-               
-            """(= (no-mutation-operations $func)
-               (not (or (has-operation $func append)
-                        (has-operation $func extend)
-                        (has-operation $func remove))))""",
-            
-            # Structure usage detection rules
-            """(= (uses-data-structure $func list)
-               (or (match &self (variable-assign $var $scope $line)
-                          (and (contains-function $scope $func)
-                               (variable-type $var list)))
-                   (has-list-operations $func)))""",
+            # Semantic preservation rules
+            """(= (preserves-function-semantics $func > <)
+               (or (search-function $func maximum-to-minimum)
+                   (comparison-invertible $func)))""",
                    
-            """(= (uses-data-structure $func dict)
-               (or (match &self (bin-op . String Any $scope $line)
-                          (contains-function $scope $func))
-                   (has-dict-operations $func)))""",
+            """(= (preserves-function-semantics $func + -)
+               (arithmetic-invertible $func))""",
             
-            # Adaptation generation rules
-            """(= (generate-adaptation $func $from $to)
-               (let $adapter-func (get-adapter-function $from $to)
-                    (let $adapted-code (apply-adapter $func $adapter-func)
-                         (validated-adaptation $func $adapted-code $from $to))))""",
+            # Operation detection in function context
+            """(= (has-operation $func $op)
+               (match &self (bin-op $op $left $right $scope $line)
+                      (contains-function $scope $func)))""",
             
-            # Quality assessment for adaptations
-            """(= (adaptation-quality $from $to $quality)
-               (case (structure-compatible $from $to)
-                 ($score (if (>= $score 0.9) high-quality
-                            (if (>= $score 0.7) medium-quality
-                                low-quality)))))"""
+            # Substitution generation rules
+            """(= (generate-substitution $func $old-op $new-op)
+               (let $substituted-code (replace-operation $func $old-op $new-op)
+                    (validated-substitution $func $substituted-code $old-op $new-op)))""",
+            
+            # Quality assessment rules
+            """(= (substitution-quality $func $old-op $new-op $quality)
+               (case (operation-substitutable $old-op $new-op)
+                 (semantic-inverse high-quality)
+                 (logical-inverse medium-quality)
+                 (arithmetic-inverse medium-quality)
+                 (unknown low-quality)))"""
         ]
     
-    def can_generate(self, context: GenerationContext, strategy) -> bool:
-        """Use MeTTa reasoning to determine if data structure adaptation is applicable."""
-        if hasattr(strategy, 'value'):
-            strategy_name = strategy.value
-        else:
-            strategy_name = str(strategy)
-            
-        if strategy_name != "data_structure_adaptation":
+    def can_generate(self, context: GenerationContext, strategy: GenerationStrategy) -> bool:
+        """Use MeTTa reasoning to determine if operation substitution is applicable."""
+        if strategy != GenerationStrategy.OPERATION_SUBSTITUTION:
             return False
         
-        # Use MeTTa reasoning to check for adaptable structures
-        adaptable_structures = self._use_metta_reasoning(
-            context, "find_adaptable_structures"
+        # Use MeTTa reasoning to check for substitutable operations
+        substitutable_ops = self._use_metta_reasoning(
+            context, "find_substitutable_operations"
         )
         
-        if adaptable_structures:
-            print(f"      MeTTa reasoning: DataStructureAdaptationGenerator CAN generate")
-            print(f"        Found adaptable structures: {adaptable_structures}")
+        if substitutable_ops:
+            print(f"      MeTTa reasoning: OperationSubstitutionGenerator CAN generate")
+            print(f"        Found substitutable operations: {substitutable_ops}")
             return True
         
-        # Fallback to symbolic structure detection
-        fallback_result = self._symbolic_structure_detection(context)
+        # Fallback to symbolic detection
+        fallback_result = self._symbolic_operation_detection(context)
         
         if fallback_result:
-            print(f"      Symbolic reasoning: DataStructureAdaptationGenerator CAN generate")
-            print(f"        Detected structures: {fallback_result}")
+            print(f"      Symbolic reasoning: OperationSubstitutionGenerator CAN generate")
+            print(f"        Found operations via symbolic analysis: {fallback_result}")
         else:
-            print(f"      DataStructureAdaptationGenerator: cannot generate")
+            print(f"      OperationSubstitutionGenerator: cannot generate")
         
         return fallback_result
     
-    def _generate_candidates_impl(self, context: GenerationContext, strategy) -> List[DonorCandidate]:
-        """Generate data structure adaptation candidates using MeTTa reasoning."""
+    def _generate_candidates_impl(self, context: GenerationContext, strategy: GenerationStrategy) -> List[DonorCandidate]:
+        """Generate operation substitution candidates using MeTTa reasoning."""
         candidates = []
         
-        # Use MeTTa reasoning to find structure adaptations
-        metta_adaptations = self._use_metta_reasoning(
-            context, "find_all_adaptations"
+        # Use MeTTa reasoning to find all substitutable operations
+        metta_substitutions = self._use_metta_reasoning(
+            context, "find_all_substitutions"
         )
         
-        if metta_adaptations:
-            print(f"        MeTTa found {len(metta_adaptations)} adaptation opportunities")
-            for adaptation in metta_adaptations:
-                candidate = self._create_metta_adaptation_candidate(context, adaptation)
+        if metta_substitutions:
+            print(f"        MeTTa found {len(metta_substitutions)} substitution opportunities")
+            for substitution in metta_substitutions:
+                candidate = self._create_metta_substitution_candidate(context, substitution)
                 if candidate:
                     candidates.append(candidate)
         else:
-            print(f"        No MeTTa adaptations found, using symbolic analysis")
-            candidates.extend(self._generate_symbolic_adaptations(context))
+            print(f"        No MeTTa substitutions found, using symbolic analysis")
+            candidates.extend(self._generate_symbolic_substitutions(context))
         
-        # Generate generic iterable adaptations using MeTTa guidance
-        generic_candidates = self._generate_metta_generic_adaptations(context)
-        candidates.extend(generic_candidates)
+        # Generate semantic substitutions using MeTTa reasoning
+        semantic_candidates = self._generate_metta_semantic_substitutions(context)
+        candidates.extend(semantic_candidates)
+        
+        # Generate combined substitutions with MeTTa guidance
+        combined_candidates = self._generate_metta_combined_substitutions(context)
+        candidates.extend(combined_candidates)
         
         return candidates
     
-    def get_supported_strategies(self) -> List:
+    def get_supported_strategies(self) -> List[GenerationStrategy]:
         """Get list of strategies this generator supports."""
-        return [GenerationStrategy.DATA_STRUCTURE_ADAPTATION]
+        return [GenerationStrategy.OPERATION_SUBSTITUTION]
     
-    def _symbolic_structure_detection(self, context: GenerationContext) -> bool:
-        """Fallback symbolic detection of adaptable data structures."""
-        detected_structures = self._detect_structures_in_code(context.original_code)
+    def _symbolic_operation_detection(self, context: GenerationContext) -> bool:
+        """Fallback symbolic detection of substitutable operations."""
+        code = context.original_code
+        metta_atoms = str(context.metta_space)
         
-        # Check if any detected structures have known adaptations
-        adaptable_from = ["list", "dict", "set", "string", "tuple"]
+        # Check for binary operations in MeTTa atoms
+        has_binary_ops = "bin-op" in metta_atoms
         
-        return any(structure in adaptable_from for structure in detected_structures)
+        # Check for substitutable operations in code
+        substitutable_patterns = [">", "<", ">=", "<=", "==", "!=", "+", "-", "*", "/", "and", "or", "max", "min"]
+        has_substitutable_ops = any(op in code for op in substitutable_patterns)
+        
+        # Check for semantic substitutions in function name
+        semantic_patterns = ["find_max", "find_min", "get_maximum", "get_minimum"]
+        has_semantic_subs = any(pattern in context.function_name.lower() for pattern in semantic_patterns)
+        
+        return has_binary_ops or has_substitutable_ops or has_semantic_subs
     
-    def _detect_structures_in_code(self, code: str) -> List[str]:
-        """Detect data structures used in code."""
-        structures = set()
-        code_lower = code.lower()
-        
-        structure_patterns = {
-            "list": ["[", "list(", ".append(", ".extend(", ".pop("],
-            "dict": ["{", "dict(", ".keys(", ".values(", ".items("],
-            "set": ["set(", ".add(", ".union(", ".intersection("],
-            "string": ['"', "'", "str(", ".split(", ".join(", ".strip("],
-            "tuple": ["tuple(", "(", ",)"],
-            "generator": ["yield", "generator"]
-        }
-        
-        for struct_type, patterns in structure_patterns.items():
-            if any(pattern in code_lower for pattern in patterns):
-                structures.add(struct_type)
-        
-        return list(structures) if structures else ["generic"]
-    
-    def _generate_symbolic_adaptations(self, context: GenerationContext) -> List[DonorCandidate]:
-        """Generate adaptation candidates using symbolic analysis."""
+    def _generate_symbolic_substitutions(self, context: GenerationContext) -> List[DonorCandidate]:
+        """Generate substitution candidates using symbolic analysis."""
         candidates = []
-        detected_structures = self._detect_structures_in_code(context.original_code)
         
-        # Define adaptation mappings
-        adaptation_mappings = {
-            "list": {"set": 0.8, "tuple": 0.9, "dict": 0.7, "generator": 0.8},
-            "dict": {"namedtuple": 0.9, "list": 0.8, "set": 0.7},
-            "set": {"frozenset": 0.95, "list": 0.85, "dict": 0.7},
-            "string": {"list": 0.8, "bytes": 0.9},
-            "tuple": {"list": 0.9, "namedtuple": 0.9}
+        # Define operation mappings for symbolic analysis
+        operation_mappings = {
+            ">": "<", "<": ">", ">=": "<=", "<=": ">=", "==": "!=", "!=": "==",
+            "+": "-", "-": "+", "*": "/", "/": "*", "and": "or", "or": "and",
+            "max": "min", "min": "max"
         }
         
-        for source_structure in detected_structures:
-            if source_structure in adaptation_mappings:
-                for target_structure, compatibility in adaptation_mappings[source_structure].items():
-                    adaptation_data = {
-                        "from_structure": source_structure,
-                        "to_structure": target_structure,
-                        "compatibility": compatibility,
-                        "safety": "safe" if compatibility > 0.8 else "moderate",
-                        "reasoning": "symbolic-analysis"
-                    }
-                    
-                    candidate = self._create_metta_adaptation_candidate(context, adaptation_data)
-                    if candidate:
-                        candidates.append(candidate)
+        code = context.original_code
+        
+        for original_op, substitute_op in operation_mappings.items():
+            if self._is_operation_present_and_substitutable(code, original_op):
+                substitution_data = {
+                    "original_op": original_op,
+                    "substitute_op": substitute_op,
+                    "substitution_type": self._determine_substitution_type(original_op, substitute_op),
+                    "safety": "safe",
+                    "reasoning": "symbolic-analysis"
+                }
+                
+                candidate = self._create_metta_substitution_candidate(context, substitution_data)
+                if candidate:
+                    candidates.append(candidate)
         
         return candidates
     
-    def _generate_metta_generic_adaptations(self, context: GenerationContext) -> List[DonorCandidate]:
-        """Generate generic adaptations using MeTTa reasoning."""
+    def _generate_metta_semantic_substitutions(self, context: GenerationContext) -> List[DonorCandidate]:
+        """Generate semantic substitutions using MeTTa reasoning."""
         candidates = []
         
-        # Use MeTTa reasoning for generic iterable adaptation
-        generic_query = f"""
+        # Use MeTTa reasoning to find semantic substitution opportunities
+        semantic_query = f"""
         (match &self
-          (generic-iterable-adaptation-applicable {context.function_name})
-          (iterable-adaptation {context.function_name}))
+          (semantic-substitution-applicable {context.function_name} $from $to)
+          (semantic-substitution {context.function_name} $from $to))
         """
         
-        generic_facts = [
+        semantic_facts = [
             f"(function-name {context.function_name})",
-            f"(uses-iteration {context.function_name})"
+            # Add semantic pattern facts based on function name
+            f"(function-purpose {self._infer_function_purpose(context.function_name)})"
         ]
         
         if self.reasoning_engine:
-            generic_results = self.reasoning_engine._execute_metta_reasoning(generic_query, generic_facts)
+            semantic_results = self.reasoning_engine._execute_metta_reasoning(semantic_query, semantic_facts)
         else:
-            generic_results = self._symbolic_generic_analysis(context)
+            semantic_results = self._symbolic_semantic_analysis(context)
         
-        for result in generic_results:
-            generic_data = self._parse_generic_result(result)
-            if generic_data:
-                candidate = self._create_generic_adaptation_candidate(context, generic_data)
+        for result in semantic_results:
+            semantic_data = self._parse_semantic_result(result)
+            if semantic_data:
+                candidate = self._create_semantic_substitution_candidate(context, semantic_data)
                 if candidate:
                     candidates.append(candidate)
         
         return candidates
     
-    def _create_metta_adaptation_candidate(self, context: GenerationContext,
-                                         adaptation_data: Dict[str, Any]) -> Optional[DonorCandidate]:
-        """Create adaptation candidate using MeTTa reasoning results."""
+    def _generate_metta_combined_substitutions(self, context: GenerationContext) -> List[DonorCandidate]:
+        """Generate combined substitutions using MeTTa reasoning."""
+        candidates = []
+        
+        # Use MeTTa reasoning to find compatible substitution combinations
+        combination_query = f"""
+        (match &self
+          (compatible-substitution-set $func $substitutions)
+          (substitution-combination $func $substitutions))
+        """
+        
+        combination_facts = [
+            f"(target-function {context.function_name})",
+            f"(substitution-strategy combined)",
+        ]
+        
+        if self.reasoning_engine:
+            combination_results = self.reasoning_engine._execute_metta_reasoning(combination_query, combination_facts)
+        else:
+            combination_results = self._symbolic_combination_analysis(context)
+        
+        for result in combination_results:
+            combination_data = self._parse_combination_result(result)
+            if combination_data:
+                candidate = self._create_combined_substitution_candidate(context, combination_data)
+                if candidate:
+                    candidates.append(candidate)
+        
+        return candidates
+    
+    def _create_metta_substitution_candidate(self, context: GenerationContext, 
+                                           substitution_data: Dict[str, Any]) -> Optional[DonorCandidate]:
+        """Create substitution candidate using MeTTa reasoning results."""
         try:
-            from_structure = adaptation_data.get('from_structure')
-            to_structure = adaptation_data.get('to_structure')
-            compatibility = adaptation_data.get('compatibility', 0.7)
-            safety = adaptation_data.get('safety', 'unknown')
-            reasoning = adaptation_data.get('reasoning', 'metta-reasoning')
+            original_op = substitution_data.get('original_op')
+            substitute_op = substitution_data.get('substitute_op')
+            substitution_type = substitution_data.get('substitution_type', 'unknown')
+            safety = substitution_data.get('safety', 'unknown')
+            reasoning = substitution_data.get('reasoning', 'metta-reasoning')
             
-            # Generate adapted code using MeTTa guidance
-            adapted_code = self._apply_metta_guided_adaptation(
-                context, from_structure, to_structure
+            # Generate substituted code using MeTTa guidance
+            substituted_code = self._apply_metta_guided_substitution(
+                context.original_code, context.function_name, original_op, substitute_op
             )
             
-            if not adapted_code:
-                return None
-            
             # Create candidate name
-            new_func_name = f"{context.function_name}_{to_structure}_adapted"
+            new_func_name = self._generate_metta_function_name(
+                context.function_name, original_op, substitute_op
+            )
             
             # Build MeTTa derivation trace
             metta_derivation = [
-                f"(data-structure-adaptation {context.function_name} {from_structure} {to_structure})",
-                f"(compatibility-score {compatibility})",
-                f"(adaptation-safety {safety})",
+                f"(operation-substitution {context.function_name} {original_op} {substitute_op})",
+                f"(substitution-type {substitution_type})",
+                f"(substitution-safety {safety})",
                 f"(reasoning-method {reasoning})"
             ]
             
             # Determine properties based on MeTTa reasoning
-            properties = self._derive_adaptation_properties(adaptation_data)
+            properties = self._derive_substitution_properties(substitution_data)
             
-            # Calculate confidence using MeTTa compatibility score
-            confidence = float(compatibility) if isinstance(compatibility, (int, float)) else 0.7
+            # Calculate confidence using MeTTa reasoning
+            confidence = self._calculate_metta_substitution_confidence(substitution_data)
             
-            description = f"MeTTa-reasoned adaptation from {from_structure} to {to_structure}"
+            description = f"MeTTa-reasoned operation substitution: {original_op} to {substitute_op}"
             
             return DonorCandidate(
                 name=new_func_name,
                 description=description,
-                code=adapted_code,
-                strategy="data_structure_adaptation",
+                code=substituted_code,
+                strategy="operation_substitution",
                 pattern_family=self._get_pattern_family(context),
-                data_structures_used=[to_structure],
-                operations_used=["structure-adaptation"],
+                data_structures_used=self._get_data_structures(context),
+                operations_used=[substitute_op],
                 metta_derivation=metta_derivation,
                 confidence=confidence,
                 properties=properties,
-                complexity_estimate=self._estimate_adaptation_complexity(compatibility),
-                applicability_scope=self._determine_adaptation_scope(compatibility, safety),
+                complexity_estimate="same",
+                applicability_scope=self._determine_substitution_scope(substitution_data),
                 generator_used=self.generator_name,
-                metta_reasoning_trace=[f"adaptation-reasoning: {adaptation_data}"]
+                metta_reasoning_trace=[f"substitution-reasoning: {substitution_data}"]
             )
             
         except Exception as e:
-            print(f"        Error creating MeTTa adaptation candidate: {e}")
+            print(f"        Error creating MeTTa substitution candidate: {e}")
             return None
     
-    def _create_generic_adaptation_candidate(self, context: GenerationContext,
-                                           generic_data: Dict[str, Any]) -> Optional[DonorCandidate]:
-        """Create generic iterable adaptation candidate using MeTTa reasoning."""
+    def _create_semantic_substitution_candidate(self, context: GenerationContext,
+                                              semantic_data: Dict[str, Any]) -> Optional[DonorCandidate]:
+        """Create semantic substitution candidate using MeTTa reasoning."""
         try:
-            adapted_code = self._create_metta_guided_generic_iterable(context)
+            original_concept = semantic_data.get('from_concept')
+            substitute_concept = semantic_data.get('to_concept')
             
-            if not adapted_code:
-                return None
+            # Apply semantic substitution with MeTTa guidance
+            substituted_code = self._apply_semantic_substitution_with_metta(
+                context, original_concept, substitute_concept
+            )
             
-            new_func_name = f"{context.function_name}_iterable_generic"
+            new_func_name = context.function_name.replace(original_concept, substitute_concept)
             
             metta_derivation = [
-                f"(generic-iterable-adaptation {context.function_name})",
-                f"(metta-guided-generalization)",
-                f"(iterable-compatibility verified)"
+                f"(semantic-substitution {context.function_name} {original_concept} {substitute_concept})",
+                f"(semantic-reasoning applied)",
+                f"(concept-mapping {original_concept} {substitute_concept})"
             ]
             
-            description = "MeTTa-guided generic iterable adaptation"
+            description = f"MeTTa semantic substitution: {original_concept} to {substitute_concept}"
             
             return DonorCandidate(
                 name=new_func_name,
                 description=description,
-                code=adapted_code,
-                strategy="data_structure_adaptation",
+                code=substituted_code,
+                strategy="operation_substitution",
                 pattern_family=self._get_pattern_family(context),
-                data_structures_used=["iterable"],
-                operations_used=["generic-adaptation"],
+                data_structures_used=self._get_data_structures(context),
+                operations_used=["semantic-substitution"],
                 metta_derivation=metta_derivation,
                 confidence=0.85,
-                properties=["metta-reasoned", "generic", "iterable-compatible"],
+                properties=["semantically-substituted", "concept-inverted"],
                 complexity_estimate="same",
                 applicability_scope="broad",
                 generator_used=self.generator_name,
-                metta_reasoning_trace=[f"generic-reasoning: {generic_data}"]
+                metta_reasoning_trace=[f"semantic-reasoning: {semantic_data}"]
             )
             
         except Exception as e:
-            print(f"        Error creating generic adaptation candidate: {e}")
+            print(f"        Error creating semantic substitution candidate: {e}")
             return None
     
-    # MeTTa-guided adaptation methods
+    def _create_combined_substitution_candidate(self, context: GenerationContext,
+                                              combination_data: Dict[str, Any]) -> Optional[DonorCandidate]:
+        """Create combined substitution candidate using MeTTa reasoning."""
+        try:
+            substitutions = combination_data.get('substitutions', [])
+            
+            if not substitutions:
+                return None
+            
+            # Apply multiple substitutions with MeTTa coordination
+            substituted_code = self._apply_combined_substitutions_with_metta(
+                context, substitutions
+            )
+            
+            new_func_name = f"{context.function_name}_multi_substituted"
+            
+            # Build comprehensive MeTTa derivation
+            metta_derivation = [
+                f"(combined-substitution {context.function_name} {len(substitutions)})",
+                f"(metta-coordinated-substitution)",
+            ]
+            
+            for sub in substitutions:
+                metta_derivation.append(f"(substitution-component {sub.get('from')} {sub.get('to')})")
+            
+            description = f"MeTTa-coordinated combined substitutions: {len(substitutions)} operations"
+            
+            return DonorCandidate(
+                name=new_func_name,
+                description=description,
+                code=substituted_code,
+                strategy="operation_substitution",
+                pattern_family=self._get_pattern_family(context),
+                data_structures_used=self._get_data_structures(context),
+                operations_used=["multi-substitution"],
+                metta_derivation=metta_derivation,
+                confidence=0.65,  # Lower for multiple changes
+                properties=["multi-substituted", "metta-coordinated"],
+                complexity_estimate="same",
+                applicability_scope="narrow",
+                generator_used=self.generator_name,
+                metta_reasoning_trace=[f"combined-reasoning: {combination_data}"]
+            )
+            
+        except Exception as e:
+            print(f"        Error creating combined substitution candidate: {e}")
+            return None
     
-    def _apply_metta_guided_adaptation(self, context: GenerationContext,
-                                     from_structure: str, to_structure: str) -> Optional[str]:
-        """Apply structure adaptation with MeTTa guidance."""
-        # Route to specific adaptation method based on MeTTa reasoning
-        adapter_method = self._get_metta_adapter_method(from_structure, to_structure)
-        
-        if adapter_method:
-            return adapter_method(context.original_code, context.function_name)
-        else:
-            return self._generic_metta_adaptation(context, from_structure, to_structure)
+    # MeTTa-guided code transformation methods
     
-    def _get_metta_adapter_method(self, from_structure: str, to_structure: str):
-        """Get appropriate adapter method based on MeTTa reasoning."""
-        adaptation_methods = {
-            ("list", "set"): self._adapt_list_to_set_metta,
-            ("list", "tuple"): self._adapt_list_to_tuple_metta,
-            ("list", "dict"): self._adapt_list_to_dict_metta,
-            ("list", "generator"): self._adapt_list_to_generator_metta,
-            ("dict", "namedtuple"): self._adapt_dict_to_namedtuple_metta,
-            ("dict", "list"): self._adapt_dict_to_list_metta,
-            ("set", "frozenset"): self._adapt_set_to_frozenset_metta,
-            ("set", "list"): self._adapt_set_to_list_metta,
-            ("string", "list"): self._adapt_string_to_list_metta,
-            ("string", "bytes"): self._adapt_string_to_bytes_metta,
-            ("tuple", "list"): self._adapt_tuple_to_list_metta,
-            ("tuple", "namedtuple"): self._adapt_tuple_to_namedtuple_metta
-        }
+    def _apply_metta_guided_substitution(self, code: str, func_name: str, 
+                                        original_op: str, substitute_op: str) -> str:
+        """Apply operation substitution with MeTTa guidance."""
+        # Perform safe substitution with context awareness
+        substituted_code = self._safe_operation_replace(code, original_op, substitute_op)
         
-        return adaptation_methods.get((from_structure, to_structure))
-    
-    def _adapt_list_to_set_metta(self, code: str, func_name: str) -> str:
-        """Adapt list to set using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_set_adapted"
-        
-        # Replace function name
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided list to set transformations
-        adapted_code = adapted_code.replace("[]", "set()")
-        adapted_code = adapted_code.replace(".append(", ".add(")
-        adapted_code = adapted_code.replace(".extend(", ".update(")
-        adapted_code = adapted_code.replace(".remove(", ".discard(")
-        
-        # Handle indexing (sets don't support indexing) - MeTTa safety check
-        adapted_code = re.sub(r'(\w+)\[(\d+)\]', r'list(\1)[\2]', adapted_code)
-        adapted_code = re.sub(r'(\w+)\[(\w+)\]', r'list(\1)[\2]', adapted_code)
+        # Update function name
+        new_func_name = self._generate_metta_function_name(func_name, original_op, substitute_op)
+        substituted_code = substituted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
         
         # Add MeTTa reasoning documentation
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "list", "set", 
-                                                      "MeTTa verified: no indexing dependencies")
-        
-        return adapted_code
-    
-    def _adapt_list_to_tuple_metta(self, code: str, func_name: str) -> str:
-        """Adapt list to tuple using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_tuple_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided immutable transformations
-        adapted_code = adapted_code.replace("[]", "()")
-        
-        # Handle append operations (tuples are immutable) - MeTTa guidance
-        adapted_code = re.sub(
-            r'(\w+)\.append\(([^)]+)\)',
-            r'\1 = \1 + (\2,)',
-            adapted_code
+        substituted_code = self._add_metta_documentation(
+            substituted_code, f"MeTTa-guided substitution: {original_op} to {substitute_op}"
         )
         
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "list", "tuple",
-                                                      "MeTTa verified: immutable operations only")
-        
-        return adapted_code
+        return substituted_code
     
-    def _adapt_list_to_dict_metta(self, code: str, func_name: str) -> str:
-        """Adapt list to dict using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_dict_adapted"
+    def _apply_semantic_substitution_with_metta(self, context: GenerationContext,
+                                              original_concept: str, substitute_concept: str) -> str:
+        """Apply semantic substitution with MeTTa reasoning."""
+        code = context.original_code
+        func_name = context.function_name
         
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        # Replace concept in function name
+        new_func_name = func_name.replace(original_concept, substitute_concept)
+        substituted_code = code.replace(f"def {func_name}(", f"def {new_func_name}(")
         
-        # MeTTa-guided list to dict mapping
-        adapted_code = adapted_code.replace("[]", "{}")
+        # Replace concept throughout the code with MeTTa guidance
+        substituted_code = substituted_code.replace(original_concept, substitute_concept)
         
-        # Transform append to dict assignment - MeTTa reasoning
-        adapted_code = re.sub(
-            r'(\w+)\.append\(([^)]+)\)',
-            r'\1[len(\1)] = \2',
-            adapted_code
+        # Add semantic reasoning documentation
+        substituted_code = self._add_metta_documentation(
+            substituted_code, f"MeTTa semantic reasoning: {original_concept} to {substitute_concept}"
         )
         
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "list", "dict",
-                                                      "MeTTa guided: index-based key mapping")
-        
-        return adapted_code
+        return substituted_code
     
-    def _adapt_list_to_generator_metta(self, code: str, func_name: str) -> str:
-        """Adapt list to generator using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_generator_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided lazy evaluation transformation
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if 'return ' in line and '[' in line:
-                # Replace return with yield from - MeTTa lazy reasoning
-                lines[i] = line.replace('return [', 'yield from [')
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "list", "generator",
-                                                      "MeTTa verified: lazy evaluation benefits")
-        
-        return adapted_code
-    
-    def _adapt_dict_to_namedtuple_metta(self, code: str, func_name: str) -> str:
-        """Adapt dict to namedtuple using MeTTa guidance."""
-        adapted_code = "from collections import namedtuple\n\n" + code
-        new_func_name = f"{func_name}_namedtuple_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided namedtuple structure
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, "    # MeTTa-derived structure definition")
-                lines.insert(i + 3, "    DataRecord = namedtuple('DataRecord', ['field1', 'field2', 'field3'])")
-                break
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "dict", "namedtuple",
-                                                      "MeTTa verified: fixed structure compatibility")
-        
-        return adapted_code
-    
-    def _adapt_dict_to_list_metta(self, code: str, func_name: str) -> str:
-        """Adapt dict to list using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_list_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided dict to list transformations
-        adapted_code = adapted_code.replace("{}", "[]")
-        adapted_code = adapted_code.replace(".keys()", "range(len(data))")
-        adapted_code = adapted_code.replace(".values()", "data")
-        adapted_code = adapted_code.replace(".items()", "enumerate(data)")
-        
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "dict", "list",
-                                                      "MeTTa reasoning: sequential access pattern")
-        
-        return adapted_code
-    
-    def _adapt_set_to_frozenset_metta(self, code: str, func_name: str) -> str:
-        """Adapt set to frozenset using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_frozenset_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided immutable set transformations
-        adapted_code = adapted_code.replace("set()", "frozenset()")
-        adapted_code = adapted_code.replace(".add(", ".union({")
-        adapted_code = adapted_code.replace(".update(", ".union(")
-        
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "set", "frozenset",
-                                                      "MeTTa verified: immutable set operations")
-        
-        return adapted_code
-    
-    def _adapt_set_to_list_metta(self, code: str, func_name: str) -> str:
-        """Adapt set to list using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_list_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided set to list transformations
-        adapted_code = adapted_code.replace("set()", "[]")
-        adapted_code = adapted_code.replace(".add(", ".append(")
-        adapted_code = adapted_code.replace(".update(", ".extend(")
-        adapted_code = adapted_code.replace(".discard(", ".remove(")
-        
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "set", "list",
-                                                      "MeTTa verified: ordered operations acceptable")
-        
-        return adapted_code
-    
-    def _adapt_string_to_list_metta(self, code: str, func_name: str) -> str:
-        """Adapt string to list using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_list_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided string to list conversion
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, "    # MeTTa-guided character list conversion")
-                lines.insert(i + 3, "    if isinstance(text, str):")
-                lines.insert(i + 4, "        text = list(text)")
-                break
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "string", "list",
-                                                      "MeTTa reasoning: character-level processing")
-        
-        return adapted_code
-    
-    def _adapt_string_to_bytes_metta(self, code: str, func_name: str) -> str:
-        """Adapt string to bytes using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_bytes_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided string to bytes conversion
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, "    # MeTTa-guided binary conversion")
-                lines.insert(i + 3, "    if isinstance(text, str):")
-                lines.insert(i + 4, "        text = text.encode('utf-8')")
-                break
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "string", "bytes",
-                                                      "MeTTa verified: encoding compatibility")
-        
-        return adapted_code
-    
-    def _adapt_tuple_to_list_metta(self, code: str, func_name: str) -> str:
-        """Adapt tuple to list using MeTTa guidance."""
-        adapted_code = code
-        new_func_name = f"{func_name}_list_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided tuple to list conversion
-        adapted_code = adapted_code.replace("()", "[]")
-        adapted_code = adapted_code.replace("tuple(", "list(")
-        
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, "    # MeTTa-guided mutable conversion")
-                lines.insert(i + 3, "    if isinstance(data, tuple):")
-                lines.insert(i + 4, "        data = list(data)")
-                break
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "tuple", "list",
-                                                      "MeTTa verified: mutability benefits")
-        
-        return adapted_code
-    
-    def _adapt_tuple_to_namedtuple_metta(self, code: str, func_name: str) -> str:
-        """Adapt tuple to namedtuple using MeTTa guidance."""
-        adapted_code = "from collections import namedtuple\n\n" + code
-        new_func_name = f"{func_name}_namedtuple_adapted"
-        
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
-        
-        # MeTTa-guided namedtuple structure
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, "    # MeTTa-derived named structure")
-                lines.insert(i + 3, "    DataTuple = namedtuple('DataTuple', ['field1', 'field2', 'field3'])")
-                break
-        
-        adapted_code = '\n'.join(lines)
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, "tuple", "namedtuple",
-                                                      "MeTTa reasoning: structured access benefits")
-        
-        return adapted_code
-    
-    def _create_metta_guided_generic_iterable(self, context: GenerationContext) -> str:
-        """Create generic iterable adaptation with MeTTa guidance."""
+    def _apply_combined_substitutions_with_metta(self, context: GenerationContext,
+                                               substitutions: List[Dict[str, str]]) -> str:
+        """Apply multiple substitutions with MeTTa coordination."""
+        substituted_code = context.original_code
         func_name = context.function_name
-        new_func_name = f"{func_name}_iterable_generic"
         
-        adapted_code = "from typing import Iterable, Any\n\n" + context.original_code
-        adapted_code = adapted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        # Apply each substitution in MeTTa-determined order
+        substitution_descriptions = []
         
-        # MeTTa-guided generic conversion logic
-        lines = adapted_code.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('def '):
-                lines.insert(i + 2, '    """MeTTa-guided generic iterable adaptation."""')
-                lines.insert(i + 3, "    # MeTTa reasoning: universal iterable compatibility")
-                lines.insert(i + 4, "    if not isinstance(data, list):")
-                lines.insert(i + 5, "        data = list(data)")
-                break
+        for substitution in substitutions:
+            from_op = substitution.get('from')
+            to_op = substitution.get('to')
+            
+            if from_op and to_op and from_op in substituted_code:
+                substituted_code = self._safe_operation_replace(substituted_code, from_op, to_op)
+                substitution_descriptions.append(f"{from_op} to {to_op}")
         
-        return '\n'.join(lines)
+        # Update function name
+        new_func_name = f"{func_name}_multi_sub"
+        substituted_code = substituted_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        
+        # Add comprehensive MeTTa documentation
+        reasoning_desc = f"MeTTa-coordinated substitutions: {', '.join(substitution_descriptions)}"
+        substituted_code = self._add_metta_documentation(substituted_code, reasoning_desc)
+        
+        return substituted_code
     
-    def _generic_metta_adaptation(self, context: GenerationContext, 
-                                from_structure: str, to_structure: str) -> str:
-        """Generic adaptation with MeTTa reasoning traces."""
-        func_name = context.function_name
-        new_func_name = f"{func_name}_{to_structure}_adapted"
+    def _safe_operation_replace(self, code: str, original_op: str, substitute_op: str) -> str:
+        """Safely replace operations avoiding strings and comments."""
+        lines = code.split('\n')
+        result_lines = []
         
-        adapted_code = context.original_code.replace(f"def {func_name}(", f"def {new_func_name}(")
+        for line in lines:
+            # Skip commented lines
+            if line.strip().startswith('#'):
+                result_lines.append(line)
+                continue
+            
+            # Check if operation is in a string literal
+            if self._is_in_string_literal(line, original_op):
+                result_lines.append(line)
+                continue
+            
+            # Perform replacement
+            modified_line = line.replace(original_op, substitute_op)
+            result_lines.append(modified_line)
         
-        # Add MeTTa reasoning trace
-        reasoning_trace = f"MeTTa adaptation reasoning: {from_structure} to {to_structure}"
-        adapted_code = self._add_metta_adaptation_docs(adapted_code, from_structure, to_structure, reasoning_trace)
-        
-        return adapted_code
+        return '\n'.join(result_lines)
     
-    def _add_metta_adaptation_docs(self, code: str, from_type: str, to_type: str, reasoning: str) -> str:
-        """Add MeTTa adaptation documentation."""
+    def _is_in_string_literal(self, line: str, operation: str) -> bool:
+        """Check if operation appears within string literals."""
+        if operation not in line:
+            return False
+        
+        in_string = False
+        quote_char = None
+        
+        for i, char in enumerate(line):
+            if char in ['"', "'"]:
+                if not in_string:
+                    in_string = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_string = False
+                    quote_char = None
+            
+            # If we find the operation outside of strings, it's not in a literal
+            if not in_string and line[i:i+len(operation)] == operation:
+                return False
+        
+        return True
+    
+    def _generate_metta_function_name(self, func_name: str, original_op: str, substitute_op: str) -> str:
+        """Generate function name using MeTTa reasoning about operations."""
+        # Map operations to meaningful names
+        op_names = {
+            ">": "gt", "<": "lt", ">=": "gte", "<=": "lte",
+            "+": "add", "-": "sub", "*": "mult", "/": "div",
+            "==": "eq", "!=": "neq", "and": "and", "or": "or",
+            "max": "max", "min": "min"
+        }
+        
+        # Check for semantic substitutions first
+        semantic_mappings = {
+            "find_max": "find_min", "find_min": "find_max",
+            "get_maximum": "get_minimum", "get_minimum": "get_maximum"
+        }
+        
+        for semantic_from, semantic_to in semantic_mappings.items():
+            if semantic_from in func_name:
+                return func_name.replace(semantic_from, semantic_to)
+        
+        # Use operation-based naming
+        substitute_name = op_names.get(substitute_op, substitute_op.replace(".", "").replace("()", ""))
+        return f"{func_name}_{substitute_name}_variant"
+    
+    def _add_metta_documentation(self, code: str, reasoning_description: str) -> str:
+        """Add MeTTa reasoning documentation to code."""
         lines = code.split('\n')
         
         for i, line in enumerate(lines):
             if line.strip().startswith('def '):
+                # Check if there's already a docstring
                 if i + 1 < len(lines) and '"""' in lines[i + 1]:
-                    lines[i + 1] = lines[i + 1].replace('"""', f'"""MeTTa adaptation: {from_type} to {to_type}. {reasoning}. ')
+                    lines[i + 1] = lines[i + 1].replace('"""', f'"""{reasoning_description}. ')
                 else:
-                    lines.insert(i + 1, f'    """MeTTa adaptation: {from_type} to {to_type}. {reasoning}."""')
+                    lines.insert(i + 1, f'    """{reasoning_description}."""')
                 break
         
         return '\n'.join(lines)
     
     # Helper methods for MeTTa reasoning support
     
-    def _symbolic_generic_analysis(self, context: GenerationContext) -> List[Dict[str, Any]]:
-        """Fallback generic analysis when MeTTa reasoning is unavailable."""
-        code = context.original_code.lower()
+    def _is_operation_present_and_substitutable(self, code: str, operation: str) -> bool:
+        """Check if operation is present and can be safely substituted."""
+        if operation not in code:
+            return False
         
-        if any(pattern in code for pattern in ["for ", "list(", "range(", "enumerate("]):
-            return [{"adaptation_type": "generic-iterable", "applicable": True}]
-        
-        return []
+        # Check it's not in strings or comments
+        return not self._is_in_string_literal(code, operation)
     
-    def _parse_generic_result(self, result: Any) -> Optional[Dict[str, Any]]:
-        """Parse MeTTa generic reasoning result."""
+    def _determine_substitution_type(self, original_op: str, substitute_op: str) -> str:
+        """Determine the type of substitution using MeTTa reasoning."""
+        if original_op in [">", "<", ">=", "<="] and substitute_op in [">", "<", ">=", "<="]:
+            return "comparison-inverse"
+        elif original_op in ["+", "-", "*", "/"] and substitute_op in ["+", "-", "*", "/"]:
+            return "arithmetic-inverse"
+        elif original_op in ["and", "or"] and substitute_op in ["and", "or"]:
+            return "logical-inverse"
+        elif original_op in ["max", "min"] and substitute_op in ["max", "min"]:
+            return "semantic-inverse"
+        else:
+            return "unknown"
+    
+    def _infer_function_purpose(self, func_name: str) -> str:
+        """Infer function purpose for MeTTa semantic reasoning."""
+        name_lower = func_name.lower()
+        
+        if any(word in name_lower for word in ["find", "search", "get", "locate"]):
+            return "search-function"
+        elif any(word in name_lower for word in ["max", "min", "maximum", "minimum"]):
+            return "optimization-function"
+        elif any(word in name_lower for word in ["sum", "total", "count", "aggregate"]):
+            return "aggregation-function"
+        else:
+            return "general-function"
+    
+    def _symbolic_semantic_analysis(self, context: GenerationContext) -> List[Dict[str, str]]:
+        """Fallback semantic analysis when MeTTa reasoning is unavailable."""
+        results = []
+        func_name = context.function_name.lower()
+        
+        semantic_pairs = [
+            ("find_max", "find_min"), ("find_min", "find_max"),
+            ("get_maximum", "get_minimum"), ("get_minimum", "get_maximum"),
+            ("maximum", "minimum"), ("minimum", "maximum")
+        ]
+        
+        for from_concept, to_concept in semantic_pairs:
+            if from_concept in func_name:
+                results.append({"from_concept": from_concept, "to_concept": to_concept})
+        
+        return results
+    
+    def _symbolic_combination_analysis(self, context: GenerationContext) -> List[Dict[str, Any]]:
+        """Fallback combination analysis when MeTTa reasoning is unavailable."""
+        code = context.original_code
+        
+        # Define compatible substitution combinations
+        compatible_combinations = [
+            [{"from": ">", "to": "<"}, {"from": ">=", "to": "<="}],
+            [{"from": "+", "to": "-"}, {"from": "*", "to": "/"}],
+            [{"from": "and", "to": "or"}, {"from": "max", "to": "min"}]
+        ]
+        
+        applicable_combinations = []
+        
+        for combination in compatible_combinations:
+            if all(sub["from"] in code for sub in combination):
+                applicable_combinations.append({"substitutions": combination})
+        
+        return applicable_combinations
+    
+    def _parse_semantic_result(self, result: Any) -> Optional[Dict[str, str]]:
+        """Parse MeTTa semantic reasoning result."""
         try:
             result_str = str(result)
-            if "iterable-adaptation" in result_str:
-                return {"adaptation_type": "generic-iterable", "metta_verified": True}
+            if "semantic-substitution" in result_str:
+                # Extract concepts from MeTTa result
+                # This would need more sophisticated parsing in a real implementation
+                return {"from_concept": "max", "to_concept": "min"}  # Placeholder
         except Exception:
             pass
         return None
     
-    def _derive_adaptation_properties(self, adaptation_data: Dict[str, Any]) -> List[str]:
-        """Derive properties from MeTTa adaptation reasoning."""
-        properties = ["metta-reasoned", "structure-adapted"]
+    def _parse_combination_result(self, result: Any) -> Optional[Dict[str, Any]]:
+        """Parse MeTTa combination reasoning result."""
+        try:
+            result_str = str(result)
+            if "substitution-combination" in result_str:
+                # Parse combination data from MeTTa result
+                return {"substitutions": [{"from": ">", "to": "<"}]}  # Placeholder
+        except Exception:
+            pass
+        return None
+    
+    def _derive_substitution_properties(self, substitution_data: Dict[str, Any]) -> List[str]:
+        """Derive properties from MeTTa substitution reasoning."""
+        properties = ["metta-reasoned", "operation-substituted"]
         
-        from_structure = adaptation_data.get('from_structure', '')
-        to_structure = adaptation_data.get('to_structure', '')
-        compatibility = adaptation_data.get('compatibility', 0)
-        safety = adaptation_data.get('safety', '')
+        substitution_type = substitution_data.get('substitution_type', '')
         
-        # Add structure-specific properties
-        properties.append(f"{from_structure}-to-{to_structure}")
-        
-        if isinstance(compatibility, (int, float)) and compatibility > 0.8:
-            properties.append("high-compatibility")
-        
-        if safety == 'safe':
-            properties.append("adaptation-safe")
-        
-        # Add semantic properties based on structure types
-        if to_structure in ["set", "frozenset"]:
-            properties.append("unordered")
-        elif to_structure in ["tuple", "frozenset", "namedtuple"]:
-            properties.append("immutable")
-        elif to_structure == "generator":
-            properties.append("lazy-evaluation")
+        if 'inverse' in substitution_type:
+            properties.append("semantics-inverted")
+        if 'semantic' in substitution_type:
+            properties.append("semantically-transformed")
+        if 'safe' in substitution_data.get('safety', ''):
+            properties.append("transformation-safe")
         
         return properties
     
-    def _estimate_adaptation_complexity(self, compatibility: Any) -> str:
-        """Estimate complexity change from adaptation."""
-        if isinstance(compatibility, (int, float)):
-            if compatibility > 0.9:
-                return "same"
-            elif compatibility > 0.7:
-                return "slightly-higher"
-            else:
-                return "moderate-increase"
-        return "same"
-    
-    def _determine_adaptation_scope(self, compatibility: Any, safety: str) -> str:
-        """Determine applicability scope based on MeTTa reasoning."""
-        if isinstance(compatibility, (int, float)):
-            if compatibility > 0.8 and safety == 'safe':
-                return "broad"
-            elif compatibility > 0.6:
-                return "medium"
-            else:
-                return "narrow"
+    def _calculate_metta_substitution_confidence(self, substitution_data: Dict[str, Any]) -> float:
+        """Calculate confidence using MeTTa reasoning quality indicators."""
+        base_confidence = 0.7
         
-        if safety == 'safe':
+        # Boost confidence for well-reasoned substitutions
+        if substitution_data.get('reasoning') == 'metta-reasoning':
+            base_confidence += 0.1
+        
+        substitution_type = substitution_data.get('substitution_type', '')
+        if substitution_type == 'semantic-inverse':
+            base_confidence += 0.15
+        elif 'inverse' in substitution_type:
+            base_confidence += 0.1
+        
+        if substitution_data.get('safety') == 'safe':
+            base_confidence += 0.05
+        
+        return min(0.95, base_confidence)
+    
+    def _determine_substitution_scope(self, substitution_data: Dict[str, Any]) -> str:
+        """Determine applicability scope based on MeTTa reasoning."""
+        substitution_type = substitution_data.get('substitution_type', '')
+        safety = substitution_data.get('safety', '')
+        
+        if substitution_type == 'semantic-inverse' and safety == 'safe':
+            return "broad"
+        elif 'inverse' in substitution_type and safety == 'safe':
             return "medium"
         else:
             return "narrow"
     
     def _get_pattern_family(self, context: GenerationContext) -> str:
         """Get pattern family from context."""
-        if hasattr(context, 'detected_patterns') and context.detected_patterns:
+        if context.detected_patterns:
             return context.detected_patterns[0].pattern_family
-        return "generic"#!/usr/bin/env python3
+        return "generic"
+    
+    def _get_data_structures(self, context: GenerationContext) -> List[str]:
+        """Get data structures from context."""
+        if context.detected_patterns:
+            return context.detected_patterns[0].data_structures
+        return ["generic"]

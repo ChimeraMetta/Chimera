@@ -22,7 +22,7 @@ from executors.export_importer import (
     verify_export,
     export_from_metta_generation
 )
-from metta_generator.base import ModularMettaDonorGenerator
+from metta_generator.base import MeTTaPoweredModularDonorGenerator
 from metta_generator.operation_substitution import OperationSubstitutionGenerator
 from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
 from metta_generator.algo_transformation import AlgorithmTransformationGenerator
@@ -784,9 +784,6 @@ def run_metta_generate_command(target_path: str = None):
     # Initialize the NEW MeTTa-Powered Modular Donor Generator
     try:
         logger.info("Initializing NEW MeTTa-Powered Modular Donor Generator...")
-        
-        # Import the new system
-        from metta_generator.base import MeTTaPoweredModularDonorGenerator
         
         # Create the new generator with MeTTa reasoning as the core engine
         metta_generator = MeTTaPoweredModularDonorGenerator(metta_space=local_monitor.metta_space)
