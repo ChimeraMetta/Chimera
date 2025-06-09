@@ -1226,7 +1226,14 @@ class MeTTaPoweredModularDonorGenerator:
             print("      Analyzing function with static analyzer...")
             from reflectors.static_analyzer import decompose_function, convert_to_metta_atoms, CodeDecomposer
             
-            tree = ast.parse(original_code)
+            parsable_code = original_code
+            # If the code is for a method (e.g., starts with @), ast.parse will fail.
+            # We can wrap it in a dummy class to make it syntactically valid.
+            if parsable_code.strip().startswith('@'):
+                print("      Detected decorated function, wrapping in a dummy class for parsing.")
+                parsable_code = f"class DummyWrapper:\n{textwrap.indent(parsable_code, '    ')}"
+
+            tree = ast.parse(parsable_code)
             decomposer = CodeDecomposer()
             decomposer.visit(tree)
             metta_atoms = convert_to_metta_atoms(decomposer)
