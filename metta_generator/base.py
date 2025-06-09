@@ -274,6 +274,9 @@ class MeTTaReasoningEngine:
     
     def _execute_metta_reasoning(self, query: str, facts: List[str]) -> List[Any]:
         """Execute MeTTa reasoning with given query and facts."""
+        print(f"        Executing MeTTa reasoning...")
+        print(f"          Query: {query.strip()}")
+        print(f"          Facts added: {len(facts)}")
         results = []
         
         try:
@@ -282,6 +285,7 @@ class MeTTaReasoningEngine:
                 self._add_rule_safely(fact)
             
             # Execute query
+            print("          Executing query on MeTTa space...")
             if hasattr(self.metta_space, 'run'):
                 query_result = self.metta_space.run(f"!({query})")
                 if query_result:
@@ -290,11 +294,15 @@ class MeTTaReasoningEngine:
                 query_result = self.metta_space.query(query)
                 if query_result:
                     results.extend(query_result)
+            
+            print(f"          MeTTa execution returned {len(results)} results.")
         
         except Exception as e:
-            print(f"MeTTa reasoning failed: {e}")
+            print(f"        MeTTa reasoning failed: {e}")
+            print("        Falling back to symbolic reasoning.")
             # Return symbolic reasoning fallback
             results = self._symbolic_reasoning_fallback(query, facts)
+            print(f"          Symbolic fallback returned {len(results)} results.")
         
         return results
     
@@ -1199,22 +1207,27 @@ class MeTTaPoweredModularDonorGenerator:
     
     def _create_generation_context(self, func: Union[Callable, str]) -> Optional[GenerationContext]:
         """Create generation context with MeTTa reasoning support."""
+        print("    Creating generation context...")
         try:
             # Extract source code and function name
             if isinstance(func, str):
                 original_code = func
                 function_name = self._extract_function_name(func)
+                print(f"      Context from string, function name: {function_name}")
             else:
                 original_code = inspect.getsource(func)
                 function_name = func.__name__
+                print(f"      Context from callable, function name: {function_name}")
             
             # Analyze the function using existing infrastructure
+            print("      Analyzing function with static analyzer...")
             from reflectors.static_analyzer import decompose_function, convert_to_metta_atoms, CodeDecomposer
             
             tree = ast.parse(original_code)
             decomposer = CodeDecomposer()
             decomposer.visit(tree)
             metta_atoms = convert_to_metta_atoms(decomposer)
+            print(f"      Static analysis complete. Found {len(metta_atoms)} MeTTa atoms.")
             
             analysis_result = {
                 "metta_atoms": metta_atoms,
@@ -1232,8 +1245,9 @@ class MeTTaPoweredModularDonorGenerator:
             
             # Create reasoning context identifier
             reasoning_context = f"reasoning-context-{function_name}-{int(__import__('time').time())}"
+            print(f"      Created MeTTa reasoning context: {reasoning_context}")
             
-            return GenerationContext(
+            context = GenerationContext(
                 function_name=function_name,
                 original_code=original_code,
                 analysis_result=analysis_result,
@@ -1242,9 +1256,13 @@ class MeTTaPoweredModularDonorGenerator:
                 metta_space=self.metta_space,
                 metta_reasoning_context=reasoning_context
             )
+            print("    Generation context created successfully.")
+            return context
             
         except Exception as e:
             print(f"  Failed to create generation context: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _extract_function_name(self, code: str) -> str:
@@ -1489,6 +1507,7 @@ class MeTTaPoweredModularDonorGenerator:
     
     def _calculate_metta_candidate_score(self, candidate, context: GenerationContext) -> float:
         """Calculate candidate score using MeTTa reasoning."""
+        print(f"      Calculating MeTTa score for candidate: {candidate.name}")
         # Query MeTTa for candidate quality assessment
         quality_query = f"""
         (match &self
@@ -1508,12 +1527,18 @@ class MeTTaPoweredModularDonorGenerator:
             for trace in candidate.metta_reasoning_trace:
                 quality_facts.append(f"(reasoning-trace {trace})")
         
+        print(f"        MeTTa quality query: {quality_query.strip()}")
+        print(f"        MeTTa quality facts: {quality_facts}")
+
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
+        print(f"        MeTTa quality results: {quality_results}")
         
         if quality_results:
+            print("        Using MeTTa reasoning results for scoring.")
             try:
                 # Extract numeric score from MeTTa result
                 result_str = str(quality_results[0])
+                print(f"          MeTTa result string: {result_str}")
                 if "high" in result_str:
                     metta_score = 0.9
                 elif "medium" in result_str:
@@ -1522,12 +1547,17 @@ class MeTTaPoweredModularDonorGenerator:
                     metta_score = 0.5
                 else:
                     metta_score = 0.6
-            except:
+                print(f"          Extracted score: {metta_score}")
+            except Exception as e:
+                print(f"          Error extracting score from MeTTa result: {e}. Defaulting to 0.6.")
                 metta_score = 0.6
         else:
+            print("        MeTTa reasoning yielded no results, using fallback symbolic scoring.")
             # Fallback to symbolic scoring
             metta_score = self._symbolic_metta_scoring(candidate, context)
+            print(f"          Fallback symbolic score: {metta_score}")
         
+        print(f"      Final MeTTa score for {candidate.name}: {metta_score}")
         return metta_score
     
     def _symbolic_metta_scoring(self, candidate, context: GenerationContext) -> float:
