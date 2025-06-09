@@ -1212,9 +1212,50 @@ class MeTTaPoweredModularDonorGenerator:
         try:
             # Extract source code and function name
             if isinstance(func, str):
-                original_code = func
-                function_name = self._extract_function_name(func)
-                print(f"      Context from string, function name: {function_name}")
+                full_code_block = func
+                function_name = self._extract_function_name(full_code_block)
+                print(f"      Context from string, isolating function '{function_name}'...")
+
+                lines = full_code_block.split('\n')
+                start_line_idx = -1
+                import re
+
+                func_def_pattern = re.compile(fr'\bdef\s+{function_name}\b')
+                for i, line in enumerate(lines):
+                    if func_def_pattern.search(line):
+                        start_line_idx = i
+                        break
+                
+                if start_line_idx == -1:
+                    print(f"      ERROR: Could not find start of function '{function_name}'.")
+                    return None
+
+                first_line_idx = start_line_idx
+                for i in range(start_line_idx - 1, -1, -1):
+                    line = lines[i].strip()
+                    if line.startswith('@'):
+                        first_line_idx = i
+                    elif not line:
+                        continue
+                    else:
+                        break
+                
+                base_indent_level = len(lines[first_line_idx]) - len(lines[first_line_idx].lstrip())
+                
+                end_line_idx = len(lines)
+                for i in range(start_line_idx + 1, len(lines)):
+                    line = lines[i]
+                    if not line.strip():
+                        continue
+                    
+                    line_indent_level = len(line) - len(line.lstrip())
+                    if line_indent_level <= base_indent_level:
+                        end_line_idx = i
+                        break
+                
+                original_code = '\n'.join(lines[first_line_idx:end_line_idx])
+                print(f"      Successfully isolated source for '{function_name}'.")
+
             else:
                 original_code = inspect.getsource(func)
                 function_name = func.__name__
