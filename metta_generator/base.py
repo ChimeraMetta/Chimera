@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import Enum
 import ast
 import inspect
+import textwrap
 
 DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 
@@ -1218,6 +1219,8 @@ class MeTTaPoweredModularDonorGenerator:
                 original_code = inspect.getsource(func)
                 function_name = func.__name__
                 print(f"      Context from callable, function name: {function_name}")
+            
+            original_code = textwrap.dedent(original_code)
             
             # Analyze the function using existing infrastructure
             print("      Analyzing function with static analyzer...")
