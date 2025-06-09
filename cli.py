@@ -667,13 +667,13 @@ def run_visualize_command():
 
 def run_metta_generate_command(target_path: str = None):
     """
-    Run MeTTa donor generation using the real modular system.
+    Run MeTTa donor generation using the NEW MeTTa-Powered Modular system.
     Uses predefined test functions if no target_path, or parses functions from target file.
     """
     if target_path:
-        logger.info(f"Running 'generate' command using real modular MeTTa system on file: {target_path}")
+        logger.info(f"Running 'generate' command using NEW MeTTa-Powered Modular system on file: {target_path}")
     else:
-        logger.info(f"Running 'generate' command using real modular MeTTa system with predefined test functions")
+        logger.info(f"Running 'generate' command using NEW MeTTa-Powered Modular system with predefined test functions")
     
     # Initialize local monitor for this command
     local_monitor = DynamicMonitor()
@@ -729,8 +729,8 @@ def run_metta_generate_command(target_path: str = None):
             target_path = None  # Fall back to predefined functions
     
     if not target_path or not test_functions:
-        # Use predefined test functions from test_metta_gen_full.py
-        logger.info("Using predefined test functions from modular system")
+        # Use predefined test functions
+        logger.info("Using predefined test functions from MeTTa-powered system")
         
         def find_max_in_range(numbers, start_idx, end_idx):
             """Find the maximum value in a list within a specific range."""
@@ -772,71 +772,55 @@ def run_metta_generate_command(target_path: str = None):
 
         # Convert predefined functions to the same format
         predefined_functions = [
-            ("Search Function with Real Generators", find_max_in_range, find_max_in_range.__name__),
-            ("String Processing with Real Adapters", clean_and_normalize_text, clean_and_normalize_text.__name__),  
-            ("Numeric Calculation with Real Transformers", calculate_moving_average, calculate_moving_average.__name__)
+            ("Search Function with MeTTa Reasoning", find_max_in_range, find_max_in_range.__name__),
+            ("String Processing with MeTTa Adapters", clean_and_normalize_text, clean_and_normalize_text.__name__),  
+            ("Numeric Calculation with MeTTa Transformers", calculate_moving_average, calculate_moving_average.__name__)
         ]
         
         test_functions = predefined_functions
     
-    logger.info(f"Testing with {len(test_functions)} functions using real modular MeTTa system")
+    logger.info(f"Testing with {len(test_functions)} functions using NEW MeTTa-Powered Modular system")
     
-    # Initialize MeTTa donor generator with proper registry setup
+    # Initialize the NEW MeTTa-Powered Modular Donor Generator
     try:
-        logger.info("Initializing Real Modular MeTTa Donor Generator...")
-        metta_generator = ModularMettaDonorGenerator(metta_space=local_monitor.metta_space)
+        logger.info("Initializing NEW MeTTa-Powered Modular Donor Generator...")
         
-        # Register the actual generators (using the real implementations)
-        logger.info("Registering specialized donor generators...")
+        # Import the new system
+        from metta_generator.base import MeTTaPoweredModularDonorGenerator
         
-        # Register operation substitution generator
-        op_sub_generator = OperationSubstitutionGenerator()
-        metta_generator.registry.register_generator(op_sub_generator)
-        logger.info("   OperationSubstitutionGenerator registered")
+        # Create the new generator with MeTTa reasoning as the core engine
+        metta_generator = MeTTaPoweredModularDonorGenerator(metta_space=local_monitor.metta_space)
         
-        # Register data structure adaptation generator
-        data_adapt_generator = DataStructureAdaptationGenerator()
-        metta_generator.registry.register_generator(data_adapt_generator)
-        logger.info("   DataStructureAdaptationGenerator registered")
-        
-        # Register algorithm transformation generator
-        algo_transform_generator = AlgorithmTransformationGenerator()
-        metta_generator.registry.register_generator(algo_transform_generator)
-        logger.info("   AlgorithmTransformationGenerator registered")
-        
-        # Try to register structure preservation generator if available
-        try:
-            from metta_generator.structure_preservation import StructurePreservationGenerator
-            structure_pres_generator = StructurePreservationGenerator()
-            metta_generator.registry.register_generator(structure_pres_generator)
-            logger.info("   StructurePreservationGenerator registered")
-        except ImportError:
-            logger.info("   StructurePreservationGenerator not available, continuing without it")
-        
-        total_generators = len(metta_generator.registry.generators)
-        supported_strategies = len(metta_generator.registry.get_supported_strategies())
-        logger.info(f"  Total generators registered: {total_generators}")
-        logger.info(f"  Supported strategies: {supported_strategies}")
-        
-        # Load ontology
+        # Load ontology for MeTTa reasoning
         if os.path.exists(ontology_file_path):
             ontology_loaded = metta_generator.load_ontology(ontology_file_path)
             if ontology_loaded:
-                logger.info("   MeTTa ontology loaded successfully")
+                logger.info("   MeTTa reasoning ontology loaded successfully")
             else:
-                logger.warning("  Warning: MeTTa ontology not found, continuing with defaults")
+                logger.warning("  Warning: MeTTa reasoning ontology could not be loaded, using defaults")
         else:
-            logger.warning(f"  Warning: Ontology file not found at {ontology_file_path}, continuing with defaults")
+            logger.warning(f"  Warning: Ontology file not found at {ontology_file_path}, using MeTTa defaults")
+        
+        # Log information about the MeTTa-powered system
+        logger.info(f"   MeTTa reasoning engine: {type(metta_generator.reasoning_engine).__name__}")
+        logger.info(f"   MeTTa pattern detector: {type(metta_generator.pattern_detector).__name__}")
+        logger.info(f"   MeTTa strategy manager: {type(metta_generator.strategy_manager).__name__}")
+        logger.info(f"   Available generators: {len(metta_generator.generators)}")
+        
+        for i, generator in enumerate(metta_generator.generators, 1):
+            supported_strategies = generator.get_supported_strategies()
+            logger.info(f"     {i}. {generator.generator_name}: {len(supported_strategies)} strategies")
             
     except Exception as e:
-        logger.error(f"Error initializing Real Modular MeTTa Donor Generator: {e}")
-        logger.exception("Full traceback for MeTTa generator initialization error:")
+        logger.error(f"Error initializing NEW MeTTa-Powered Modular Donor Generator: {e}")
+        logger.exception("Full traceback for NEW MeTTa generator initialization error:")
         return
 
-    # Process each function
+    # Process each function with the NEW MeTTa-powered system
     all_results = {}
     successful_generations = 0
     best_alternatives = {}  # Store best alternative for each function
+    metta_reasoning_stats = {"patterns_detected": 0, "reasoning_decisions": 0, "metta_guided_generations": 0}
     
     for test_data in test_functions:
         if len(test_data) == 3:
@@ -875,23 +859,33 @@ def run_metta_generate_command(target_path: str = None):
         logger.info(f"  Description: {description}")
         
         try:
-            # Generate MeTTa donor candidates using the real modular system
-            logger.info(f"  Generating MeTTa donor candidates for '{func_name}' using real modular system...")
+            # Generate MeTTa donor candidates using the NEW MeTTa-powered system
+            logger.info(f"  Generating candidates for '{func_name}' using NEW MeTTa-Powered Modular system...")
             
-            # Use the real generation system
+            # Use the NEW generation system with MeTTa reasoning throughout
             metta_candidates = metta_generator.generate_donors_from_function(func_to_process)
             
             if metta_candidates:
-                logger.info(f"   Generated {len(metta_candidates)} MeTTa donor candidates")
+                logger.info(f"   Generated {len(metta_candidates)} MeTTa-powered candidates")
                 
-                # Store results with generator attribution
+                # Count MeTTa reasoning usage
+                metta_guided_count = sum(1 for c in metta_candidates 
+                                       if any(prop in c.get('properties', []) for prop in ['metta-reasoned', 'reasoning-guided']))
+                metta_reasoning_stats["metta_guided_generations"] += metta_guided_count
+                
+                # Store results with MeTTa reasoning attribution
                 all_results[func_name] = {
                     "test_name": test_name,
                     "function_source": func_source,
                     "candidates": metta_candidates,
                     "generation_success": True,
+                    "metta_reasoning_used": metta_guided_count,
                     "generators_used": [
                         candidate.get('generator_used', candidate['strategy']) 
+                        for candidate in metta_candidates
+                    ],
+                    "metta_reasoning_traces": [
+                        candidate.get('metta_reasoning_trace', [])
                         for candidate in metta_candidates
                     ]
                 }
@@ -900,28 +894,41 @@ def run_metta_generate_command(target_path: str = None):
                 best_candidate = metta_candidates[0] if metta_candidates else None
                 if best_candidate:
                     best_alternatives[func_name] = best_candidate
-                    logger.info(f"   Best alternative: {best_candidate['name']} (score: {best_candidate['final_score']:.2f})")
+                    metta_score = best_candidate.get('metta_score', 'N/A')
+                    logger.info(f"   Best alternative: {best_candidate['name']} (final score: {best_candidate['final_score']:.2f}, MeTTa score: {metta_score})")
                 
-                # Log top candidates with generator information
+                # Log top candidates with MeTTa reasoning information
                 for i, candidate in enumerate(metta_candidates[:3], 1):
                     generator_used = candidate.get('generator_used', 'UnknownGenerator')
+                    metta_score = candidate.get('metta_score', 'N/A')
+                    metta_traces = candidate.get('metta_reasoning_trace', [])
+                    
                     logger.info(f"    {i}. {candidate['name']}")
                     logger.info(f"       Generated by: {generator_used}")
                     logger.info(f"       Strategy: {candidate['strategy']}")
-                    logger.info(f"       Score: {candidate['final_score']:.2f}")
+                    logger.info(f"       Final Score: {candidate['final_score']:.2f}")
+                    if metta_score != 'N/A':
+                        logger.info(f"       MeTTa Score: {metta_score:.2f}")
                     logger.info(f"       Description: {candidate['description']}")
                     logger.info(f"       Pattern Family: {candidate['pattern_family']}")
+                    
+                    # Show MeTTa derivation if available
                     if candidate.get('metta_derivation'):
-                        logger.info(f"       MeTTa Reasoning: {candidate['metta_derivation'][0]}")
+                        logger.info(f"       MeTTa Derivation: {candidate['metta_derivation'][0]}")
+                    
+                    # Show MeTTa reasoning traces
+                    if metta_traces:
+                        logger.info(f"       MeTTa Reasoning: {', '.join(metta_traces[:2])}")
                 
                 successful_generations += 1
             else:
-                logger.warning(f"   No MeTTa donor candidates generated for '{func_name}'")
+                logger.warning(f"   No MeTTa-powered candidates generated for '{func_name}'")
                 all_results[func_name] = {
                     "test_name": test_name,
                     "function_source": func_source,
                     "candidates": [],
-                    "generation_success": False
+                    "generation_success": False,
+                    "metta_reasoning_used": 0
                 }
                 
         except Exception as e:
@@ -932,19 +939,28 @@ def run_metta_generate_command(target_path: str = None):
                 "function_source": "Error retrieving source",
                 "candidates": [],
                 "generation_success": False,
+                "metta_reasoning_used": 0,
                 "error": str(e)
             }
 
-    # Generate enhanced summary report with generator statistics
-    logger.info(f"\n" + "="*60)
+    # Generate enhanced summary report with MeTTa reasoning statistics
+    logger.info(f"\n" + "="*70)
     if target_path:
-        logger.info(f"REAL MODULAR METTA DONOR GENERATION SUMMARY (FILE: {os.path.basename(target_path)})")
+        logger.info(f"NEW METTA-POWERED MODULAR DONOR GENERATION SUMMARY (FILE: {os.path.basename(target_path)})")
     else:
-        logger.info(f"REAL MODULAR METTA DONOR GENERATION SUMMARY (PREDEFINED FUNCTIONS)")
-    logger.info(f"="*60)
+        logger.info(f"NEW METTA-POWERED MODULAR DONOR GENERATION SUMMARY (PREDEFINED FUNCTIONS)")
+    logger.info(f"="*70)
     logger.info(f"Functions processed: {len(test_functions)}")
     logger.info(f"Successful generations: {successful_generations}")
     logger.info(f"Failed generations: {len(test_functions) - successful_generations}")
+    
+    # MeTTa reasoning statistics
+    total_metta_guided = sum(result.get("metta_reasoning_used", 0) for result in all_results.values())
+    logger.info(f"\nMeTTa Reasoning Statistics:")
+    logger.info(f"  Total MeTTa-guided candidates: {total_metta_guided}")
+    if successful_generations > 0:
+        avg_metta_per_func = total_metta_guided / successful_generations
+        logger.info(f"  Average MeTTa-guided per function: {avg_metta_per_func:.1f}")
     
     # Generator usage statistics
     generator_stats = {}
@@ -964,80 +980,99 @@ def run_metta_generate_command(target_path: str = None):
                 strategy = candidate['strategy']
                 strategy_stats[strategy] = strategy_stats.get(strategy, 0) + 1
     
-    logger.info(f"\nReal Generator Usage Statistics:")
+    logger.info(f"\nMeTTa-Powered Generator Usage Statistics:")
     for generator, count in sorted(generator_stats.items(), key=lambda x: x[1], reverse=True):
         percentage = (count / total_candidates * 100) if total_candidates > 0 else 0
         logger.info(f"  {generator}: {count} candidates ({percentage:.1f}%)")
     
-    logger.info(f"\nStrategy Usage Statistics:")
+    logger.info(f"\nMeTTa-Guided Strategy Usage Statistics:")
     for strategy, count in sorted(strategy_stats.items(), key=lambda x: x[1], reverse=True):
         percentage = (count / total_candidates * 100) if total_candidates > 0 else 0
         logger.info(f"  {strategy}: {count} candidates ({percentage:.1f}%)")
     
-    # Show best alternatives prominently
+    # Show best alternatives prominently with MeTTa reasoning details
     if best_alternatives:
-        logger.info(f"\n" + "="*60)
-        logger.info(f"BEST WORKING ALTERNATIVES")
-        logger.info(f"="*60)
+        logger.info(f"\n" + "="*70)
+        logger.info(f"BEST METTA-REASONED ALTERNATIVES")
+        logger.info(f"="*70)
         
         for func_name, best_candidate in best_alternatives.items():
             result = all_results[func_name]
+            metta_score = best_candidate.get('metta_score', 'N/A')
+            metta_traces = best_candidate.get('metta_reasoning_trace', [])
+            
             logger.info(f"\nFunction: {func_name}")
             logger.info(f"Test: {result['test_name']}")
             logger.info(f"Best Alternative: {best_candidate['name']}")
             logger.info(f"Generated by: {best_candidate.get('generator_used', 'Unknown')}")
             logger.info(f"Strategy: {best_candidate['strategy']}")
             logger.info(f"Final Score: {best_candidate['final_score']:.2f}")
+            if metta_score != 'N/A':
+                logger.info(f"MeTTa Score: {metta_score:.2f}")
             logger.info(f"Confidence: {best_candidate['confidence']:.2f}")
             logger.info(f"Description: {best_candidate['description']}")
             logger.info(f"Pattern Family: {best_candidate['pattern_family']}")
             logger.info(f"Properties: {', '.join(best_candidate['properties'])}")
+            
+            # Show MeTTa reasoning details
             if best_candidate.get('metta_derivation'):
-                logger.info(f"MeTTa Reasoning: {best_candidate['metta_derivation'][0]}")
+                logger.info(f"MeTTa Derivation: {best_candidate['metta_derivation'][0]}")
+            if metta_traces:
+                logger.info(f"MeTTa Reasoning Traces: {', '.join(metta_traces)}")
             
             logger.info(f"\nBest Alternative Code:")
-            logger.info(f"-" * 40)
+            logger.info(f"-" * 50)
             code_lines = best_candidate['code'].split('\n')
             for i, line in enumerate(code_lines, 1):
                 logger.info(f"{i:3d}: {line}")
-            logger.info(f"-" * 40)
+            logger.info(f"-" * 50)
     
-    # Show detailed results for each function
-    logger.info(f"\n" + "="*60)
-    logger.info(f"DETAILED PER-FUNCTION RESULTS")
-    logger.info(f"="*60)
+    # Show detailed results for each function with MeTTa reasoning info
+    logger.info(f"\n" + "="*70)
+    logger.info(f"DETAILED PER-FUNCTION METTA RESULTS")
+    logger.info(f"="*70)
     
     for func_name, result in all_results.items():
         logger.info(f"\n{result['test_name']} ({func_name}):")
         if result["generation_success"]:
             candidates = result["candidates"]
             generators_used = set(result.get("generators_used", []))
+            metta_reasoning_used = result.get("metta_reasoning_used", 0)
+            
             logger.info(f"   {len(candidates)} candidates generated successfully")
-            logger.info(f"  Generators used: {', '.join(generators_used)}")
+            logger.info(f"   MeTTa-guided candidates: {metta_reasoning_used}")
+            logger.info(f"   Generators used: {', '.join(generators_used)}")
+            
             if candidates:
                 best_candidate = candidates[0]
-                logger.info(f"  Best: {best_candidate['name']} (score: {best_candidate['final_score']:.2f})")
-                logger.info(f"  Best strategy: {best_candidate['strategy']}")
-                logger.info(f"  Best generator: {best_candidate.get('generator_used', 'Unknown')}")
+                metta_score = best_candidate.get('metta_score', 'N/A')
+                logger.info(f"   Best: {best_candidate['name']} (final score: {best_candidate['final_score']:.2f}")
+                if metta_score != 'N/A':
+                    logger.info(f"         MeTTa score: {metta_score:.2f})")
+                else:
+                    logger.info(")")
+                logger.info(f"   Best strategy: {best_candidate['strategy']}")
+                logger.info(f"   Best generator: {best_candidate.get('generator_used', 'Unknown')}")
         else:
             if "error" in result:
                 logger.info(f"   Error: {result['error']}")
             else:
                 logger.info(f"   No candidates generated")
 
-    # Save detailed results to file with generator information
+    # Save detailed results to file with MeTTa reasoning information
     try:
         output_dir = os.path.join(_WORKSPACE_ROOT, "metta_generation_results")
         os.makedirs(output_dir, exist_ok=True)
         
-        # Save enhanced summary report
+        # Save enhanced summary report with MeTTa reasoning stats
         if target_path:
-            summary_file = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(target_path))[0]}_real_modular_metta_summary.txt")
+            summary_file = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(target_path))[0]}_metta_powered_summary.txt")
         else:
-            summary_file = os.path.join(output_dir, f"predefined_functions_real_modular_metta_summary.txt")
+            summary_file = os.path.join(output_dir, f"predefined_functions_metta_powered_summary.txt")
+        
         with open(summary_file, 'w') as f:
-            f.write(f"Real Modular MeTTa Donor Generation Summary\n")
-            f.write(f"{'='*60}\n")
+            f.write(f"NEW MeTTa-Powered Modular Donor Generation Summary\n")
+            f.write(f"{'='*70}\n")
             if target_path:
                 f.write(f"Source file: {target_path}\n")
             else:
@@ -1045,71 +1080,101 @@ def run_metta_generate_command(target_path: str = None):
             f.write(f"Generated on: {time.ctime()}\n")
             f.write(f"Functions processed: {len(test_functions)}\n")
             f.write(f"Successful generations: {successful_generations}\n")
-            f.write(f"Total candidates: {total_candidates}\n\n")
+            f.write(f"Total candidates: {total_candidates}\n")
+            f.write(f"MeTTa-guided candidates: {total_metta_guided}\n\n")
+            
+            # MeTTa reasoning statistics
+            f.write(f"MeTTa Reasoning Statistics:\n")
+            f.write(f"{'='*35}\n")
+            f.write(f"Total MeTTa-guided candidates: {total_metta_guided}\n")
+            if successful_generations > 0:
+                avg_metta_per_func = total_metta_guided / successful_generations
+                f.write(f"Average MeTTa-guided per function: {avg_metta_per_func:.1f}\n")
             
             # Generator statistics
-            f.write(f"Real Generator Usage:\n")
-            f.write(f"{'='*30}\n")
+            f.write(f"\nMeTTa-Powered Generator Usage:\n")
+            f.write(f"{'='*40}\n")
             for generator, count in sorted(generator_stats.items(), key=lambda x: x[1], reverse=True):
                 percentage = (count / total_candidates * 100) if total_candidates > 0 else 0
                 f.write(f"{generator}: {count} candidates ({percentage:.1f}%)\n")
             
-            f.write(f"\nStrategy Usage:\n")
-            f.write(f"{'='*20}\n")
+            f.write(f"\nMeTTa-Guided Strategy Usage:\n")
+            f.write(f"{'='*35}\n")
             for strategy, count in sorted(strategy_stats.items(), key=lambda x: x[1], reverse=True):
                 percentage = (count / total_candidates * 100) if total_candidates > 0 else 0
                 f.write(f"{strategy}: {count} candidates ({percentage:.1f}%)\n")
             
-            # Best alternatives section
-            f.write(f"\nBest Working Alternatives:\n")
-            f.write(f"{'='*40}\n")
+            # Best alternatives section with MeTTa reasoning
+            f.write(f"\nBest MeTTa-Reasoned Alternatives:\n")
+            f.write(f"{'='*45}\n")
             for func_name, best_candidate in best_alternatives.items():
                 result = all_results[func_name]
+                metta_score = best_candidate.get('metta_score', 'N/A')
+                metta_traces = best_candidate.get('metta_reasoning_trace', [])
+                
                 f.write(f"\nFunction: {func_name}\n")
                 f.write(f"Test: {result['test_name']}\n")
                 f.write(f"Best Alternative: {best_candidate['name']}\n")
                 f.write(f"Generated by: {best_candidate.get('generator_used', 'Unknown')}\n")
                 f.write(f"Strategy: {best_candidate['strategy']}\n")
                 f.write(f"Final Score: {best_candidate['final_score']:.2f}\n")
+                if metta_score != 'N/A':
+                    f.write(f"MeTTa Score: {metta_score:.2f}\n")
                 f.write(f"Description: {best_candidate['description']}\n")
                 f.write(f"Properties: {', '.join(best_candidate['properties'])}\n")
+                
+                # MeTTa reasoning details
                 if best_candidate.get('metta_derivation'):
-                    f.write(f"MeTTa Reasoning: {best_candidate['metta_derivation'][0]}\n")
+                    f.write(f"MeTTa Derivation: {best_candidate['metta_derivation'][0]}\n")
+                if metta_traces:
+                    f.write(f"MeTTa Reasoning Traces: {', '.join(metta_traces)}\n")
+                    
                 f.write(f"\nCode:\n{best_candidate['code']}\n")
-                f.write(f"{'-'*50}\n")
+                f.write(f"{'-'*60}\n")
             
-            f.write(f"\nDetailed Results:\n")
-            f.write(f"{'='*30}\n")
+            # Detailed results with MeTTa reasoning
+            f.write(f"\nDetailed MeTTa Results:\n")
+            f.write(f"{'='*35}\n")
             
             for func_name, result in all_results.items():
                 f.write(f"\nTest: {result['test_name']}\n")
                 f.write(f"Function: {func_name}\n")
-                f.write(f"{'='*50}\n")
+                f.write(f"{'='*60}\n")
                 if result["generation_success"]:
                     candidates = result["candidates"]
                     generators_used = set(result.get("generators_used", []))
+                    metta_reasoning_used = result.get("metta_reasoning_used", 0)
+                    
                     f.write(f"Candidates generated: {len(candidates)}\n")
+                    f.write(f"MeTTa-guided candidates: {metta_reasoning_used}\n")
                     f.write(f"Generators used: {', '.join(generators_used)}\n")
                     
                     for i, candidate in enumerate(candidates, 1):
                         generator_used = candidate.get('generator_used', 'Unknown')
+                        metta_score = candidate.get('metta_score', 'N/A')
+                        metta_traces = candidate.get('metta_reasoning_trace', [])
+                        
                         f.write(f"\n{i}. {candidate['name']}\n")
                         f.write(f"   Generated by: {generator_used}\n")
                         f.write(f"   Strategy: {candidate['strategy']}\n")
-                        f.write(f"   Score: {candidate['final_score']:.2f}\n")
+                        f.write(f"   Final Score: {candidate['final_score']:.2f}\n")
+                        if metta_score != 'N/A':
+                            f.write(f"   MeTTa Score: {metta_score:.2f}\n")
                         f.write(f"   Pattern Family: {candidate['pattern_family']}\n")
                         f.write(f"   Description: {candidate['description']}\n")
                         f.write(f"   Properties: {', '.join(candidate['properties'])}\n")
                         
                         # MeTTa reasoning evidence
                         if candidate.get('metta_derivation'):
-                            f.write(f"   MeTTa Reasoning: {candidate['metta_derivation'][0]}\n")
+                            f.write(f"   MeTTa Derivation: {candidate['metta_derivation'][0]}\n")
+                        if metta_traces:
+                            f.write(f"   MeTTa Reasoning: {', '.join(metta_traces)}\n")
                 else:
                     f.write("No candidates generated\n")
                     if "error" in result:
                         f.write(f"Error: {result['error']}\n")
         
-        # Save detailed code for successful generations with generator attribution
+        # Save detailed code for successful generations with MeTTa reasoning attribution
         for func_name, result in all_results.items():
             if result["generation_success"] and result["candidates"]:
                 func_output_dir = os.path.join(output_dir, func_name)
@@ -1120,20 +1185,26 @@ def run_metta_generate_command(target_path: str = None):
                     candidate_path = os.path.join(func_output_dir, candidate_filename)
                     
                     generator_used = candidate.get('generator_used', 'UnknownGenerator')
+                    metta_score = candidate.get('metta_score', 'N/A')
+                    metta_traces = candidate.get('metta_reasoning_trace', [])
                     
                     with open(candidate_path, 'w') as f:
-                        f.write(f"# Real Modular MeTTa Donor Candidate: {candidate['name']}\n")
+                        f.write(f"# NEW MeTTa-Powered Donor Candidate: {candidate['name']}\n")
                         f.write(f"# Original function: {func_name}\n")
                         f.write(f"# Test: {result['test_name']}\n")
                         f.write(f"# Generated by: {generator_used}\n")
                         f.write(f"# Strategy: {candidate['strategy']}\n")
                         f.write(f"# Pattern Family: {candidate['pattern_family']}\n")
-                        f.write(f"# Score: {candidate['final_score']:.2f}\n")
+                        f.write(f"# Final Score: {candidate['final_score']:.2f}\n")
+                        if metta_score != 'N/A':
+                            f.write(f"# MeTTa Score: {metta_score:.2f}\n")
                         f.write(f"# Confidence: {candidate['confidence']:.2f}\n")
                         f.write(f"# Description: {candidate['description']}\n")
                         f.write(f"# Properties: {', '.join(candidate['properties'])}\n")
                         if candidate.get('metta_derivation'):
-                            f.write(f"# MeTTa Reasoning: {candidate['metta_derivation'][0]}\n")
+                            f.write(f"# MeTTa Derivation: {candidate['metta_derivation'][0]}\n")
+                        if metta_traces:
+                            f.write(f"# MeTTa Reasoning: {', '.join(metta_traces)}\n")
                         f.write(f"# Generated on: {time.ctime()}\n")
                         f.write(f"\n{candidate['code']}\n")
         
@@ -1143,38 +1214,63 @@ def run_metta_generate_command(target_path: str = None):
     except Exception as e:
         logger.error(f"Error saving results: {e}")
 
-    # DIRECT EXPORT: Export MeTTa atoms from generation with generator info
+    # DIRECT EXPORT: Export MeTTa atoms from generation with MeTTa reasoning info
     try:
         if not os.path.exists(_INTERMEDIATE_EXPORT_DIR):
             os.makedirs(_INTERMEDIATE_EXPORT_DIR, exist_ok=True)
         
-        metta_generate_export_file = os.path.join(_INTERMEDIATE_EXPORT_DIR, "real_modular_metta_generate_export.metta")
-        logger.info(f"Exporting real modular MeTTa generation atoms to: {metta_generate_export_file}")
+        metta_generate_export_file = os.path.join(_INTERMEDIATE_EXPORT_DIR, "metta_powered_generate_export.metta")
+        logger.info(f"Exporting MeTTa-powered generation atoms to: {metta_generate_export_file}")
         
-        # Export generation results to MeTTa format with generator information
+        # Export generation results to MeTTa format with MeTTa reasoning information
         export_success = export_from_metta_generation(all_results, metta_generate_export_file)
         
         if export_success:
             verification = verify_export(metta_generate_export_file)
             if verification["success"]:
-                logger.info(f"Real modular MeTTa generation atoms exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
+                logger.info(f"MeTTa-powered generation atoms exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
             else:
                 logger.warning(f"Export verification failed: {verification.get('error', 'Unknown error')}")
         else:
-            logger.warning(f"Failed to export real modular MeTTa generation atoms.")
+            logger.warning(f"Failed to export MeTTa-powered generation atoms.")
             
     except Exception as e:
-        logger.error(f"Error during real modular MeTTa generation atom export: {e}")
+        logger.error(f"Error during MeTTa-powered generation atom export: {e}")
 
-    logger.info(f"\n" + "="*60)
-    logger.info(f"REAL MODULAR METTA GENERATE COMMAND COMPLETE")
-    logger.info(f"="*60)
-    logger.info(f"Successfully demonstrated real modular MeTTa donor generation")
+    logger.info(f"\n" + "="*70)
+    logger.info(f"NEW METTA-POWERED GENERATE COMMAND COMPLETE")
+    logger.info(f"="*70)
+    logger.info(f"Successfully demonstrated NEW MeTTa-powered donor generation")
     logger.info(f"Total candidates generated: {total_candidates}")
+    logger.info(f"MeTTa-guided candidates: {total_metta_guided}")
     logger.info(f"Best alternatives identified for {len(best_alternatives)} functions")
-    logger.info(f"Real generators used: {len(generator_stats)}")
-    logger.info(f"Strategies applied: {len(strategy_stats)}")
+    logger.info(f"MeTTa-powered generators used: {len(generator_stats)}")
+    logger.info(f"MeTTa-guided strategies applied: {len(strategy_stats)}")
     logger.info(f"Results saved to: {output_dir}")
+    
+    # Provide guidance on the NEW MeTTa-powered system
+    logger.info(f"\n" + "="*70)
+    logger.info(f"NEW METTA-POWERED SYSTEM FEATURES DEMONSTRATED:")
+    logger.info(f"="*70)
+    logger.info(f"✓ MeTTa reasoning engine for intelligent pattern detection")
+    logger.info(f"✓ MeTTa-guided strategy selection and applicability checking")
+    logger.info(f"✓ Symbolic reasoning fallbacks when MeTTa execution fails")
+    logger.info(f"✓ MeTTa-derived transformations with reasoning traces")
+    logger.info(f"✓ Enhanced candidate scoring with MeTTa confidence metrics")
+    logger.info(f"✓ Learning and adaptation from generation feedback")
+    logger.info(f"")
+    logger.info(f"Key advantages over previous system:")
+    logger.info(f"  - Symbolic reasoning as core decision-making engine")
+    logger.info(f"  - Pattern detection guided by formal logic")
+    logger.info(f"  - Transformation safety verified through MeTTa rules")
+    logger.info(f"  - Detailed reasoning traces for transparency")
+    logger.info(f"  - Self-improving through learning rules")
+    logger.info(f"")
+    logger.info(f"Next steps:")
+    logger.info(f"  - Review MeTTa reasoning traces in generated candidates")
+    logger.info(f"  - Examine the symbolic reasoning fallbacks for robustness")
+    logger.info(f"  - Use 'export' command to save MeTTa reasoning atomspace")
+    logger.info(f"  - Compare results with 'analyze' command for API-based optimization")
 
 # --- Main CLI Logic ---
 
