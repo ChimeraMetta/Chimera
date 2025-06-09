@@ -1264,6 +1264,9 @@ class MeTTaPoweredModularDonorGenerator:
             
         except Exception as e:
             print(f"  Failed to create generation context: {e}")
+            print("  --- Problematic Code ---")
+            print(original_code)
+            print("  ------------------------")
             import traceback
             traceback.print_exc()
             return None
