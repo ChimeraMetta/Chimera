@@ -1577,7 +1577,7 @@ class MeTTaPoweredModularDonorGenerator:
         ]
         
         # Add reasoning trace facts
-        if hasattr(candidate, 'metta_reasoning_trace'):
+        if hasattr(candidate, 'metta_reasoning_trace') and candidate.metta_reasoning_trace is not None:
             for trace in candidate.metta_reasoning_trace:
                 quality_facts.append(f"(reasoning-trace {trace})")
         
