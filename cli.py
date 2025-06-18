@@ -530,6 +530,27 @@ def run_export_atomspace_command(output_metta_path: str):
 
     logger.info(f"'export' command for {output_metta_path} complete.")
 
+def run_evolve_command():
+    """
+    Run the basic evolution test from metta_generator.base
+    """
+    logger.info(f"Running 'evolve' command - testing basic evolution system")
+    
+    try:
+        from metta_generator.base import test_basic_evolution
+        success = test_basic_evolution()
+        
+        if success:
+            logger.info("Evolution test completed successfully")
+        else:
+            logger.warning("Evolution test completed with issues")
+            
+    except Exception as e:
+        logger.error(f"Error running evolution test: {e}")
+        logger.exception("Full traceback for evolution test error:")
+
+    logger.info(f"'evolve' command complete.")
+
 def run_visualize_command():
     """
     Run the enhanced donor generation visualization using a demonstration function.
@@ -1286,7 +1307,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "command", 
-        choices=["summary", "analyze", "import", "export", "visualize", "generate"],
+        choices=["summary", "analyze", "import", "export", "visualize", "generate", "evolve"],
         help=(
             "The command to execute. Each command has specific behaviors:\n"
             "  summary: Codebase structure, patterns, and concepts analysis.\n"
@@ -1383,6 +1404,8 @@ if __name__ == "__main__":
         run_visualize_command()
     elif args.command == "generate":
         run_metta_generate_command(args.path)
+    elif args.command == "evolve":
+        run_evolve_command()
     else:
         logger.error(f"Unknown command: {args.command}") 
         parser.print_help()
