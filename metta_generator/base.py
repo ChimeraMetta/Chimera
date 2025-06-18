@@ -15,7 +15,10 @@ from enum import Enum
 import ast
 import inspect
 import textwrap
+from metta_generator.evolution.basic import BasicEvolutionEngine
+from metta_generator.genetics.genome import SimpleCodeGenome, MeTTaGene
 
+EVOLUTION_AVAILABLE = True
 DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 
 @dataclass
@@ -1058,7 +1061,7 @@ class MeTTaStrategyManager:
 class MeTTaPoweredModularDonorGenerator:
     """Main coordinator using MeTTa reasoning as the core engine."""
     
-    def __init__(self, metta_space=None):
+    def __init__(self, metta_space=None, enable_evolution=True):
         from reflectors.dynamic_monitor import monitor
         
         self.metta_space = metta_space or monitor
@@ -1075,6 +1078,20 @@ class MeTTaPoweredModularDonorGenerator:
         self._setup_generators_with_reasoning()
         
         print("  Initialized MeTTa-Powered Modular Donor Generator...")
+
+        # Add evolution capability
+        self.enable_evolution = enable_evolution and EVOLUTION_AVAILABLE
+        self.evolution_engine = None
+        
+        if self.enable_evolution:
+            print("Evolution mode enabled - initializing BasicEvolutionEngine")
+            self.evolution_engine = BasicEvolutionEngine(
+                metta_space=self.metta_space,
+                population_size=10,  # Small for testing
+                max_generations=5    # Small for testing
+            )
+            print(f"     Population size: 10, Generations: 5")
+            print(f"     Gene pool initialized with {len(self.evolution_engine.gene_pool.genes_by_type)} pattern types")
     
     def _setup_generators_with_reasoning(self):
         """Setup generators with access to MeTTa reasoning engine."""
@@ -1101,6 +1118,68 @@ class MeTTaPoweredModularDonorGenerator:
     def get_generators_for_strategy(self, strategy: GenerationStrategy) -> List:
         """Get all generators that can handle a specific strategy."""
         return [gen for gen in self.generators if strategy in gen.get_supported_strategies()]
+    
+    def generate_donors_with_evolution(self, func: Union[Callable, str],
+                                     strategies: Optional[List] = None) -> List[Dict[str, Any]]:
+        """Generate donor candidates using evolutionary algorithm (experimental)"""
+        
+        if not self.enable_evolution:
+            print("  Evolution not enabled, falling back to standard generation")
+            return self.generate_donors_from_function(func, strategies)
+        
+        print("Starting evolutionary donor generation...")
+        
+        # Create generation context like your existing method
+        context = self._create_generation_context(func)
+        if not context:
+            return []
+        
+        print(f"  Function to evolve: {context.function_name}")
+        
+        # Use evolution engine
+        try:
+            evolved_population = self.evolution_engine.evolve_population(
+                context.original_code, 
+                context.function_name
+            )
+            
+            # Convert evolved genomes to donor candidates
+            candidates = []
+            for i, genome in enumerate(evolved_population[:5]):  # Top 5
+                evolved_code = self.evolution_engine.genome_to_code(genome, context.function_name)
+                
+                candidate = {
+                    "name": f"{context.function_name}_evolved_gen{genome.generation}_{i+1}",
+                    "description": f"Evolved candidate (fitness: {genome.fitness_score:.3f})",
+                    "code": evolved_code,
+                    "strategy": "evolutionary_algorithm",
+                    "pattern_family": "evolved",
+                    "data_structures_used": [gene.pattern_type for gene in genome.genes],
+                    "operations_used": ["evolution"],
+                    "metta_derivation": [gene.metta_atom for gene in genome.genes],
+                    "confidence": genome.fitness_score,
+                    "final_score": genome.fitness_score,
+                    "properties": ["evolved", "metta-guided"],
+                    "complexity_estimate": "similar",
+                    "applicability_scope": "experimental",
+                    "generator_used": "BasicEvolutionEngine",
+                    "evolution_metadata": {
+                        "genome_id": genome.genome_id,
+                        "generation": genome.generation,
+                        "parent_ids": genome.parent_ids,
+                        "gene_count": len(genome.genes),
+                        "gene_types": list(set(gene.pattern_type for gene in genome.genes))
+                    }
+                }
+                candidates.append(candidate)
+            
+            print(f"Evolution generated {len(candidates)} candidates")
+            return candidates
+            
+        except Exception as e:
+            print(f"Evolution failed: {e}")
+            print("  Falling back to standard generation")
+            return self.generate_donors_from_function(func, strategies)
     
     def generate_candidates(self, context: GenerationContext, 
                           strategies: Optional[List] = None) -> List:
@@ -1767,5 +1846,56 @@ def demonstrate_metta_powered_generation():
     
     return True
 
+def test_basic_evolution():
+    """Quick test of the basic evolution system"""
+    print("Testing Basic Evolution System")
+    print("=" * 50)
+    
+    # Test function
+    def find_max_in_range(numbers, start_idx, end_idx):
+        """Find the maximum value in a list within a specific range."""
+        if start_idx < 0 or end_idx > len(numbers) or start_idx >= end_idx:
+            return None
+        
+        max_val = numbers[start_idx]
+        for i in range(start_idx + 1, end_idx):
+            if numbers[i] > max_val:
+                max_val = numbers[i]
+        
+        return max_val
+    
+    try:
+        # Initialize generator with evolution
+        generator = MeTTaPoweredModularDonorGenerator(enable_evolution=True)
+        
+        # Generate evolutionary donors
+        print(f"\nTesting evolution on: {find_max_in_range.__name__}")
+        candidates = generator.generate_donors_with_evolution(find_max_in_range)
+        
+        print(f"\nResults:")
+        for i, candidate in enumerate(candidates, 1):
+            print(f"\n{i}. {candidate['name']}")
+            print(f"   Fitness: {candidate['confidence']:.3f}")
+            print(f"   Gene types: {candidate['evolution_metadata']['gene_types']}")
+            print(f"   Generation: {candidate['evolution_metadata']['generation']}")
+        
+        if candidates:
+            print(f"\nBest candidate:")
+            best = candidates[0]
+            print(f"   Name: {best['name']}")
+            print(f"   Fitness: {best['confidence']:.3f}")
+            print(f"   Code preview:")
+            for line_num, line in enumerate(best['code'].split('\n')[:10], 1):
+                print(f"     {line_num:2d}: {line}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Evolution test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+# Add this to enable command line testing
 if __name__ == "__main__":
-    demonstrate_metta_powered_generation()
+    test_basic_evolution()
