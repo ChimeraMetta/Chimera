@@ -13,13 +13,21 @@ from typing import Dict, List, Any, Optional, Union, Callable
 from dataclasses import dataclass
 from enum import Enum
 import ast
+import os
 import inspect
 import textwrap
 from metta_generator.evolution.basic import BasicEvolutionEngine
 from metta_generator.genetics.genome import SimpleCodeGenome, MeTTaGene
+from metta_generator.evolution_integrator import (
+        integrate_semantic_evolution_with_base_generator,
+        EnhancedEvolutionIntegrator,
+        SEMANTIC_EVOLUTION_AVAILABLE
+    )
 
 EVOLUTION_AVAILABLE = True
 DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
+SEMANTIC_EVOLUTION_ONTOLOGY = "metta/semantic_evolution.metta"
+_WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 @dataclass
 class GenerationContext:
@@ -1079,19 +1087,36 @@ class MeTTaPoweredModularDonorGenerator:
         
         print("  Initialized MeTTa-Powered Modular Donor Generator...")
 
-        # Add evolution capability
-        self.enable_evolution = enable_evolution and EVOLUTION_AVAILABLE
-        self.evolution_engine = None
+       # Add semantic evolution capability
+        self.enable_semantic_evolution = enable_evolution and SEMANTIC_EVOLUTION_AVAILABLE
         
-        if self.enable_evolution:
-            print("Evolution mode enabled - initializing BasicEvolutionEngine")
-            self.evolution_engine = BasicEvolutionEngine(
-                metta_space=self.metta_space,
-                population_size=10,  # Small for testing
-                max_generations=5    # Small for testing
-            )
-            print(f"     Population size: 10, Generations: 5")
-            print(f"     Gene pool initialized with {len(self.evolution_engine.gene_pool.genes_by_type)} pattern types")
+        if self.enable_semantic_evolution:
+            print("  Enabling semantic evolution integration...")
+            integrate_semantic_evolution_with_base_generator(self, enable_semantic=True)
+            # Load semantic evolution MeTTa rules
+            self._load_semantic_evolution_rules()
+        else:
+            print("  Semantic evolution not enabled")
+    
+    def _load_semantic_evolution_rules(self):
+        """Load semantic evolution MeTTa rules"""
+        semantic_rules_file = os.path.join(_WORKSPACE_ROOT, SEMANTIC_EVOLUTION_ONTOLOGY)
+        if os.path.exists(semantic_rules_file):
+            try:
+                with open(semantic_rules_file, 'r') as f:
+                    rules_content = f.read()
+                
+                # Parse and load rules
+                for line in rules_content.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith(';') and line.startswith('(='):
+                        self.reasoning_engine._add_rule_safely(line)
+                
+                print(f"    Loaded semantic evolution rules from {semantic_rules_file}")
+            except Exception as e:
+                print(f"    Failed to load semantic evolution rules: {e}")
+        else:
+            print(f"    Semantic evolution rules file not found: {semantic_rules_file}")
     
     def _setup_generators_with_reasoning(self):
         """Setup generators with access to MeTTa reasoning engine."""
@@ -1180,6 +1205,14 @@ class MeTTaPoweredModularDonorGenerator:
             print(f"Evolution failed: {e}")
             print("  Falling back to standard generation")
             return self.generate_donors_from_function(func, strategies)
+    
+    def generate_donors_with_semantic_evolution(self, func, strategies=None):
+        """Generate donors using semantic evolution if available"""
+        if not self.enable_semantic_evolution:
+            return self.generate_donors_from_function(func, strategies)
+        
+        # This will use the integrated semantic evolution
+        return self.generate_donors_from_function(func, strategies, use_semantic_evolution=True)
     
     def generate_candidates(self, context: GenerationContext, 
                           strategies: Optional[List] = None) -> List:
