@@ -537,17 +537,17 @@ def run_evolve_command():
     logger.info(f"Running 'evolve' command - testing basic evolution system")
     
     try:
-        from metta_generator.base import test_basic_evolution
-        success = test_basic_evolution()
-        
-        if success:
-            logger.info("Evolution test completed successfully")
-        else:
-            logger.warning("Evolution test completed with issues")
+        from metta_generator.evolution.semantic_evolution import demonstrate_semantic_evolution
+        logger.info("Starting semantic evolution demonstration...")
+        success = demonstrate_semantic_evolution()
             
-    except Exception as e:
-        logger.error(f"Error running evolution test: {e}")
-        logger.exception("Full traceback for evolution test error:")
+        if success:
+            logger.info("Semantic evolution demonstration completed successfully")
+        else:
+            logger.warning("Semantic evolution demonstration completed with issues")
+                
+    except ImportError as e:
+        logger.error(f"Semantic evolution not available: {e}")
 
     logger.info(f"'evolve' command complete.")
 
