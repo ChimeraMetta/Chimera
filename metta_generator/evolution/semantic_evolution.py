@@ -234,8 +234,6 @@ class SemanticEvolutionEngine:
         self.fitness_evaluator = FitnessEvaluator(
             reference_function=reference_function,
         )
-        
-        print(f"  Setup complete: {len(self.test_framework.test_cases)} test cases generated")
     
     def evolve_solutions(self, target_semantics: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Main evolution loop with semantic awareness"""
@@ -638,7 +636,6 @@ class SemanticEvolutionEngine:
             ),
             "gene_pool_stats": self.semantic_gene_pool.get_stats(),
             "evaluator_stats": self.fitness_evaluator.get_evaluation_stats(),
-            "test_summary": self.test_framework.get_test_summary(),
             "evolution_history": self.evolution_history,
             "best_genome_summary": best_ever.get_semantic_summary() if best_ever else {}
         }
@@ -727,7 +724,6 @@ def demonstrate_semantic_evolution():
         print(f"   Efficiency: {metadata['efficiency_score']:.3f}")
         print(f"   Generation: {metadata['generation']}")
         print(f"   Semantic Roles: {metadata['semantic_roles']}")
-        print(f"   Test Results: {metadata['test_results'].get('passed', 0)}/{len(engine.test_framework.test_cases)} passed")
         
         # Show code preview
         code_lines = result['code'].split('\n')
