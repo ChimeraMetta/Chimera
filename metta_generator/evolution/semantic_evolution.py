@@ -233,7 +233,6 @@ class SemanticEvolutionEngine:
         # Setup fitness evaluator
         self.fitness_evaluator = FitnessEvaluator(
             reference_function=reference_function,
-            test_cases=[(tc.inputs, tc.expected_output) for tc in self.test_framework.test_cases]
         )
         
         print(f"  Setup complete: {len(self.test_framework.test_cases)} test cases generated")
