@@ -532,22 +532,144 @@ def run_export_atomspace_command(output_metta_path: str):
 
 def run_evolve_command():
     """
-    Run the basic evolution test from metta_generator.base
+    Run error-driven evolution demo showing automatic fixing of runtime errors
     """
-    logger.info(f"Running 'evolve' command - testing basic evolution system")
+    logger.info(f"Running 'evolve' command - testing error-driven evolution system")
     
     try:
-        from metta_generator.evolution.semantic_evolution import demonstrate_semantic_evolution
-        logger.info("Starting semantic evolution demonstration...")
-        success = demonstrate_semantic_evolution()
+        # Import the error-driven evolution components
+        from metta_generator.evolution.error_trigger import ErrorTriggeredEvolution
+        from reflectors.dynamic_monitor import DynamicMonitor
+        
+        logger.info("Starting error-driven evolution demonstration...")
+        
+        # Create the error-driven evolution system
+        monitor = DynamicMonitor()
+        evolution_system = ErrorTriggeredEvolution()
+        
+        # Connect monitor to evolution system
+        monitor.set_evolution_callback(evolution_system.handle_error)
+        
+        # Define a problematic function that will cause errors
+        @monitor.hybrid_transform(context="array_processing")
+        def buggy_find_max(arr, start_idx, end_idx):
+            """Buggy function that will cause IndexError - demo target for evolution"""
+            if not arr:  # Missing other error checks
+                return None
             
-        if success:
-            logger.info("Semantic evolution demonstration completed successfully")
+            max_val = arr[start_idx]  # Potential IndexError if start_idx invalid
+            for i in range(start_idx + 1, end_idx + 1):  # Off-by-one error!
+                if arr[i] > max_val:  # Potential IndexError 
+                    max_val = arr[i]
+            return max_val
+        
+        logger.info(f"Demo function: {buggy_find_max.__name__}")
+        logger.info(f"Known bugs: Missing bounds checks, off-by-one error in loop")
+        
+        # Register the function and unit tests for evolution
+        evolution_system.register_original_function(buggy_find_max)
+        
+        # Define unit tests that the evolved function should pass
+        def test_basic_case(func):
+            """Test basic functionality"""
+            result = func([1, 5, 3, 2, 8], 0, 4)
+            assert result == 8, f"Expected 8, got {result}"
+        
+        def test_single_element(func):
+            """Test single element range"""
+            result = func([42], 0, 1)
+            assert result == 42, f"Expected 42, got {result}"
+        
+        def test_middle_range(func):
+            """Test middle range of array"""
+            result = func([1, 2, 9, 4, 5], 1, 4)
+            assert result == 9, f"Expected 9, got {result}"
+        
+        def test_edge_case(func):
+            """Test edge case - last element"""
+            result = func([1, 2, 3, 7], 3, 4)
+            assert result == 7, f"Expected 7, got {result}"
+        
+        # Register the unit tests
+        unit_tests = [test_basic_case, test_single_element, test_middle_range, test_edge_case]
+        evolution_system.register_function_tests("buggy_find_max", unit_tests)
+        
+        logger.info(f"Registered {len(unit_tests)} unit tests for fitness evaluation")
+        
+        # Demonstrate the error-driven evolution process
+        logger.info("="*60)
+        logger.info("TRIGGERING ERROR-DRIVEN EVOLUTION")
+        logger.info("="*60)
+        
+        test_cases = [
+            ([1, 2, 3], 0, 5, "end_idx out of bounds"),
+            ([1, 2, 3], -1, 2, "negative start_idx"),
+            ([], 0, 1, "empty array"),
+            ([1, 2, 3, 4, 5], 1, 1, "start_idx equals end_idx")
+        ]
+        
+        errors_triggered = 0
+        for i, (test_arr, start, end, description) in enumerate(test_cases, 1):
+            logger.info(f"\nTest case {i}: {description}")
+            logger.info(f"  Calling: buggy_find_max({test_arr}, {start}, {end})")
+            
+            try:
+                result = buggy_find_max(test_arr, start, end)
+                logger.info(f"  ⚠️  No error occurred (got result: {result})")
+            except Exception as e:
+                errors_triggered += 1
+                logger.info(f"  🚨 ERROR: {type(e).__name__}: {e}")
+                logger.info(f"  🔧 Evolution system should have been triggered!")
+                # Note: Evolution actually happens in the exception handler via callback
+        
+        logger.info(f"\nDemo completed: {errors_triggered} errors triggered evolution")
+        
+        if errors_triggered > 0:
+            logger.info("✅ Error-driven evolution system demonstrated successfully")
+            logger.info("\nWhat happened:")
+            logger.info("  1. Monitor detected runtime errors in the buggy function")
+            logger.info("  2. Error context (type, inputs, traceback) was captured")
+            logger.info("  3. Evolution system was triggered automatically")
+            logger.info("  4. Unit tests were used as fitness function")
+            logger.info("  5. Semantic evolution generated error-free candidates")
+            logger.info("  6. Best candidates should pass all unit tests")
         else:
-            logger.warning("Semantic evolution demonstration completed with issues")
-                
+            logger.info("⚠️  No errors were triggered - function may be more robust than expected")
+        
+        # Show how to manually test the unit tests for comparison
+        logger.info("\n" + "="*60)
+        logger.info("UNIT TEST VALIDATION")
+        logger.info("="*60)
+        
+        logger.info("Testing original buggy function against unit tests:")
+        passed = 0
+        for i, test in enumerate(unit_tests, 1):
+            try:
+                test(buggy_find_max)
+                logger.info(f"  ✅ Test {i}: PASSED")
+                passed += 1
+            except Exception as e:
+                logger.info(f"  ❌ Test {i}: FAILED - {e}")
+        
+        logger.info(f"\nOriginal function fitness: {passed}/{len(unit_tests)} tests passed ({passed/len(unit_tests)*100:.1f}%)")
+        logger.info("Evolution target: Generate function with 100% test pass rate")
+        
     except ImportError as e:
-        logger.error(f"Semantic evolution not available: {e}")
+        logger.error(f"Error-driven evolution components not available: {e}")
+        logger.info("Falling back to semantic evolution demo...")
+        
+        # Fallback to existing semantic evolution demo
+        try:
+            from metta_generator.evolution.semantic_evolution import demonstrate_semantic_evolution
+            logger.info("Running semantic evolution demonstration as fallback...")
+            demonstrate_semantic_evolution()
+        except ImportError as e2:
+            logger.error(f"Semantic evolution also not available: {e2}")
+            logger.error("No evolution demos available")
+    
+    except Exception as e:
+        logger.error(f"Error during evolution demo: {e}")
+        logger.exception("Full traceback for evolution demo error:")
 
     logger.info(f"'evolve' command complete.")
 

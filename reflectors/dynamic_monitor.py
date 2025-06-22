@@ -2,6 +2,7 @@ import functools
 import inspect
 import traceback
 import time
+import textwrap
 from typing import Any, Dict, List, Callable, Optional
 
 # Import the static analyzer and type conversion function
@@ -28,6 +29,22 @@ class DynamicMonitor:
         self.AtomType = AtomType
         self.G = G
         self.interpret = interpret
+
+        # Evolutionary components
+        self.evolution_callback = None
+        self.error_context = {}
+    
+    def set_evolution_callback(self, callback: Callable):
+        """Set callback function to trigger evolution on errors"""
+        self.evolution_callback = callback
+    
+    def _trigger_evolution_on_error(self, func_name: str, error_info: Dict[str, Any]):
+        """Trigger evolution when an error occurs"""
+        if self.evolution_callback:
+            try:
+                self.evolution_callback(func_name, error_info)
+            except Exception as e:
+                print(f"Evolution callback failed: {e}")
     
     def hybrid_transform(self, context: Optional[str] = None, 
                         auto_fix: bool = False):
@@ -139,6 +156,14 @@ class DynamicMonitor:
                                     # For now, just record that we attempted a fix
                                     self.metta_space.add_atom(f"(fix-attempted {error_id} {fix_to_apply})")
                     
+                        error_context = self._create_error_context(func, e, args)
+                    
+                    # Store error context
+                    self.error_context[func.__name__] = error_context
+                    
+                    # Trigger evolution if callback is set
+                    self._trigger_evolution_on_error(func.__name__, error_context)
+                    
                     # Re-raise the exception
                     raise
             
@@ -217,6 +242,25 @@ class DynamicMonitor:
             return str_val
         except:
             return None
+    
+    def _create_error_context(self, func: Callable, e: Exception, args: tuple) -> Dict[str, Any]:
+        """Creates a dictionary containing detailed context about an error."""
+        try:
+            # Get and dedent the original function source
+            raw_func_source = inspect.getsource(func)
+            clean_func_source = textwrap.dedent(raw_func_source)
+        except:
+            clean_func_source = f"# Source not available for {func.__name__}"
+        
+        error_context = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'failing_inputs': [args] if args else [],
+            'function_name': func.__name__,
+            'traceback': traceback.format_exc(),
+            'function_source': clean_func_source
+        }
+        return error_context
     
     def query(self, query_pattern: str) -> List:
         """
