@@ -262,3 +262,34 @@
    (weighted-sum (correctness $genome)
                  (efficiency $genome)
                  (maintainability $genome)))
+
+;; Gene selection preference rules
+(= (prefer-gene-for-purpose maximize maximize-condition) True)
+(= (prefer-gene-for-purpose minimize minimize-condition) True)
+(= (prefer-gene-for-purpose search forward-scan) True)
+(= (prefer-gene-for-purpose aggregate update-accumulator) True)
+
+;; Gene compatibility rules
+(= (compatible-gene-sequence initialization iteration) True)
+(= (compatible-gene-sequence iteration condition) True)
+(= (compatible-gene-sequence condition operation) True)
+(= (compatible-gene-sequence operation termination) True)
+
+;; Gene success prediction rules
+(= (predict-gene-success $gene-role $success-rate)
+   (and (gene-success-rate $gene-role $rate)
+        (> $rate 0.5)))
+
+;; LLM fallback necessity rules
+(= (need-llm-fallback $gene-type $role-hint)
+   (and (not (suitable-gene-available $gene-type $role-hint))
+        (critical-gene-type $gene-type)))
+
+(= (critical-gene-type initialization) True)
+(= (critical-gene-type condition) True)
+(= (critical-gene-type termination) True)
+
+;; Learning rules for LLM-generated genes
+(= (incorporate-llm-gene $gene-role $template $success-rate)
+   (and (llm-generated-gene $gene-role)
+        (> $success-rate 0.7)))

@@ -27,6 +27,11 @@ class SemanticEvolutionEngine:
         # Enhanced components
         self.semantic_gene_pool = SemanticGenePool()
         self.fitness_evaluator = FitnessEvaluator()
+
+        # LLM client access (from reasoning engine's proof analyzer)
+        self._llm_client = None
+        if reasoning_engine and hasattr(reasoning_engine, 'proof_analyzer'):
+            self._llm_client = getattr(reasoning_engine.proof_analyzer, 'openai_client', None)
         
         # Evolution state
         self.population: List[SemanticGenome] = []
@@ -118,7 +123,7 @@ class SemanticEvolutionEngine:
         for gene in iteration_genes:
             self.semantic_gene_pool.add_gene(gene)
         
-        # Condition genes
+        # Condition genes 
         condition_genes = [
             SemanticGene(
                 gene_type=SemanticGeneType.CONDITION,
@@ -303,22 +308,186 @@ class SemanticEvolutionEngine:
             if selected_gene:
                 genome.add_gene(selected_gene)
     
+    def _llm_generate_gene(self, gene_type: SemanticGeneType, role_hint: str, 
+                      target_semantics: Dict[str, Any], genome: SemanticGenome) -> Optional[SemanticGene]:
+        """Generate new gene using LLM when MeTTa reasoning fails"""
+        if not hasattr(self, '_llm_client') or not self._llm_client:
+            return None
+        
+        # Get proof analyzer from reasoning engine if available
+        proof_analyzer = getattr(self.reasoning_engine, 'proof_analyzer', None)
+        if not proof_analyzer:
+            return None
+        
+        # Build context for LLM
+        context = self._build_llm_gene_context(gene_type, role_hint, target_semantics, genome)
+        
+        # Generate using LLM
+        try:
+            generated_code = proof_analyzer._call_openai_api(context)
+            
+            if generated_code and len(generated_code.strip()) > 5:
+                # Create new semantic gene from LLM result
+                new_gene = SemanticGene(
+                    gene_type=gene_type,
+                    semantic_role=f"llm_generated_{role_hint}",
+                    preconditions=self._infer_preconditions(gene_type, role_hint),
+                    postconditions=self._infer_postconditions(gene_type, role_hint),
+                    code_template=generated_code.strip(),
+                    parameter_slots=self._extract_parameters_from_template(generated_code),
+                    metta_derivation=[f"(llm-generated {gene_type.value} {role_hint})"]
+                )
+                new_gene.generation_born = genome.generation
+                return new_gene
+                
+        except Exception as e:
+            print(f"          LLM gene generation failed: {e}")
+        
+        return None
+
+    def _build_llm_gene_context(self, gene_type: SemanticGeneType, role_hint: str,
+                            target_semantics: Dict[str, Any], genome: SemanticGenome) -> str:
+        """Build context prompt for LLM gene generation"""
+        purpose = target_semantics.get("purpose", "optimization")
+        existing_roles = [g.semantic_role for g in genome.genes]
+        
+        context = f"""
+    Generate a Python code template for:
+    - Gene Type: {gene_type.value}
+    - Semantic Role: {role_hint}
+    - Function Purpose: {purpose}
+    - Existing Context: {existing_roles}
+
+    Requirements:
+    1. Use parameter placeholders like {{variable_name}}
+    2. Generate only the code template, no explanations
+    3. Make it compatible with existing genes
+    4. Focus on {purpose} optimization
+
+    Example format for {gene_type.value}:
+    """
+        
+        # Add type-specific examples
+        if gene_type == SemanticGeneType.INITIALIZATION:
+            context += "    {var} = {initial_value}"
+        elif gene_type == SemanticGeneType.CONDITION:
+            context += "        if {condition}:"
+        elif gene_type == SemanticGeneType.OPERATION:
+            context += "            {target} = {source}"
+        
+        return context
+
+    def _add_gene_to_metta_space(self, gene: SemanticGene):
+        """Add LLM-generated gene to MeTTa space for future reasoning"""
+        if not self.reasoning_engine:
+            return
+        
+        # Add gene facts to MeTTa space
+        gene_facts = [
+            f"(gene-type {gene.semantic_role.replace('_', '-')} {gene.gene_type.value})",
+            f"(gene-template {gene.semantic_role.replace('_', '-')} \"{gene.code_template}\")",
+            f"(gene-success-rate {gene.semantic_role.replace('_', '-')} {gene.success_rate})",
+            f"(llm-generated-gene {gene.semantic_role.replace('_', '-')})"
+        ]
+        
+        # Add precondition/postcondition relationships
+        for precond in gene.preconditions:
+            gene_facts.append(f"(gene-requires {gene.semantic_role.replace('_', '-')} {precond.replace('_', '-')})")
+        
+        for postcond in gene.postconditions:
+            gene_facts.append(f"(gene-provides {gene.semantic_role.replace('_', '-')} {postcond.replace('_', '-')})")
+        
+        # Add parameter slot information
+        for slot, param_type in gene.parameter_slots.items():
+            gene_facts.append(f"(gene-parameter {gene.semantic_role.replace('_', '-')} {slot} {param_type.replace('_', '-')})")
+        
+        # Load facts into MeTTa space
+        for fact in gene_facts:
+            self.reasoning_engine._add_rule_safely(fact)
+        
+        print(f"          Added {len(gene_facts)} facts to MeTTa space for gene: {gene.semantic_role}")
+
+    def _infer_preconditions(self, gene_type: SemanticGeneType, role_hint: str) -> List[str]:
+        """Infer likely preconditions for gene type and role"""
+        mapping = {
+            SemanticGeneType.INITIALIZATION: ["input_received"],
+            SemanticGeneType.ITERATION: ["accumulator_ready", "variables_ready"],
+            SemanticGeneType.CONDITION: ["elements_processed"],
+            SemanticGeneType.OPERATION: ["condition_met", "optimal_found"],
+            SemanticGeneType.TERMINATION: ["processing_complete"],
+            SemanticGeneType.ERROR_HANDLING: ["input_received"]
+        }
+        return mapping.get(gene_type, ["input_received"])
+
+    def _infer_postconditions(self, gene_type: SemanticGeneType, role_hint: str) -> List[str]:
+        """Infer likely postconditions for gene type and role"""
+        mapping = {
+            SemanticGeneType.INITIALIZATION: ["variables_ready", "accumulator_ready"],
+            SemanticGeneType.ITERATION: ["elements_processed"],
+            SemanticGeneType.CONDITION: ["condition_evaluated", "optimal_found"],
+            SemanticGeneType.OPERATION: ["accumulator_updated", "value_updated"],
+            SemanticGeneType.TERMINATION: ["result_returned"],
+            SemanticGeneType.ERROR_HANDLING: ["error_handled"]
+        }
+        return mapping.get(gene_type, ["processing_complete"])
+
+    def _extract_parameters_from_template(self, template: str) -> Dict[str, str]:
+        """Extract parameter placeholders from template"""
+        import re
+        
+        # Find all {parameter} patterns
+        parameters = re.findall(r'\{(\w+)\}', template)
+        
+        # Map to semantic types
+        param_mapping = {}
+        for param in parameters:
+            param_lower = param.lower()
+            if any(word in param_lower for word in ['var', 'target', 'result']):
+                param_mapping[param] = "accumulator"
+            elif any(word in param_lower for word in ['data', 'collection', 'array']):
+                param_mapping[param] = "input_collection"
+            elif any(word in param_lower for word in ['start', 'begin']):
+                param_mapping[param] = "start_index"
+            elif any(word in param_lower for word in ['end', 'stop']):
+                param_mapping[param] = "end_index"
+            elif any(word in param_lower for word in ['condition', 'check']):
+                param_mapping[param] = "condition_expression"
+            else:
+                param_mapping[param] = "generic_parameter"
+        
+        return param_mapping
+    
     def _select_gene_with_reasoning(self, gene_type: SemanticGeneType, role_hint: str,
-                                  genome: SemanticGenome, target_semantics: Dict[str, Any]) -> Optional[SemanticGene]:
-        """Select gene using MeTTa reasoning when available"""
+                              genome: SemanticGenome, target_semantics: Dict[str, Any]) -> Optional[SemanticGene]:
+        """Select gene using MeTTa reasoning first, LLM fallback if needed"""
         available_genes = self.semantic_gene_pool.get_genes_by_type(gene_type)
         
         if not available_genes:
             return None
         
+        # 1. Try MeTTa reasoning first
         if self.reasoning_engine and len(available_genes) > 1:
-            # Try MeTTa reasoning for selection
-            best_gene = self._metta_guided_gene_selection(available_genes, role_hint, target_semantics)
-            if best_gene:
-                return best_gene.clone()
+            metta_gene = self._metta_guided_gene_selection(available_genes, role_hint, target_semantics)
+            if metta_gene:
+                return metta_gene.clone()
         
-        # Fallback to semantic selection
-        return self._semantic_gene_selection(available_genes, role_hint, target_semantics)
+        # 2. Try semantic selection
+        semantic_gene = self._semantic_gene_selection(available_genes, role_hint, target_semantics)
+        if semantic_gene and semantic_gene.success_rate > 0.3:  # Only if reasonably successful
+            return semantic_gene
+        
+        # 3. LLM fallback - generate new gene
+        print(f"        MeTTa reasoning insufficient, using LLM fallback for {gene_type.value}")
+        llm_gene = self._llm_generate_gene(gene_type, role_hint, target_semantics, genome)
+        if llm_gene:
+            # Add to gene pool for future use
+            self.semantic_gene_pool.add_gene(llm_gene)
+            # Add to MeTTa space for future reasoning
+            self._add_gene_to_metta_space(llm_gene)
+            return llm_gene.clone()
+        
+        # 4. Final fallback
+        return semantic_gene if semantic_gene else available_genes[0].clone()
     
     def _metta_guided_gene_selection(self, available_genes: List[SemanticGene], 
                                    role_hint: str, target_semantics: Dict[str, Any]) -> Optional[SemanticGene]:
@@ -386,10 +555,13 @@ class SemanticEvolutionEngine:
             genome.overall_fitness = fitness_results["overall_fitness"]
             genome.fitness_scores = fitness_results
             
-            # Update gene success rates
+            # Update gene success rates and MeTTa space
             for gene in genome.genes:
                 gene.add_fitness_record(genome.overall_fitness)
                 self.semantic_gene_pool.mark_gene_successful(gene, genome.overall_fitness)
+                # Update MeTTa space with performance (if method exists)
+                if hasattr(gene, 'update_metta_space_with_performance'):
+                    gene.update_metta_space_with_performance(self.reasoning_engine, genome.overall_fitness)
     
     def _generate_code_from_genome(self, genome: SemanticGenome) -> str:
         """Generate executable code from semantic genome"""
