@@ -72,6 +72,119 @@ class SemanticGene:
             metta_derivation=self.metta_derivation.copy(),
             reasoning_confidence=self.reasoning_confidence
         )
+    
+    # Add these methods to SemanticGene class
+
+    def generate_template_from_role(self) -> str:
+        """Generate code template based on semantic role and gene type"""
+        
+        # Template patterns by gene type and semantic intent
+        patterns = {
+            SemanticGeneType.INITIALIZATION: {
+                "validate": "if {condition}:\n        return {error_value}",
+                "initialize": "{var} = {initial_value}",
+                "setup": "{var} = {setup_expression}"
+            },
+            SemanticGeneType.ITERATION: {
+                "scan": "for {iterator} in {iterable}:",
+                "range": "for {iterator} in range({start}, {end}):",
+                "enumerate": "for {iterator}, {value} in enumerate({iterable}):"
+            },
+            SemanticGeneType.CONDITION: {
+                "maximize": "if {current} > {best}:",
+                "minimize": "if {current} < {best}:",
+                "compare": "if {condition}:",
+                "safe": "if {best} is None or {condition}:"
+            },
+            SemanticGeneType.OPERATION: {
+                "update": "{target} = {source}",
+                "assign": "{var} = {expression}",
+                "modify": "{var} {op}= {value}"
+            },
+            SemanticGeneType.TERMINATION: {
+                "return": "return {result}",
+                "yield": "yield {result}",
+                "break": "break"
+            },
+            SemanticGeneType.ERROR_HANDLING: {
+                "check": "if {error_condition}:\n        return {error_value}",
+                "try": "try:\n        {body}\n    except {exception}:\n        {handler}"
+            }
+        }
+        
+        # Find matching pattern
+        type_patterns = patterns.get(self.gene_type, {})
+        
+        # Match role keywords to patterns
+        for pattern_key, template in type_patterns.items():
+            if pattern_key in self.semantic_role:
+                return template
+        
+        # Default fallback
+        return self._get_default_template()
+
+    def _get_default_template(self) -> str:
+        """Get default template for gene type"""
+        defaults = {
+            SemanticGeneType.INITIALIZATION: "{var} = {value}",
+            SemanticGeneType.ITERATION: "for {i} in {iterable}:",
+            SemanticGeneType.CONDITION: "if {condition}:",
+            SemanticGeneType.OPERATION: "{var} = {expression}",
+            SemanticGeneType.TERMINATION: "return {result}",
+            SemanticGeneType.ERROR_HANDLING: "if {check}:\n        return {default}"
+        }
+        return defaults.get(self.gene_type, "# {semantic_role}")
+
+    def infer_parameter_slots(self) -> Dict[str, str]:
+        """Infer parameter slots from semantic role and gene type"""
+        slots = {}
+        
+        # Common slots by gene type
+        if self.gene_type == SemanticGeneType.INITIALIZATION:
+            if "validate" in self.semantic_role:
+                slots = {"condition": "boundary_check", "error_value": "null_result"}
+            elif "initialize" in self.semantic_role:
+                slots = {"var": "accumulator", "initial_value": "first_element"}
+        
+        elif self.gene_type == SemanticGeneType.ITERATION:
+            slots = {"iterator": "index_var", "iterable": "data_source"}
+            if "range" in self.semantic_role:
+                slots.update({"start": "start_index", "end": "end_index"})
+        
+        elif self.gene_type == SemanticGeneType.CONDITION:
+            if "maximize" in self.semantic_role or "minimize" in self.semantic_role:
+                slots = {"current": "current_element", "best": "best_so_far"}
+        
+        elif self.gene_type == SemanticGeneType.OPERATION:
+            if "update" in self.semantic_role:
+                slots = {"target": "accumulator", "source": "new_value"}
+        
+        elif self.gene_type == SemanticGeneType.TERMINATION:
+            slots = {"result": "final_result"}
+        
+    def update_metta_space_with_performance(self, reasoning_engine, fitness_score: float):
+        """Update MeTTa space with gene performance for future learning"""
+        if not reasoning_engine:
+            return
+            
+        # Update success rate in MeTTa space
+        performance_facts = [
+            f"(gene-success-rate {self.semantic_role.replace('_', '-')} {self.success_rate})",
+            f"(gene-fitness-score {self.semantic_role.replace('_', '-')} {fitness_score})",
+            f"(gene-performance-updated {self.semantic_role.replace('_', '-')} {self.usage_count})"
+        ]
+            
+        # Add performance classification
+        if self.success_rate > 0.8:
+            performance_facts.append(f"(high-performing-gene {self.semantic_role.replace('_', '-')})")
+        elif self.success_rate > 0.5:
+            performance_facts.append(f"(medium-performing-gene {self.semantic_role.replace('_', '-')})")
+        else:
+            performance_facts.append(f"(low-performing-gene {self.semantic_role.replace('_', '-')})")
+            
+        # Load facts into MeTTa space
+        for fact in performance_facts:
+            reasoning_engine._add_rule_safely(fact)
 
 @dataclass
 class SemanticGenome:
@@ -297,3 +410,4 @@ class SemanticGenePool:
                 for gene in genes
             ) / max(1, total_genes)
         }
+
