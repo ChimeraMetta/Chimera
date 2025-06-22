@@ -68,14 +68,16 @@ class DynamicMonitor:
                     self.metta_space.add_atom(atom)
             else:
                 # If static analysis failed, at least register the function
-                self.metta_space.add_atom(f"(function {func.__name__})")
+                func_atom = self.metta.parse_single(f"(function {func.__name__})")
+                self.metta_space.add_atom(func_atom)
             
             # Add context information if provided
             if context:
                 # Use proper atom format with hyphen-separated identifiers
                 scope_atoms = context.replace(":", "-").split(".")
                 context_expr = " ".join(scope_atoms)
-                self.metta_space.add_atom(f"(function-context {func.__name__} {context_expr})")
+                context_atom = self.metta.parse_single(f"(function-context {func.__name__} {context_expr})")
+                self.metta_space.add_atom(context_atom)
             
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
@@ -84,14 +86,16 @@ class DynamicMonitor:
                 
                 # Record call start
                 start_time = time.time()
-                self.metta_space.add_atom(f"(execution-start {exec_id} {func.__name__} {start_time})")
+                start_atom = self.metta.parse_single(f"(execution-start {exec_id} {func.__name__} {start_time})")
+                self.metta_space.add_atom(start_atom)
                 
                 # Capture and record input parameters
                 try:
                     input_info = self._capture_inputs(func, exec_id, args, kwargs)
                 except Exception as e:
                     # If input capture fails, log it but continue
-                    self.metta_space.add_atom(f"(execution-input-error {exec_id} \"{str(e)}\")")
+                    error_atom = self.metta.parse_single(f"(execution-input-error {exec_id} \"{str(e)}\")")
+                    self.metta_space.add_atom(error_atom)
                 
                 try:
                     # Execute the function
@@ -102,14 +106,16 @@ class DynamicMonitor:
                     execution_time = end_time - start_time
                     
                     # Record success in MeTTa
-                    self.metta_space.add_atom(f"(execution-success {exec_id} {execution_time})")
+                    success_atom = self.metta.parse_single(f"(execution-success {exec_id} {execution_time})")
+                    self.metta_space.add_atom(success_atom)
                     
                     # Capture and record output value
                     try:
                         self._capture_output(exec_id, result)
                     except Exception as e:
                         # If output capture fails, log it but return the result
-                        self.metta_space.add_atom(f"(execution-output-error {exec_id} \"{str(e)}\")")
+                        output_error_atom = self.metta.parse_single(f"(execution-output-error {exec_id} \"{str(e)}\")")
+                        self.metta_space.add_atom(output_error_atom)
                     
                     return result
                     
@@ -124,9 +130,16 @@ class DynamicMonitor:
                     error_id = f"error-{func.__name__}-{int(time.time()*1000)}"
                     
                     # Record error details in MeTTa
-                    self.metta_space.add_atom(f"(execution-error {exec_id} {error_id} {execution_time})")
-                    self.metta_space.add_atom(f"(error-type {error_id} {error_type})")
-                    self.metta_space.add_atom(f"(error-message {error_id} \"{error_msg}\")")
+                    error_atom = self.metta.parse_single(f"(execution-error {exec_id} {error_id} {execution_time})")
+                    self.metta_space.add_atom(error_atom)
+                    
+                    error_type_atom = self.metta.parse_single(f"(error-type {error_id} {error_type})")
+                    self.metta_space.add_atom(error_type_atom)
+                    
+                    # Escape error message for MeTTa
+                    escaped_msg = error_msg.replace('"', '\\"').replace('\\', '\\\\')
+                    error_msg_atom = self.metta.parse_single(f"(error-message {error_id} \"{escaped_msg}\")")
+                    self.metta_space.add_atom(error_msg_atom)
                     
                     # Capture stack trace information
                     trace = traceback.format_exc()
@@ -195,13 +208,16 @@ class DynamicMonitor:
             metta_type = convert_python_type_to_metta(param_type)
             
             # Record parameter in MeTTa
-            self.metta_space.add_atom(f"(input-param {exec_id} {i} {param_name} {metta_type})")
+            param_atom = self.metta.parse_single(f"(input-param {exec_id} {i} {param_name} {metta_type})")
+            self.metta_space.add_atom(param_atom)
             
             # Try to capture sample value for debugging (safely)
             try:
                 sample = self._safe_str_sample(param_value)
                 if sample:
-                    self.metta_space.add_atom(f"(input-sample {exec_id} {param_name} \"{sample}\")")
+                    escaped_sample = sample.replace('"', '\\"').replace('\\', '\\\\')
+                    sample_atom = self.metta.parse_single(f"(input-sample {exec_id} {param_name} \"{escaped_sample}\")")
+                    self.metta_space.add_atom(sample_atom)
             except Exception:
                 # If sampling fails, just continue
                 pass
@@ -222,13 +238,16 @@ class DynamicMonitor:
         metta_type = convert_python_type_to_metta(result_type)
         
         # Record output type in MeTTa
-        self.metta_space.add_atom(f"(output-type {exec_id} {metta_type})")
+        output_type_atom = self.metta.parse_single(f"(output-type {exec_id} {metta_type})")
+        self.metta_space.add_atom(output_type_atom)
         
         # Try to capture sample output value (safely)
         try:
             sample = self._safe_str_sample(result)
             if sample:
-                self.metta_space.add_atom(f"(output-sample {exec_id} \"{sample}\")")
+                escaped_sample = sample.replace('"', '\\"').replace('\\', '\\\\')
+                sample_atom = self.metta.parse_single(f"(output-sample {exec_id} \"{escaped_sample}\")")
+                self.metta_space.add_atom(sample_atom)
         except Exception:
             # If sampling fails, just continue
             pass
@@ -371,7 +390,6 @@ class DynamicMonitor:
                     print(f"Reconstructed atom: {atom_str[:100]}...")
             
             parsed_atom = self.metta.parse_single(atom_str)
-            
             self.metta_space.add_atom(parsed_atom)
             return True
             
