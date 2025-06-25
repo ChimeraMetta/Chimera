@@ -7,7 +7,7 @@ healing capabilities for the file-based healer.
 
 import functools
 import inspect
-import textwrap
+import traceback
 import ast
 from typing import Any, Dict, List, Callable, Optional
 
@@ -596,10 +596,6 @@ class AutonomousErrorFixer:
         return self.current_implementations.get(func_name, self.function_registry.get(func_name))
 
 
-# Backward compatibility: alias the enhanced version
-AutonomousErrorFixer = EnhancedAutonomousErrorFixer
-
-
 class AutonomousMonitor(DynamicMonitor):
     """
     Enhanced monitor that integrates with autonomous error fixing.
@@ -608,7 +604,7 @@ class AutonomousMonitor(DynamicMonitor):
     
     def __init__(self, metta_space=None):
         super().__init__(metta_space)
-        self.error_fixer = EnhancedAutonomousErrorFixer(metta_space)
+        self.error_fixer = AutonomousErrorFixer(metta_space)
         self.function_call_stack = []  # Track nested function calls
         
     def autonomous_transform(self, context: Optional[str] = None, 
@@ -801,7 +797,7 @@ def test_enhanced_error_fixer_standalone():
     print("-" * 50)
     
     # Create error fixer
-    error_fixer = EnhancedAutonomousErrorFixer()
+    error_fixer = AutonomousErrorFixer()
     
     # Test function with IndexError
     def test_index_func(arr, index):
