@@ -202,7 +202,7 @@ class BasicEvolutionEngine:
                     print(f"       ⚠ MeTTa fitness query failed: {e}")
             
             enhanced_fitness = min(1.0, base_fitness + metta_bonus)
-            print(f"       📊 Enhanced fitness: {base_fitness:.3f} + {metta_bonus:.3f} = {enhanced_fitness:.3f}")
+            print(f"       [INFO] Enhanced fitness: {base_fitness:.3f} + {metta_bonus:.3f} = {enhanced_fitness:.3f}")
             
             return enhanced_fitness
         
