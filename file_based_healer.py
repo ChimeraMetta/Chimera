@@ -15,7 +15,7 @@ import textwrap
 import ast
 import re
 from datetime import datetime
-from typing import Dict, Any, Optional, Callable
+from typing import Optional, Callable
 from pathlib import Path
 import functools
 import traceback
@@ -24,7 +24,6 @@ import inspect
 # Import healing components
 from reflectors.autonomous_evolution import AutonomousErrorFixer
 from hyperon import MeTTa
-
 
 class FileBasedHealer:
     """
@@ -172,7 +171,7 @@ class FileBasedHealer:
             
             # Use regex to find the function definition
             pattern = rf'def\s+{re.escape(func_name)}\s*\([^)]*\):'
-            match = re.search(pattern, func_source)
+            match = re.search(pattern, func_source, re.MULTILINE)
             
             if match:
                 # Extract just the parameter part
@@ -181,16 +180,42 @@ class FileBasedHealer:
                 end_paren = full_def.find(')')
                 if start_paren != -1 and end_paren != -1:
                     params = full_def[start_paren+1:end_paren].strip()
-                    return params
+                    return params if params else "*args, **kwargs"
             
             # Fallback: try AST parsing
-            tree = ast.parse(func_source)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == func_name:
-                    params = []
-                    for arg in node.args.args:
-                        params.append(arg.arg)
-                    return ', '.join(params)
+            try:
+                tree = ast.parse(func_source)
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                        params = []
+                        
+                        # Handle regular arguments
+                        for arg in node.args.args:
+                            params.append(arg.arg)
+                        
+                        # Handle default arguments
+                        defaults_start = len(node.args.args) - len(node.args.defaults)
+                        for i, default in enumerate(node.args.defaults):
+                            if hasattr(default, 'id'):
+                                params[defaults_start + i] += f"={default.id}"
+                            elif hasattr(default, 'value'):
+                                params[defaults_start + i] += f"={default.value}"
+                            elif hasattr(default, 's'):  # String literal
+                                params[defaults_start + i] += f"='{default.s}'"
+                            else:
+                                params[defaults_start + i] += "=None"
+                        
+                        # Handle *args
+                        if node.args.vararg:
+                            params.append(f"*{node.args.vararg.arg}")
+                        
+                        # Handle **kwargs
+                        if node.args.kwarg:
+                            params.append(f"**{node.args.kwarg.arg}")
+                        
+                        return ', '.join(params) if params else "*args, **kwargs"
+            except Exception as ast_e:
+                print(f"[DEBUG] AST parsing failed: {ast_e}")
         
         except Exception as e:
             print(f"[WARNING] Could not extract function signature: {e}")
@@ -268,8 +293,11 @@ class FileBasedHealer:
                 # Parse to validate syntax
                 parsed = ast.parse(func_source)
                 
-                # Execute to get function object
-                exec_globals = {}
+                # Execute to get function object in a safe environment
+                exec_globals = {
+                    '__builtins__': __builtins__,
+                    # Add any other safe globals needed
+                }
                 exec_locals = {}
                 exec(func_source, exec_globals, exec_locals)
                 
@@ -284,6 +312,11 @@ class FileBasedHealer:
                     
             except SyntaxError as e:
                 print(f"[WARNING] Syntax error in function source: {e}")
+                print(f"[DEBUG] Problematic source:\n{func_source}")
+                return False
+            except NameError as e:
+                print(f"[WARNING] Name error (missing imports/decorators): {e}")
+                # This is expected if decorators were removed
                 return False
                 
         except Exception as e:
@@ -556,10 +589,13 @@ class HealingFileDecorator:
             # Clean and dedent the source
             func_source = textwrap.dedent(func_source)
             
-            # Save function source
+            # Remove decorator lines to make the function executable
+            clean_source = self._clean_function_source(func_source, func_name)
+            
+            # Save cleaned function source
             func_file = self.healing_dir / "functions" / f"{func_name}.py"
             with open(func_file, 'w') as f:
-                f.write(func_source)
+                f.write(clean_source)
             
             # Save metadata
             meta_file = self.healing_dir / "functions" / f"{func_name}.meta.json"
@@ -567,13 +603,40 @@ class HealingFileDecorator:
                 'function_name': func_name,
                 'context': context,
                 'timestamp': datetime.now().isoformat(),
-                'source_hash': hashlib.sha256(func_source.encode()).hexdigest()
+                'source_hash': hashlib.sha256(func_source.encode()).hexdigest(),
+                'original_source': func_source,  # Keep original for reference
+                'cleaned_source': clean_source
             }
             with open(meta_file, 'w') as f:
                 json.dump(meta_data, f, indent=2)
                 
         except Exception as e:
             print(f"[WARNING] Could not save function source: {e}")
+    
+    def _clean_function_source(self, func_source: str, func_name: str) -> str:
+        """Clean function source by removing decorators and making it executable."""
+        lines = func_source.split('\n')
+        cleaned_lines = []
+        
+        # Find the function definition line
+        func_def_found = False
+        for i, line in enumerate(lines):
+            # Skip decorator lines (start with @)
+            if line.strip().startswith('@'):
+                continue
+            
+            # Include the function definition and everything after
+            if line.strip().startswith(f'def {func_name}(') or func_def_found:
+                func_def_found = True
+                cleaned_lines.append(line)
+        
+        if not cleaned_lines:
+            # Fallback: try to extract just the function body
+            for line in lines:
+                if not line.strip().startswith('@'):
+                    cleaned_lines.append(line)
+        
+        return '\n'.join(cleaned_lines)
             
     def _report_error(self, func_name: str, error: Exception, args: tuple, kwargs: dict):
         """Report error to a file."""
@@ -882,7 +945,7 @@ def test_signature_preservation():
         print("❌ Function source not saved")
     
     # Simulate healing by creating a manual healed function
-    from file_based_healer import FileBasedHealer
+    from file_based_healer_final import FileBasedHealer
     healer = FileBasedHealer(str(test_dir))
     
     error_data = {
