@@ -615,17 +615,17 @@ def run_evolve_command():
             
             try:
                 result = buggy_find_max(test_arr, start, end)
-                logger.info(f"  ⚠️  No error occurred (got result: {result})")
+                logger.info(f"  [WARNING] No error occurred (got result: {result})")
             except Exception as e:
                 errors_triggered += 1
-                logger.info(f"  🚨 ERROR: {type(e).__name__}: {e}")
-                logger.info(f"  🔧 Evolution system should have been triggered!")
+                logger.info(f"  [ERROR] {type(e).__name__}: {e}")
+                logger.info(f"  [INFO] Evolution system should have been triggered!")
                 # Note: Evolution actually happens in the exception handler via callback
         
         logger.info(f"\nDemo completed: {errors_triggered} errors triggered evolution")
         
         if errors_triggered > 0:
-            logger.info("✅ Error-driven evolution system demonstrated successfully")
+            logger.info("[OK] Error-driven evolution system demonstrated successfully")
             logger.info("\nWhat happened:")
             logger.info("  1. Monitor detected runtime errors in the buggy function")
             logger.info("  2. Error context (type, inputs, traceback) was captured")
@@ -634,7 +634,7 @@ def run_evolve_command():
             logger.info("  5. Semantic evolution generated error-free candidates")
             logger.info("  6. Best candidates should pass all unit tests")
         else:
-            logger.info("⚠️  No errors were triggered - function may be more robust than expected")
+            logger.info("[WARNING] No errors were triggered - function may be more robust than expected")
         
         # Show how to manually test the unit tests for comparison
         logger.info("\n" + "="*60)
@@ -646,10 +646,10 @@ def run_evolve_command():
         for i, test in enumerate(unit_tests, 1):
             try:
                 test(buggy_find_max)
-                logger.info(f"  ✅ Test {i}: PASSED")
+                logger.info(f"  [OK] Test {i}: PASSED")
                 passed += 1
             except Exception as e:
-                logger.info(f"  ❌ Test {i}: FAILED - {e}")
+                logger.info(f"  [ERROR] Test {i}: FAILED - {e}")
         
         logger.info(f"\nOriginal function fitness: {passed}/{len(unit_tests)} tests passed ({passed/len(unit_tests)*100:.1f}%)")
         logger.info("Evolution target: Generate function with 100% test pass rate")
@@ -755,7 +755,7 @@ def run_visualize_command():
         
         # Log summary of results for the demonstration
         if successful_candidates:
-            logger.info(f"🎉 Demonstration successful: {len(successful_candidates)} successful candidates found")
+            logger.info(f"[OK] Demonstration successful: {len(successful_candidates)} successful candidates found")
             
             # Log top successful candidates
             logger.info("Top successful candidates from demonstration:")
@@ -787,11 +787,11 @@ def run_visualize_command():
         logger.info(f"\n" + "="*60)
         logger.info(f"DEMONSTRATION COMPLETE - What you learned:")
         logger.info(f"="*60)
-        logger.info(f"✓ How the ModularMettaDonorGenerator creates alternative implementations")
-        logger.info(f"✓ How different strategies (operation substitution, data adaptation, etc.) work")
-        logger.info(f"✓ How candidates are tested against the original function's constraints")
-        logger.info(f"✓ How the system evolves toward better solutions over iterations")
-        logger.info(f"✓ The visualization shows real-time progress and final analysis")
+        logger.info(f"[OK] How the ModularMettaDonorGenerator creates alternative implementations")
+        logger.info(f"[OK] How different strategies (operation substitution, data adaptation, etc.) work")
+        logger.info(f"[OK] How candidates are tested against the original function's constraints")
+        logger.info(f"[OK] How the system evolves toward better solutions over iterations")
+        logger.info(f"[OK] The visualization shows real-time progress and final analysis")
         logger.info(f"")
         logger.info(f"Next steps:")
         logger.info(f"  - Use 'generate' command on your own Python files")
@@ -935,11 +935,11 @@ def run_metta_generate_command(target_path: str = None):
         if os.path.exists(ontology_file_path):
             ontology_loaded = metta_generator.load_ontology(ontology_file_path)
             if ontology_loaded:
-                logger.info("   MeTTa reasoning ontology loaded successfully")
+                logger.info("[OK] MeTTa reasoning ontology loaded successfully")
             else:
-                logger.warning("  Warning: MeTTa reasoning ontology could not be loaded, using defaults")
+                logger.warning("[WARNING] MeTTa reasoning ontology could not be loaded, using defaults")
         else:
-            logger.warning(f"  Warning: Ontology file not found at {ontology_file_path}, using MeTTa defaults")
+            logger.warning(f"[WARNING] Ontology file not found at {ontology_file_path}, using MeTTa defaults")
         
         # Log information about the MeTTa-powered system
         logger.info(f"   MeTTa reasoning engine: {type(metta_generator.reasoning_engine).__name__}")
@@ -999,7 +999,7 @@ def run_metta_generate_command(target_path: str = None):
         logger.info(f"  Description: {description}")
         
         try:
-            # Generate MeTTa donor candidates using the NEW MeTTa-powered system
+            # Generate MeTTa donor candidates using the NEW MeTTa-Powered Modular system
             logger.info(f"  Generating candidates for '{func_name}' using NEW MeTTa-Powered Modular system...")
             
             # Use the NEW generation system with MeTTa reasoning throughout
@@ -1368,11 +1368,11 @@ def run_metta_generate_command(target_path: str = None):
         if export_success:
             verification = verify_export(metta_generate_export_file)
             if verification["success"]:
-                logger.info(f"MeTTa-powered generation atoms exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
+                logger.info(f"[OK] MeTTa-powered generation atoms exported successfully: {verification['atom_count']} atoms ({verification['file_size']} bytes)")
             else:
-                logger.warning(f"Export verification failed: {verification.get('error', 'Unknown error')}")
+                logger.warning(f"[WARNING] Export verification failed: {verification.get('error', 'Unknown error')}")
         else:
-            logger.warning(f"Failed to export MeTTa-powered generation atoms.")
+            logger.warning(f"[WARNING] Failed to export MeTTa-powered generation atoms.")
             
     except Exception as e:
         logger.error(f"Error during MeTTa-powered generation atom export: {e}")
@@ -1380,7 +1380,7 @@ def run_metta_generate_command(target_path: str = None):
     logger.info(f"\n" + "="*70)
     logger.info(f"NEW METTA-POWERED GENERATE COMMAND COMPLETE")
     logger.info(f"="*70)
-    logger.info(f"Successfully demonstrated NEW MeTTa-powered donor generation")
+    logger.info(f"[OK] Successfully demonstrated NEW MeTTa-powered donor generation")
     logger.info(f"Total candidates generated: {total_candidates}")
     logger.info(f"MeTTa-guided candidates: {total_metta_guided}")
     logger.info(f"Best alternatives identified for {len(best_alternatives)} functions")
@@ -1392,12 +1392,12 @@ def run_metta_generate_command(target_path: str = None):
     logger.info(f"\n" + "="*70)
     logger.info(f"NEW METTA-POWERED SYSTEM FEATURES DEMONSTRATED:")
     logger.info(f"="*70)
-    logger.info(f"✓ MeTTa reasoning engine for intelligent pattern detection")
-    logger.info(f"✓ MeTTa-guided strategy selection and applicability checking")
-    logger.info(f"✓ Symbolic reasoning fallbacks when MeTTa execution fails")
-    logger.info(f"✓ MeTTa-derived transformations with reasoning traces")
-    logger.info(f"✓ Enhanced candidate scoring with MeTTa confidence metrics")
-    logger.info(f"✓ Learning and adaptation from generation feedback")
+    logger.info(f"[OK] MeTTa reasoning engine for intelligent pattern detection")
+    logger.info(f"[OK] MeTTa-guided strategy selection and applicability checking")
+    logger.info(f"[OK] Symbolic reasoning fallbacks when MeTTa execution fails")
+    logger.info(f"[OK] MeTTa-derived transformations with reasoning traces")
+    logger.info(f"[OK] Enhanced candidate scoring with MeTTa confidence metrics")
+    logger.info(f"[OK] Learning and adaptation from generation feedback")
     logger.info(f"")
     logger.info(f"Key advantages over previous system:")
     logger.info(f"  - Symbolic reasoning as core decision-making engine")
