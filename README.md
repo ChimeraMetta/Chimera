@@ -28,11 +28,11 @@ Chimera bridges the gap between symbolic systems (using [MeTTa](https://metta-la
 
 Chimera intends to implement the following features:
 
-- 🔄 **Autonomous Evolution Loop:** Reads code, hypothesizes changes, tests outcomes, and learns from failure.
-- 🧩 **Symbolic Reasoning Layer:** Uses logic and pattern-matching to identify structure, invariants, and design flaws.
-- 📚 **LLM-Augmented Inference:** Leverages language models to generate new code, fix errors, and explain intentions.
-- 🧪 **Test-Aware Mutation:** Integrates with unit and integration tests to validate hypotheses and regressions.
-- 🧠 **Memory and Self-Reflection:** Tracks past decisions and adapts future iterations accordingly.
+- [INFO] **Autonomous Evolution Loop:** Reads code, hypothesizes changes, tests outcomes, and learns from failure.
+- [INFO] **Symbolic Reasoning Layer:** Uses logic and pattern-matching to identify structure, invariants, and design flaws.
+- [INFO] **LLM-Augmented Inference:** Leverages language models to generate new code, fix errors, and explain intentions.
+- [INFO] **Test-Aware Mutation:** Integrates with unit and integration tests to validate hypotheses and regressions.
+- [INFO] **Memory and Self-Reflection:** Tracks past decisions and adapts future iterations accordingly.
 
 --
 
