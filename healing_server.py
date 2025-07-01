@@ -964,6 +964,12 @@ def create_self_healing_function(client: SimpleHealingClient, original_func: Cal
             if healed_source:
                 print(f"Received healed source for {original_func.__name__}")
                 
+                # Show the healed source code
+                print(f"Generated healed function:")
+                source_lines = healed_source.split('\n')
+                for i, line in enumerate(source_lines, 1):
+                    print(f"    {i:2d}: {line}")
+                
                 # Create healed function
                 healed_func = create_function_from_source(healed_source, original_func.__name__)
                 
@@ -1038,21 +1044,23 @@ def run_standalone_demo():
         healing_string_ops = create_self_healing_function(client, buggy_string_ops, "string_ops")
         healing_dict_access = create_self_healing_function(client, buggy_dict_access, "dict_ops")
         
-        # Test scenarios
+        # Test scenarios with more detailed output
         test_scenarios = [
-            ("Array bounds error", lambda: healing_array_access([1, 2, 3], 5)),
-            ("Division by zero", lambda: healing_division(10, 0)),
-            ("None attribute error", lambda: healing_string_ops("hello", None)),
-            ("Missing dictionary key", lambda: healing_dict_access({"a": 1}, "b")),
+            ("Array bounds error", lambda: healing_array_access([1, 2, 3], 5), "Should return None instead of IndexError"),
+            ("Division by zero", lambda: healing_division(10, 0), "Should return inf instead of ZeroDivisionError"),
+            ("None attribute error", lambda: healing_string_ops("hello", None), "Should handle None gracefully"),
+            ("Missing dictionary key", lambda: healing_dict_access({"a": 1}, "b"), "Should return None instead of KeyError"),
         ]
         
         print(f"\nRunning {len(test_scenarios)} test scenarios...")
+        print("=" * 70)
         
         successful_healings = 0
         
-        for i, (description, test_func) in enumerate(test_scenarios, 1):
+        for i, (description, test_func, expected) in enumerate(test_scenarios, 1):
             print(f"\n[{i}] {description}")
-            print("-" * 30)
+            print(f"    Expected: {expected}")
+            print("-" * 50)
             
             try:
                 result = test_func()
@@ -1061,12 +1069,54 @@ def run_standalone_demo():
             except Exception as e:
                 print(f"Function still failed: {type(e).__name__}: {e}")
         
+        # Show what each healed function looks like
+        print(f"\nSummary of Generated Healed Functions")
+        print("=" * 60)
+        
+        function_names = ["buggy_array_access", "buggy_division", "buggy_string_ops", "buggy_dict_access"]
+        
+        for func_name in function_names:
+            try:
+                import requests
+                response = requests.get(f"http://localhost:8765/function/{func_name}/source", timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('is_healed') and data.get('healed_source'):
+                        print(f"\nCreating self-healing function wrappers...")
+                        source_lines = data['healed_source'].split('\n')
+                        for i, line in enumerate(source_lines, 1):
+                            print(f"    {i:2d}: {line}")
+                    else:
+                        print(f"\n⚠️  {func_name}: Not healed")
+                else:
+                    print(f"\n❌ Could not get source for {func_name}")
+            except Exception as e:
+                print(f"\n❌ Error getting {func_name} source: {e}")
+        
         # Summary
         print(f"\nDemo Summary")
         print("=" * 30)
         print(f"Test scenarios: {len(test_scenarios)}")
         print(f"Successful healings: {successful_healings}")
         print(f"Success rate: {100 * successful_healings / len(test_scenarios):.1f}%")
+        
+        # Test the healed functions with valid inputs too
+        print(f"\nTesting Healed Functions with Valid Inputs")
+        print("-" * 50)
+        
+        valid_tests = [
+            ("Array access (valid)", lambda: healing_array_access([1, 2, 3], 1), "Should return 2"),
+            ("Division (valid)", lambda: healing_division(10, 2), "Should return 5.0"),
+            ("String ops (valid)", lambda: healing_string_ops("world", "hello"), "Should return formatted string"),
+            ("Dict access (valid)", lambda: healing_dict_access({"a": 1, "b": 2}, "a"), "Should return 1"),
+        ]
+        
+        for description, test_func, expected in valid_tests:
+            try:
+                result = test_func()
+                print(f"✅ {description}: {repr(result)} ({expected})")
+            except Exception as e:
+                print(f"❌ {description}: Failed with {type(e).__name__}: {e}")
         
         # Server stats
         try:
