@@ -1161,6 +1161,22 @@ def run_metta_infrastructure_demo():
     else:
         print("No performance data collected")
     
+    # Print the actual optimized functions
+    print(f"\n" + "="*60)
+    print(f"METTA-GENERATED OPTIMIZED FUNCTIONS")
+    print("="*60)
+    
+    for func_name in healer.registered_functions.keys():
+        optimized_source = healer.generate_metta_optimization(func_name)
+        if optimized_source:
+            print(f"\n--- OPTIMIZED: {func_name} ---")
+            lines = optimized_source.split('\n')
+            for i, line in enumerate(lines, 1):
+                print(f"{i:3d}: {line}")
+            print(f"--- END {func_name} ({len(lines)} lines) ---")
+        else:
+            print(f"\n[WARNING] No optimized version available for {func_name}")
+    
     print(f"\nMeTTa Infrastructure Healing completed.")
     return len(performance_results) > 0
 
