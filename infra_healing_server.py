@@ -187,7 +187,8 @@ class MeTTaInfrastructureAnalyzer:
         }
         
         # Add function source to MeTTa space for analysis
-        func_atom = f'(FunctionSource "{func_name}" "{source_code.replace('"', '\\"')}")'
+        escaped_source = source_code.replace('"', '\\"').replace('\n', '\\n')
+        func_atom = f'(FunctionSource "{func_name}" "{escaped_source}")'
         try:
             parsed_atom = self.metta_space.metta.parse_single(func_atom)
             self.metta_space.add_atom(parsed_atom)
