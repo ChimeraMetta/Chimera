@@ -4,6 +4,7 @@ cffi==1.14.6
 charset-normalizer==3.4.1
 colorama==0.4.6
 editor==1.6.6
+fastapi==0.104.1
 gitdb==4.0.12
 GitPython==3.1.44
 greenlet==0.4.13
@@ -11,6 +12,7 @@ hpy==0.0.3
 hyperon==0.2.4
 idna==3.10
 inquirer==3.4.0
+psutil==5.9.6
 readchar==4.2.1
 readline==6.2.4.1
 requests==2.32.3
@@ -18,5 +20,6 @@ runs==1.2.2
 smmap==5.0.2
 tqdm==4.67.1
 urllib3==2.2.3
+uvicorn==0.24.0
 wcwidth==0.2.13
 xmod==1.8.1
