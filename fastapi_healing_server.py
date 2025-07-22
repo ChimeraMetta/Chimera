@@ -22,7 +22,7 @@ import uvicorn
 
 # Import existing Chimera components
 from reflectors.dynamic_monitor import DynamicMonitor
-from reflectors.autonomous_evolution import AutonomousEvolution
+from reflectors.autonomous_evolution import AutonomousErrorFixer
 from common.logging_utils import get_logger
 
 # Import demo endpoints
@@ -102,7 +102,7 @@ class SelfHealingManager:
     
     def __init__(self):
         self.monitor = DynamicMonitor()
-        self.evolution = AutonomousEvolution()
+        self.evolution = AutonomousErrorFixer()
         self.classifier = ErrorClassifier()
         self.metrics_history = deque(maxlen=1000)
         self.healing_actions = deque(maxlen=100)
