@@ -442,14 +442,12 @@ async def generate_dashboard_html():
                         </tr>
                     </thead>
                     <tbody>
-                        {''.join([f"""
-                        <tr>
+                        {''.join([f"""<tr>
                             <td>{action.timestamp.strftime('%H:%M:%S')}</td>
                             <td>{action.error_type}</td>
                             <td>{action.healing_strategy}</td>
                             <td><span class="{'success' if action.success else 'error'}">{'✅ Success' if action.success else '❌ Failed'}</span></td>
-                        </tr>
-                        """ for action in recent_actions])}
+                        </tr>""" for action in recent_actions])}
                     </tbody>
                 </table>
             </div>
