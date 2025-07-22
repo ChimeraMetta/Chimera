@@ -441,13 +441,21 @@ async def generate_dashboard_html():
                             <th>Status</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {''.join([f"""<tr>
+                    <tbody>"""
+    
+    # Generate table rows for healing actions
+    for action in recent_actions:
+        status_class = 'success' if action.success else 'error'
+        status_text = '✅ Success' if action.success else '❌ Failed'
+        html_content += f"""
+                        <tr>
                             <td>{action.timestamp.strftime('%H:%M:%S')}</td>
                             <td>{action.error_type}</td>
                             <td>{action.healing_strategy}</td>
-                            <td><span class="{'success' if action.success else 'error'}">{'✅ Success' if action.success else '❌ Failed'}</span></td>
-                        </tr>""" for action in recent_actions])}
+                            <td><span class="{status_class}">{status_text}</span></td>
+                        </tr>"""
+    
+    html_content += """
                     </tbody>
                 </table>
             </div>
