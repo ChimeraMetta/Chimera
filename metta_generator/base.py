@@ -28,6 +28,7 @@ EVOLUTION_AVAILABLE = True
 DONOR_GENERATION_ONTOLOGY = "metta/donor_generation.metta"
 SEMANTIC_EVOLUTION_ONTOLOGY = "metta/semantic_evolution.metta"
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
+_PROJECT_ROOT = os.path.abspath(os.path.join(_WORKSPACE_ROOT, ".."))
 
 @dataclass
 class GenerationContext:
@@ -1100,7 +1101,7 @@ class MeTTaPoweredModularDonorGenerator:
     
     def _load_semantic_evolution_rules(self):
         """Load semantic evolution MeTTa rules"""
-        semantic_rules_file = os.path.join(_WORKSPACE_ROOT, SEMANTIC_EVOLUTION_ONTOLOGY)
+        semantic_rules_file = os.path.join(_PROJECT_ROOT, SEMANTIC_EVOLUTION_ONTOLOGY)
         if os.path.exists(semantic_rules_file):
             try:
                 with open(semantic_rules_file, 'r') as f:
