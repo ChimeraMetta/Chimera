@@ -78,9 +78,19 @@ class FitnessEvaluator:
         }
         
         try:
-            # Execute the generated code
+            # Fix indentation issues before executing
+            import textwrap
+            cleaned_code = textwrap.dedent(code).strip()
+            
+            # Add logging to see what code is being executed
+            print(f"[DEBUG] Executing evolved function code:")
+            print("=" * 50)  
+            print(cleaned_code)
+            print("=" * 50)
+            
+            # Execute the cleaned code
             exec_globals = {}
-            exec(code, exec_globals)
+            exec(cleaned_code, exec_globals)
             
             # Find the evolved function
             evolved_func = None
@@ -129,8 +139,12 @@ class FitnessEvaluator:
     def _evaluate_syntactic_correctness(self, code: str) -> float:
         """Evaluate syntactic correctness when no tests available"""
         try:
+            # Fix indentation issues with dedent
+            import textwrap
+            cleaned_code = textwrap.dedent(code).strip()
+            
             # Check if code parses
-            ast.parse(code)
+            ast.parse(cleaned_code)
             
             # Basic structure checks
             score = 0.5  # Base score for valid syntax
@@ -153,8 +167,17 @@ class FitnessEvaluator:
         efficiency_score = 1.0
         
         try:
-            # Parse code for analysis
-            tree = ast.parse(code)
+            # Fix indentation and parse code for analysis
+            import textwrap
+            cleaned_code = textwrap.dedent(code).strip()
+            
+            # Add logging to see what code is being analyzed
+            print(f"[DEBUG] Analyzing code efficiency:")
+            print("=" * 50)
+            print(cleaned_code)
+            print("=" * 50)
+            
+            tree = ast.parse(cleaned_code)
             
             # Count complexity indicators
             complexity_metrics = self._analyze_code_complexity(tree)
@@ -180,7 +203,11 @@ class FitnessEvaluator:
             efficiency_score = (efficiency_score + semantic_efficiency) / 2
             
         except Exception as e:
-            print(f"Efficiency evaluation error: {e}")
+            print(f"[DEBUG] Efficiency evaluation error: {e}")
+            print(f"[DEBUG] Problematic code was:")
+            print("=" * 50)
+            print(repr(code))  # Show raw code with escape characters
+            print("=" * 50)
             efficiency_score = 0.5
         
         return max(0.0, min(1.0, efficiency_score))
