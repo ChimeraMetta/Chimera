@@ -79,7 +79,7 @@ async def demo_overview():
 
 @router.post("/memory-leak")
 @router.get("/memory-leak")
-async def trigger_memory_leak(size_mb: int = 50, count: int = 3):
+async def trigger_memory_leak(size_mb: int = 30, count: int = 4):
     """
     Trigger memory leak by creating memory-consuming objects
     
@@ -88,15 +88,19 @@ async def trigger_memory_leak(size_mb: int = 50, count: int = 3):
         count: Number of memory hogs to create
     """
     before_memory = psutil.Process().memory_info().rss / 1024 / 1024
+    print(f"[DEMO] Starting memory leak simulation - Current memory: {before_memory:.1f}MB")
     
     # Create memory hogs
     for i in range(count):
         memory_hog = MemoryHog(size_mb)
         memory_hogs.append(memory_hog)
+        current_memory = psutil.Process().memory_info().rss / 1024 / 1024
+        print(f"[DEMO] Created memory hog {i+1}/{count} ({size_mb}MB) - Total memory: {current_memory:.1f}MB")
         await asyncio.sleep(0.1)  # Small delay between allocations
     
     after_memory = psutil.Process().memory_info().rss / 1024 / 1024
     memory_increase = after_memory - before_memory
+    print(f"[DEMO] Memory leak simulation complete - Final memory: {after_memory:.1f}MB (increased by {memory_increase:.1f}MB)")
     
     return {
         "message": f"Created {count} memory hogs of {size_mb}MB each",
