@@ -308,7 +308,7 @@ class SemanticEvolutionEngine:
             (SemanticGeneType.INITIALIZATION, "initialize_accumulator"),  # Ensure result is initialized
             (SemanticGeneType.ITERATION, "scan"),
             (SemanticGeneType.CONDITION, purpose if purpose in ["maximize", "minimize"] else "maximize"),
-            (SemanticGeneType.OPERATION, "update"),
+            (SemanticGeneType.OPERATION, "update_with_value"),
             (SemanticGeneType.TERMINATION, "return_result")  # Prefer simple return over return_with_position
         ]
         
@@ -530,22 +530,25 @@ class SemanticEvolutionEngine:
         """Fallback semantic gene selection"""
         purpose = target_semantics.get("purpose", "generic")
         
-        # Look for genes matching the role hint
+        # Look for genes matching the exact role hint first
+        exact_matches = [g for g in available_genes if g.semantic_role == role_hint]
+        if exact_matches:
+            return exact_matches[0].clone()
+        
+        # Look for genes containing the role hint
         matching_genes = [g for g in available_genes if role_hint in g.semantic_role]
         if matching_genes:
-            return random.choice(matching_genes).clone()
+            # Prefer genes with higher success rates
+            best_match = max(matching_genes, key=lambda g: g.success_rate)
+            return best_match.clone()
         
         # Look for genes matching the purpose
         if purpose in ["maximize", "minimize"]:
             purpose_genes = [g for g in available_genes if purpose in g.semantic_role]
             if purpose_genes:
-                return random.choice(purpose_genes).clone()
+                return purpose_genes[0].clone()
         
-        # Random selection with preference for higher success rates
-        if available_genes:
-            weights = [max(0.1, gene.success_rate) for gene in available_genes]
-            return random.choices(available_genes, weights=weights)[0].clone()
-        
+        # Final fallback: select first available gene
         return available_genes[0].clone()
     
     def _evaluate_population_fitness(self):
