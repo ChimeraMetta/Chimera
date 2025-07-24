@@ -304,8 +304,8 @@ class SemanticEvolutionEngine:
         
         # Required gene types in semantic order
         gene_sequence = [
-            (SemanticGeneType.INITIALIZATION, "validate_input_bounds"),
-            (SemanticGeneType.INITIALIZATION, "initialize"),
+            (SemanticGeneType.ERROR_HANDLING, "null_check"),  # Add error handling first
+            (SemanticGeneType.INITIALIZATION, "initialize_accumulator"),  # Ensure result is initialized
             (SemanticGeneType.ITERATION, "scan"),
             (SemanticGeneType.CONDITION, purpose if purpose in ["maximize", "minimize"] else "maximize"),
             (SemanticGeneType.OPERATION, "update"),
@@ -667,31 +667,43 @@ class SemanticEvolutionEngine:
         lines = code.split('\n')
         indented_lines = []
         
-        base_indent = '    ' * indent_level  # 4 spaces per level
-        
-        for line in lines:
+        for i, line in enumerate(lines):
             # Remove any existing indentation
             clean_line = line.strip()
             if clean_line:
-                # Apply proper indentation based on gene type
-                if gene.gene_type == SemanticGeneType.ERROR_HANDLING or gene.gene_type == SemanticGeneType.INITIALIZATION:
-                    # These go at function body level
+                # Apply proper indentation based on gene type and line structure
+                if gene.gene_type == SemanticGeneType.ERROR_HANDLING:
+                    # Error handling: if statement at body level, return indented
+                    if clean_line.startswith('if '):
+                        indented_lines.append('    ' + clean_line)
+                    elif clean_line.startswith('return'):
+                        # return statements inside if blocks need extra indentation
+                        indented_lines.append('        ' + clean_line)
+                    else:
+                        # other lines inside if blocks
+                        indented_lines.append('        ' + clean_line)
+                elif gene.gene_type == SemanticGeneType.INITIALIZATION:
+                    # Variable initialization at function body level
                     indented_lines.append('    ' + clean_line)
                 elif gene.gene_type == SemanticGeneType.ITERATION:
-                    # Loops go at function body level
-                    indented_lines.append('    ' + clean_line)
+                    # Loops at function body level, but need to handle continuation lines
+                    if i == 0 or clean_line.startswith('for ') or clean_line.startswith('while '):
+                        indented_lines.append('    ' + clean_line)
+                    else:
+                        # Continuation lines like 'i = idx' need loop body indentation
+                        indented_lines.append('        ' + clean_line)
                 elif gene.gene_type == SemanticGeneType.CONDITION:
-                    # Conditions go inside loops
+                    # Conditions inside loops
                     indented_lines.append('        ' + clean_line)
                 elif gene.gene_type == SemanticGeneType.OPERATION:
-                    # Operations go inside conditions
+                    # Operations inside conditions
                     indented_lines.append('            ' + clean_line)
                 elif gene.gene_type == SemanticGeneType.TERMINATION:
-                    # Return statements go at function body level
+                    # Return statements at function body level
                     indented_lines.append('    ' + clean_line)
                 else:
                     # Default indentation
-                    indented_lines.append(base_indent + clean_line)
+                    indented_lines.append('    ' + clean_line)
         
         return '\n'.join(indented_lines)
     
