@@ -370,14 +370,20 @@ class DynamicMonitor:
         Add a MeTTa atom to the space.
         """
         try:
+            # Skip processing for simple rule atoms that don't contain code strings
+            if not ('"' in atom_str and any(keyword in atom_str for keyword in ['def ', 'class ', 'import ', 'return '])):
+                # Simple atom - parse directly
+                parsed_atom = self.metta.parse_single(atom_str)
+                self.metta_space.add_atom(parsed_atom)
+                return True
+            
             # Handle function code atoms specially
-            if "= (" in atom_str and ")" in atom_str:
-                print("Found function code atom")
+            if "= (" in atom_str and '"' in atom_str:
                 # Extract the code part
-                code_start = atom_str.find('"') + 1
+                code_start = atom_str.find('"')
                 code_end = atom_str.rfind('"')
-                if code_start < code_end:
-                    code = atom_str[code_start:code_end]
+                if code_start != -1 and code_end != -1 and code_start < code_end:
+                    code = atom_str[code_start+1:code_end]
                     
                     # Escape backslashes and quotes
                     escaped_code = code.replace('\\', '\\\\').replace('"', '\\"')
@@ -386,19 +392,18 @@ class DynamicMonitor:
                     escaped_code = escaped_code.replace('\n', '\\n')
                     
                     # Reconstruct the atom string
-                    atom_str = atom_str[:code_start] + escaped_code + atom_str[code_end:]
-                    print(f"Reconstructed atom: {atom_str[:100]}...")
+                    atom_str = atom_str[:code_start+1] + escaped_code + atom_str[code_end:]
             
             parsed_atom = self.metta.parse_single(atom_str)
             self.metta_space.add_atom(parsed_atom)
             return True
             
         except Exception as e:
-            print(f"Error adding atom: {atom_str[:100]}...")  # Log first 100 chars
-            print(f"Error type: {type(e)}")
-            print(f"Error details: {str(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            # More informative error handling - but suppress the noisy output unless debug mode
+            if hasattr(self, 'debug_mode') and self.debug_mode:
+                print(f"Error adding atom: {atom_str[:200]}...")  # Show more chars for debugging
+                print(f"Error type: {type(e)}")
+                print(f"Error details: {str(e)}")
             return False
     
     def load_metta_rules(self, rules_file: str) -> bool:
@@ -422,8 +427,10 @@ class DynamicMonitor:
                     self.metta_space.add_atom(atom)
                     atom_count += 1
                 except Exception as atom_err:
-                    print(f"Error adding atom: {atom}")
-                    print(f"  Error details: {atom_err}")
+                    # Suppress individual atom errors during bulk loading unless debug mode
+                    if hasattr(self, 'debug_mode') and self.debug_mode:
+                        print(f"Error adding atom: {atom}")
+                        print(f"  Error details: {atom_err}")
             
             print(f"Successfully loaded {atom_count}/{len(parsed_atoms)} rules from {rules_file}")
             return atom_count > 0
