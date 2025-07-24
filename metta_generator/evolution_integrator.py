@@ -58,7 +58,7 @@ class EnhancedEvolutionIntegrator:
                 reference_func = func
             
             # Setup semantic evolution for this function
-            self.semantic_engine.setup_for_function(reference_func, function_type)
+            self.semantic_engine.setup_for_function(reference_func)
             
             # Determine target semantics based on function analysis
             target_semantics = self._analyze_function_semantics(reference_func, function_type)
