@@ -1466,12 +1466,17 @@ class MeTTaPoweredModularDonorGenerator:
         loaded_count = 0
         failed_count = 0
         
-        # Load function-specific atoms
-        for atom in metta_atoms:
+        # Load function-specific atoms with debugging
+        for i, atom in enumerate(metta_atoms):
             if self.reasoning_engine._add_rule_safely(atom):
                 loaded_count += 1
             else:
                 failed_count += 1
+                # Show first few failed atoms for debugging
+                if failed_count <= 3:
+                    print(f"   DEBUG: Failed atom {i+1}: {atom}")
+                elif failed_count == 4:
+                    print(f"   DEBUG: ... ({len(metta_atoms) - i - 1} more atoms will be checked quietly)")
         
         print(f"   Loaded {loaded_count}/{len(metta_atoms)} atoms for reasoning ({failed_count} failed)")
         
