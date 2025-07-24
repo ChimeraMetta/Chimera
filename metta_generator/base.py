@@ -1130,17 +1130,44 @@ class MeTTaPoweredModularDonorGenerator:
                 with open(semantic_rules_file, 'r') as f:
                     rules_content = f.read()
                 
-                # Parse and load rules
-                for line in rules_content.split('\n'):
-                    line = line.strip()
-                    if line and not line.startswith(';') and line.startswith('(='):
-                        self.reasoning_engine._add_rule_safely(line)
+                # Parse complete MeTTa expressions, not individual lines
+                from hyperon import MeTTa
+                temp_metta = MeTTa()
+                try:
+                    parsed_atoms = temp_metta.parse_all(rules_content)
+                    loaded_count = 0
+                    failed_count = 0
+                    
+                    for atom in parsed_atoms:
+                        try:
+                            self.metta_space.add_atom(atom)
+                            loaded_count += 1
+                        except Exception as e:
+                            failed_count += 1
+                            if failed_count <= 3:  # Show first few failures
+                                print(f"Failed to add semantic rule: {atom} | Error: {e}")
+                    
+                    print(f"Loaded {loaded_count} semantic evolution rules ({failed_count} failed)")
+                    
+                except Exception as parse_error:
+                    print(f"Failed to parse semantic evolution file: {parse_error}")
+                    print("Falling back to line-by-line parsing...")
+                    # Fallback to original method if parse_all fails
+                    self._load_semantic_rules_line_by_line(rules_content)
                 
                 print(f"    Loaded semantic evolution rules from {semantic_rules_file}")
             except Exception as e:
                 print(f"    Failed to load semantic evolution rules: {e}")
         else:
             print(f"    Semantic evolution rules file not found: {semantic_rules_file}")
+    
+    def _load_semantic_rules_line_by_line(self, rules_content: str):
+        """Fallback method for loading semantic rules line by line"""
+        # This is the original method - kept as fallback
+        for line in rules_content.split('\n'):
+            line = line.strip()
+            if line and not line.startswith(';') and line.startswith('(='):
+                self.reasoning_engine._add_rule_safely(line)
     
     def _setup_generators_with_reasoning(self):
         """Setup generators with access to MeTTa reasoning engine."""
