@@ -191,8 +191,8 @@ class SemanticEvolutionEngine:
                 semantic_role="update_with_value",
                 preconditions=["optimal_element_found"],
                 postconditions=["accumulator_updated"],
-                code_template="{result} = value",
-                parameter_slots={"result": "accumulator"},
+                code_template="{result} = {data}[i]",
+                parameter_slots={"result": "accumulator", "data": "input_collection"},
                 metta_derivation=["(operation-pattern update-with-value)"]
             )
         ]
@@ -309,7 +309,7 @@ class SemanticEvolutionEngine:
             (SemanticGeneType.ITERATION, "scan"),
             (SemanticGeneType.CONDITION, purpose if purpose in ["maximize", "minimize"] else "maximize"),
             (SemanticGeneType.OPERATION, "update"),
-            (SemanticGeneType.TERMINATION, "return")
+            (SemanticGeneType.TERMINATION, "return_result")  # Prefer simple return over return_with_position
         ]
         
         for gene_type, role_hint in gene_sequence:
