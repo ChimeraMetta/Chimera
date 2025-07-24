@@ -137,15 +137,12 @@ class MeTTaReasoningEngine:
     def _add_rule_safely(self, rule: str):
         """Safely add rule to MeTTa space."""
         try:
-            # Parse the rule string into a proper MeTTa atom
-            from hyperon import MeTTa
-            temp_metta = MeTTa()
-            parsed_atom = temp_metta.parse_single(rule)
-            self.metta_space.add_atom(parsed_atom)
-            return True
+            if hasattr(self.metta_space, 'run'):
+                self.metta_space.run(f"!({rule})")
+            elif hasattr(self.metta_space, 'add_atom'):
+                self.metta_space.add_atom(rule)
         except Exception as e:
-            print(f"Failed to add rule: {rule[:100]}... | Error: {e}")
-            return False
+            print(f"Failed to add rule: {e}")
     
     def reason_about_patterns(self, context: GenerationContext) -> List[FunctionPattern]:
         """Use MeTTa reasoning to detect patterns."""
@@ -302,31 +299,14 @@ class MeTTaReasoningEngine:
             
             # Execute query
             print("          Executing query on MeTTa space...")
-            try:
-                # For now, use pattern matching on the space directly
-                # This is a simplified approach while the full MeTTa integration is stabilized
-                query_result = []
-                
-                # Extract atoms from space and search for matches
-                space_atoms = []
-                if hasattr(self.metta_space, 'get_atoms'):
-                    space_atoms = self.metta_space.get_atoms()
-                
-                # Simple pattern matching for the specific queries we expect
-                if "detect-pattern" in query and "pattern-detected" in query:
-                    # For pattern detection, return at least one generic pattern
-                    query_result = ["(pattern-detected memory_leaking_data_processor generic)"]
-                elif "donor-quality" in query and "quality-score" in query:
-                    # For quality scoring, return a reasonable score
-                    query_result = ["(quality-score candidate 0.75)"]
-                elif "fallback-generation-approach" in query:
-                    # For fallback approaches
-                    query_result = ["(fallback-strategy memory_leaking_data_processor memory_optimization)"]
-                
-                results.extend(query_result)
-                    
-            except Exception as e:
-                print(f"          Query execution failed: {e}")
+            if hasattr(self.metta_space, 'run'):
+                query_result = self.metta_space.run(f"!({query})")
+                if query_result:
+                    results.extend(query_result)
+            elif hasattr(self.metta_space, 'query'):
+                query_result = self.metta_space.query(query)
+                if query_result:
+                    results.extend(query_result)
             
             print(f"          MeTTa execution returned {len(results)} results.")
         
@@ -1106,9 +1086,6 @@ class MeTTaPoweredModularDonorGenerator:
         self.generators = []
         self._setup_generators_with_reasoning()
         
-        # Update strategy manager with actual generators
-        self.strategy_manager.generators = self.generators
-        
         print("  Initialized MeTTa-Powered Modular Donor Generator...")
 
        # Add semantic evolution capability
@@ -1130,44 +1107,17 @@ class MeTTaPoweredModularDonorGenerator:
                 with open(semantic_rules_file, 'r') as f:
                     rules_content = f.read()
                 
-                # Parse complete MeTTa expressions, not individual lines
-                from hyperon import MeTTa
-                temp_metta = MeTTa()
-                try:
-                    parsed_atoms = temp_metta.parse_all(rules_content)
-                    loaded_count = 0
-                    failed_count = 0
-                    
-                    for atom in parsed_atoms:
-                        try:
-                            self.metta_space.add_atom(atom)
-                            loaded_count += 1
-                        except Exception as e:
-                            failed_count += 1
-                            if failed_count <= 3:  # Show first few failures
-                                print(f"Failed to add semantic rule: {atom} | Error: {e}")
-                    
-                    print(f"Loaded {loaded_count} semantic evolution rules ({failed_count} failed)")
-                    
-                except Exception as parse_error:
-                    print(f"Failed to parse semantic evolution file: {parse_error}")
-                    print("Falling back to line-by-line parsing...")
-                    # Fallback to original method if parse_all fails
-                    self._load_semantic_rules_line_by_line(rules_content)
+                # Parse and load rules
+                for line in rules_content.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith(';') and line.startswith('(='):
+                        self.reasoning_engine._add_rule_safely(line)
                 
                 print(f"    Loaded semantic evolution rules from {semantic_rules_file}")
             except Exception as e:
                 print(f"    Failed to load semantic evolution rules: {e}")
         else:
             print(f"    Semantic evolution rules file not found: {semantic_rules_file}")
-    
-    def _load_semantic_rules_line_by_line(self, rules_content: str):
-        """Fallback method for loading semantic rules line by line"""
-        # This is the original method - kept as fallback
-        for line in rules_content.split('\n'):
-            line = line.strip()
-            if line and not line.startswith(';') and line.startswith('(='):
-                self.reasoning_engine._add_rule_safely(line)
     
     def _setup_generators_with_reasoning(self):
         """Setup generators with access to MeTTa reasoning engine."""
@@ -1493,17 +1443,12 @@ class MeTTaPoweredModularDonorGenerator:
         loaded_count = 0
         failed_count = 0
         
-        # Load function-specific atoms with debugging
-        for i, atom in enumerate(metta_atoms):
+        # Load function-specific atoms
+        for atom in metta_atoms:
             if self.reasoning_engine._add_rule_safely(atom):
                 loaded_count += 1
             else:
                 failed_count += 1
-                # Show first few failed atoms for debugging
-                if failed_count <= 3:
-                    print(f"   DEBUG: Failed atom {i+1}: {atom}")
-                elif failed_count == 4:
-                    print(f"   DEBUG: ... ({len(metta_atoms) - i - 1} more atoms will be checked quietly)")
         
         print(f"   Loaded {loaded_count}/{len(metta_atoms)} atoms for reasoning ({failed_count} failed)")
         
