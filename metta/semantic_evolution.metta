@@ -247,6 +247,18 @@
 ; Default Rules and Fallbacks
 ; =============================================================================
 
+; Gene selection rules for common gene types
+(= (select-gene generic validate-input-bounds) True)
+(= (select-gene generic initialize-accumulator) True)
+(= (select-gene generic initialize-with-first-valid) True)
+(= (select-gene generic forward-linear-scan) True)
+(= (select-gene generic maximize-condition) True)
+(= (select-gene generic update-accumulator) True)
+(= (select-gene generic update-with-value) True)
+(= (select-gene generic null-check) True)
+(= (select-gene generic track-position) True)
+(= (select-gene generic return-result) True)
+
 ; Default gene selection when no specific rule applies
 (= (select-gene $purpose $gene-type)
    (random-selection $gene-type))
