@@ -62,7 +62,7 @@ class SemanticEvolutionEngine:
                 semantic_role="validate_input_bounds",
                 preconditions=["input_received"],
                 postconditions=["bounds_validated", "input_safe"],
-                code_template="if start_idx < 0 or end_idx > len({data}) or start_idx >= end_idx:\n        return None",
+                code_template="if start_idx < 0 or end_idx > len({data}) or start_idx >= end_idx:\n    return None",
                 parameter_slots={"data": "input_collection"},
                 metta_derivation=["(validation-pattern input-bounds)"]
             ),
@@ -96,7 +96,7 @@ class SemanticEvolutionEngine:
                 semantic_role="forward_linear_scan",
                 preconditions=["accumulator_ready"],
                 postconditions=["elements_processed"],
-                code_template="    for i in range({start_idx} + 1, {end_idx}):",
+                code_template="for i in range({start_idx} + 1, {end_idx}):",
                 parameter_slots={"start_idx": "start_index", "end_idx": "end_index"},
                 metta_derivation=["(iteration-pattern forward-scan)"]
             ),
@@ -105,7 +105,7 @@ class SemanticEvolutionEngine:
                 semantic_role="indexed_iteration",
                 preconditions=["accumulator_ready"],
                 postconditions=["elements_processed"],
-                code_template="    for idx in range({start_idx}, {end_idx}):\n        i = idx",
+                code_template="for idx in range({start_idx}, {end_idx}):\n    i = idx",
                 parameter_slots={"start_idx": "start_index", "end_idx": "end_index"},
                 metta_derivation=["(iteration-pattern indexed)"]
             ),
@@ -114,7 +114,7 @@ class SemanticEvolutionEngine:
                 semantic_role="enumerated_iteration",
                 preconditions=["accumulator_ready"],
                 postconditions=["elements_processed"],
-                code_template="    for i, value in enumerate({data}[{start_idx}:{end_idx}], {start_idx}):",
+                code_template="for i, value in enumerate({data}[{start_idx}:{end_idx}], {start_idx}):",
                 parameter_slots={"data": "input_collection", "start_idx": "start_index", "end_idx": "end_index"},
                 metta_derivation=["(iteration-pattern enumerated)"]
             )
@@ -130,7 +130,7 @@ class SemanticEvolutionEngine:
                 semantic_role="maximize_condition",
                 preconditions=["elements_processed"],
                 postconditions=["optimal_element_found"],
-                code_template="        if {data}[i] > {result}:",
+                code_template="if {data}[i] > {result}:",
                 parameter_slots={"data": "input_collection", "result": "accumulator"},
                 metta_derivation=["(condition-pattern maximize)"]
             ),
@@ -139,7 +139,7 @@ class SemanticEvolutionEngine:
                 semantic_role="minimize_condition",
                 preconditions=["elements_processed"],
                 postconditions=["optimal_element_found"],
-                code_template="        if {data}[i] < {result}:",
+                code_template="if {data}[i] < {result}:",
                 parameter_slots={"data": "input_collection", "result": "accumulator"},
                 metta_derivation=["(condition-pattern minimize)"]
             ),
@@ -148,7 +148,7 @@ class SemanticEvolutionEngine:
                 semantic_role="safe_comparison",
                 preconditions=["elements_processed"],
                 postconditions=["optimal_element_found"],
-                code_template="        if {result} is None or {data}[i] > {result}:",
+                code_template="if {result} is None or {data}[i] > {result}:",
                 parameter_slots={"data": "input_collection", "result": "accumulator"},
                 metta_derivation=["(condition-pattern safe-maximize)"]
             )
@@ -164,7 +164,7 @@ class SemanticEvolutionEngine:
                 semantic_role="update_accumulator",
                 preconditions=["optimal_element_found"],
                 postconditions=["accumulator_updated"],
-                code_template="            {result} = {data}[i]",
+                code_template="{result} = {data}[i]",
                 parameter_slots={"result": "accumulator", "data": "input_collection"},
                 metta_derivation=["(operation-pattern update-accumulator)"]
             ),
@@ -173,7 +173,7 @@ class SemanticEvolutionEngine:
                 semantic_role="track_position",
                 preconditions=["optimal_element_found"],
                 postconditions=["position_tracked"],
-                code_template="            {result_pos} = i",
+                code_template="{result_pos} = i",
                 parameter_slots={"result_pos": "best_position"},
                 metta_derivation=["(operation-pattern track-position)"]
             ),
@@ -191,7 +191,7 @@ class SemanticEvolutionEngine:
                 semantic_role="update_with_value",
                 preconditions=["optimal_element_found"],
                 postconditions=["accumulator_updated"],
-                code_template="            {result} = value",
+                code_template="{result} = value",
                 parameter_slots={"result": "accumulator"},
                 metta_derivation=["(operation-pattern update-with-value)"]
             )
@@ -232,7 +232,7 @@ class SemanticEvolutionEngine:
                 semantic_role="null_check",
                 preconditions=["input_received"],
                 postconditions=["null_handled"],
-                code_template="    if {data} is None or len({data}) == 0:\n        return None",
+                code_template="if {data} is None or len({data}) == 0:\n    return None",
                 parameter_slots={"data": "input_collection"},
                 metta_derivation=["(error-handling-pattern null-check)"]
             )
@@ -592,11 +592,33 @@ class SemanticEvolutionEngine:
         # Sort genes by proper execution order for correct code structure
         ordered_genes = self._order_genes_for_execution(genome.genes)
         
-        # Generate code from genes in proper sequence
+        # Generate code from genes with proper indentation
+        current_indent_level = 1  # Start at function body level
+        in_loop = False
+        in_condition = False
+        
         for gene in ordered_genes:
             gene_code = self._instantiate_gene_template(gene, context_vars)
             if gene_code:
-                code_lines.append(gene_code)
+                # Apply proper indentation based on gene type and context
+                indented_code = self._apply_proper_indentation(gene, gene_code, current_indent_level, in_loop, in_condition)
+                code_lines.append(indented_code)
+                
+                # Update context for next genes
+                if gene.gene_type == SemanticGeneType.ITERATION:
+                    in_loop = True
+                    current_indent_level = 2
+                elif gene.gene_type == SemanticGeneType.CONDITION:
+                    in_condition = True
+                    current_indent_level = 3 if in_loop else 2
+                elif gene.gene_type == SemanticGeneType.OPERATION:
+                    # Operations go inside conditions
+                    current_indent_level = 4 if in_condition else (3 if in_loop else 2)
+                elif gene.gene_type == SemanticGeneType.TERMINATION:
+                    # Termination goes back to function level
+                    current_indent_level = 1
+                    in_loop = False
+                    in_condition = False
         
         return "\n".join(code_lines)
     
@@ -607,8 +629,9 @@ class SemanticEvolutionEngine:
             SemanticGeneType.ERROR_HANDLING: 0,      # First: validation/error checks
             SemanticGeneType.INITIALIZATION: 1,      # Second: variable initialization  
             SemanticGeneType.ITERATION: 2,           # Third: loops and control structures
-            SemanticGeneType.OPERATION: 3,           # Fourth: main logic operations
-            SemanticGeneType.TERMINATION: 4          # Last: return statements
+            SemanticGeneType.CONDITION: 3,           # Fourth: conditions inside loops
+            SemanticGeneType.OPERATION: 4,           # Fifth: operations inside conditions
+            SemanticGeneType.TERMINATION: 5          # Last: return statements (MUST be last)
         }
         
         # Sort genes by type priority, maintaining original order within same type
@@ -617,7 +640,14 @@ class SemanticEvolutionEngine:
             genes.index(gene)  # Preserve original order within same priority
         ))
         
-        return ordered_genes
+        # Double-check: ensure no genes come after termination genes
+        termination_genes = [g for g in ordered_genes if g.gene_type == SemanticGeneType.TERMINATION]
+        non_termination_genes = [g for g in ordered_genes if g.gene_type != SemanticGeneType.TERMINATION]
+        
+        # Always put termination genes at the very end
+        final_order = non_termination_genes + termination_genes
+        
+        return final_order
     
     def _instantiate_gene_template(self, gene: SemanticGene, context_vars: Dict[str, str]) -> str:
         """Instantiate gene template with context variables"""
@@ -631,6 +661,39 @@ class SemanticEvolutionEngine:
                 template = template.replace(f"{{{slot}}}", context_vars[slot])
         
         return template
+    
+    def _apply_proper_indentation(self, gene: SemanticGene, code: str, indent_level: int, in_loop: bool, in_condition: bool) -> str:
+        """Apply proper indentation to gene code based on context"""
+        lines = code.split('\n')
+        indented_lines = []
+        
+        base_indent = '    ' * indent_level  # 4 spaces per level
+        
+        for line in lines:
+            # Remove any existing indentation
+            clean_line = line.strip()
+            if clean_line:
+                # Apply proper indentation based on gene type
+                if gene.gene_type == SemanticGeneType.ERROR_HANDLING or gene.gene_type == SemanticGeneType.INITIALIZATION:
+                    # These go at function body level
+                    indented_lines.append('    ' + clean_line)
+                elif gene.gene_type == SemanticGeneType.ITERATION:
+                    # Loops go at function body level
+                    indented_lines.append('    ' + clean_line)
+                elif gene.gene_type == SemanticGeneType.CONDITION:
+                    # Conditions go inside loops
+                    indented_lines.append('        ' + clean_line)
+                elif gene.gene_type == SemanticGeneType.OPERATION:
+                    # Operations go inside conditions
+                    indented_lines.append('            ' + clean_line)
+                elif gene.gene_type == SemanticGeneType.TERMINATION:
+                    # Return statements go at function body level
+                    indented_lines.append('    ' + clean_line)
+                else:
+                    # Default indentation
+                    indented_lines.append(base_indent + clean_line)
+        
+        return '\n'.join(indented_lines)
     
     def _show_generation_stats(self):
         """Show generation statistics"""
