@@ -57,6 +57,7 @@ class FakeConnection:
         return f"Result for query {self.query_count}: {query[:50]}..."
 
 @router.get("/")
+@router.get("")
 async def demo_overview():
     """Overview of available demo endpoints"""
     return {
@@ -77,6 +78,7 @@ async def demo_overview():
     }
 
 @router.post("/memory-leak")
+@router.get("/memory-leak")
 async def trigger_memory_leak(size_mb: int = 50, count: int = 3):
     """
     Trigger memory leak by creating memory-consuming objects
@@ -106,6 +108,7 @@ async def trigger_memory_leak(size_mb: int = 50, count: int = 3):
     }
 
 @router.post("/cpu-overload")
+@router.get("/cpu-overload")
 async def trigger_cpu_overload(duration: int = 10, num_threads: int = 4):
     """
     Trigger CPU overload by starting CPU-intensive background tasks
@@ -148,6 +151,7 @@ async def trigger_cpu_overload(duration: int = 10, num_threads: int = 4):
     }
 
 @router.post("/connection-issues")
+@router.get("/connection-issues")
 async def trigger_connection_issues(connection_count: int = 50):
     """
     Simulate connection pool issues by creating many fake connections
@@ -181,6 +185,7 @@ async def trigger_connection_issues(connection_count: int = 50):
     }
 
 @router.post("/request-failures")
+@router.get("/request-failures")
 async def trigger_request_failures(failure_rate: float = 0.7):
     """
     Simulate request handling failures
@@ -264,6 +269,7 @@ async def demo_status():
     }
 
 @router.post("/reset")
+@router.get("/reset")
 async def reset_demo_conditions():
     """Reset all demo conditions to clean state"""
     global memory_hogs, cpu_intensive_tasks, fake_connections
@@ -301,6 +307,7 @@ async def reset_demo_conditions():
     }
 
 @router.post("/stress-test")
+@router.get("/stress-test")
 async def comprehensive_stress_test(background_tasks: BackgroundTasks):
     """
     Run a comprehensive stress test that triggers multiple healing mechanisms

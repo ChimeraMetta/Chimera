@@ -343,6 +343,11 @@ async def dashboard():
     """Performance monitoring dashboard"""
     return await generate_dashboard_html()
 
+@app.get("/test")
+async def test_endpoint():
+    """Simple test endpoint to verify server is working"""
+    return {"status": "Server is working", "timestamp": datetime.now().isoformat()}
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint with detailed diagnostics"""
