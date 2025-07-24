@@ -178,6 +178,15 @@ class SemanticEvolutionEngine:
                 metta_derivation=["(operation-pattern track-position)"]
             ),
             SemanticGene(
+                gene_type=SemanticGeneType.INITIALIZATION,
+                semantic_role="initialize_position_tracker",
+                preconditions=["input_validated"],
+                postconditions=["position_tracker_ready"],
+                code_template="    {result_pos} = {start_index}",
+                parameter_slots={"result_pos": "best_position", "start_index": "start_index"},
+                metta_derivation=["(initialization-pattern position-tracker)"]
+            ),
+            SemanticGene(
                 gene_type=SemanticGeneType.OPERATION,
                 semantic_role="update_with_value",
                 preconditions=["optimal_element_found"],
@@ -580,13 +589,35 @@ class SemanticEvolutionEngine:
             "best_position": "best_pos"
         }
         
-        # Generate code from genes in sequence
-        for gene in genome.genes:
+        # Sort genes by proper execution order for correct code structure
+        ordered_genes = self._order_genes_for_execution(genome.genes)
+        
+        # Generate code from genes in proper sequence
+        for gene in ordered_genes:
             gene_code = self._instantiate_gene_template(gene, context_vars)
             if gene_code:
                 code_lines.append(gene_code)
         
         return "\n".join(code_lines)
+    
+    def _order_genes_for_execution(self, genes: List[SemanticGene]) -> List[SemanticGene]:
+        """Order genes for proper code execution flow"""
+        # Define execution order by gene type priority
+        type_priority = {
+            SemanticGeneType.ERROR_HANDLING: 0,      # First: validation/error checks
+            SemanticGeneType.INITIALIZATION: 1,      # Second: variable initialization  
+            SemanticGeneType.ITERATION: 2,           # Third: loops and control structures
+            SemanticGeneType.OPERATION: 3,           # Fourth: main logic operations
+            SemanticGeneType.TERMINATION: 4          # Last: return statements
+        }
+        
+        # Sort genes by type priority, maintaining original order within same type
+        ordered_genes = sorted(genes, key=lambda gene: (
+            type_priority.get(gene.gene_type, 99),  # Unknown types go last
+            genes.index(gene)  # Preserve original order within same priority
+        ))
+        
+        return ordered_genes
     
     def _instantiate_gene_template(self, gene: SemanticGene, context_vars: Dict[str, str]) -> str:
         """Instantiate gene template with context variables"""
