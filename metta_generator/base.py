@@ -1371,12 +1371,25 @@ class MeTTaPoweredModularDonorGenerator:
                     (strategy-applicable $strategy $func)
                     (no-contraindications $func $strategy)))""",
             
-            # Quality assessment rules
-            """(= (donor-quality $donor $quality)
-               (let $correctness (correctness-score $donor)
-                    (let $maintainability (maintainability-score $donor)
-                         (let $performance (performance-score $donor)
-                              (overall-quality $correctness $maintainability $performance)))))""",
+            # Simple quality assessment rules that actually work
+            """(= (quality-score $donor high)
+               (and (candidate-strategy $donor algorithm_transformation)
+                    (metta-derived $donor $count)
+                    (> $count 0)))""",
+            
+            """(= (quality-score $donor medium)
+               (and (candidate-strategy $donor data_structure_adaptation)
+                    (source-function $source)))""",
+            
+            """(= (quality-score $donor medium)
+               (candidate-strategy $donor operation_substitution))""",
+            
+            """(= (quality-score $donor low)
+               (candidate-strategy $donor structure_preservation))""",
+            
+            # Default quality rule
+            """(= (quality-score $donor medium)
+               (candidate-name $donor))""",
             
             # Learning and adaptation rules
             """(= (learn-from-success $original $donor $feedback)
@@ -1786,15 +1799,15 @@ class MeTTaPoweredModularDonorGenerator:
         # Query MeTTa for candidate quality assessment
         quality_query = f"""
         (match &self
-          (donor-quality {candidate.name} $quality)
-          (quality-score {candidate.name} $quality))
+          (quality-score {candidate.name} $quality)
+          $quality)
         """
         
         quality_facts = [
             f"(candidate-name {candidate.name})",
-            f"(candidate-strategy {candidate.strategy})",
+            f"(candidate-strategy {candidate.name} {candidate.strategy})",
             f"(source-function {context.function_name})",
-            f"(metta-derived {len(candidate.metta_derivation)})"
+            f"(metta-derived {candidate.name} {len(candidate.metta_derivation)})"
         ]
         
         # Add reasoning trace facts
@@ -1812,20 +1825,27 @@ class MeTTaPoweredModularDonorGenerator:
             print("        Using MeTTa reasoning results for scoring.")
             try:
                 # Extract numeric score from MeTTa result
-                result_str = str(quality_results[0])
+                result_str = str(quality_results[0]).lower()
                 print(f"          MeTTa result string: {result_str}")
-                if "high" in result_str:
+                
+                # Handle empty results or nested empty lists
+                if not quality_results[0] or quality_results[0] == [] or '[]' in result_str:
+                    print("          Empty MeTTa result, using fallback scoring")
+                    metta_score = self._symbolic_metta_scoring(candidate, context)
+                elif "high" in result_str:
                     metta_score = 0.9
                 elif "medium" in result_str:
                     metta_score = 0.7
                 elif "low" in result_str:
                     metta_score = 0.5
                 else:
-                    metta_score = 0.6
+                    print(f"          Unrecognized quality result: {result_str}, using fallback")
+                    metta_score = self._symbolic_metta_scoring(candidate, context)
+                    
                 print(f"          Extracted score: {metta_score}")
             except Exception as e:
-                print(f"          Error extracting score from MeTTa result: {e}. Defaulting to 0.6.")
-                metta_score = 0.6
+                print(f"          Error extracting score from MeTTa result: {e}. Using fallback.")
+                metta_score = self._symbolic_metta_scoring(candidate, context)
         else:
             print("        MeTTa reasoning yielded no results, using fallback symbolic scoring.")
             # Fallback to symbolic scoring
