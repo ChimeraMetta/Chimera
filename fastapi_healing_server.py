@@ -550,7 +550,8 @@ class SelfHealingManager:
                 from metta_generator.base import MeTTaPoweredModularDonorGenerator
                 generator = MeTTaPoweredModularDonorGenerator(
                     metta_space=self.metta_space,  # Pass our controlled MeTTa space
-                    enable_evolution=False  # Disable evolution to prevent loops
+                    metta_instance=self.metta,     # Pass the MeTTa instance too
+                    enable_evolution=False         # Disable evolution to prevent loops
                 )
                 
                 # Generate donors for the problematic function using actual supported strategies
