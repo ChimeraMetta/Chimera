@@ -325,13 +325,29 @@ class MeTTaReasoningEngine:
             # Execute query
             print("          Executing query on MeTTa space...")
             if hasattr(self.metta_space, 'run'):
-                query_result = self.metta_space.run(f"!({query})")
-                if query_result:
-                    results.extend(query_result)
+                try:
+                    # Clean the query like we do for rules
+                    cleaned_query = ' '.join(query.split())
+                    query_result = self.metta_space.run(f"!({cleaned_query})")
+                    if query_result:
+                        results.extend(query_result)
+                except Exception as e:
+                    print(f"          MeTTa run failed: {e}")
+                    # Try fallback approach without the ! prefix
+                    try:
+                        cleaned_query = ' '.join(query.split())
+                        query_result = self.metta_space.run(f"({cleaned_query})")
+                        if query_result:
+                            results.extend(query_result)
+                    except Exception as e2:
+                        print(f"          MeTTa fallback also failed: {e2}")
             elif hasattr(self.metta_space, 'query'):
-                query_result = self.metta_space.query(query)
-                if query_result:
-                    results.extend(query_result)
+                try:
+                    query_result = self.metta_space.query(query)
+                    if query_result:
+                        results.extend(query_result)
+                except Exception as e:
+                    print(f"          MeTTa query failed: {e}")
             
             print(f"          MeTTa execution returned {len(results)} results.")
         
@@ -1008,8 +1024,22 @@ class MeTTaStrategyManager:
                                 requested_strategies: Optional[List] = None):
         """Get applicable strategies using MeTTa reasoning."""
         if requested_strategies:
-            print(f"    Using requested strategies: {[s.value if hasattr(s, 'value') else str(s) for s in requested_strategies]}")
-            return requested_strategies
+            # Convert string strategies to enum values if needed
+            converted_strategies = []
+            for strategy in requested_strategies:
+                if isinstance(strategy, str):
+                    # Convert string to enum
+                    try:
+                        enum_strategy = GenerationStrategy(strategy)
+                        converted_strategies.append(enum_strategy)
+                    except ValueError:
+                        print(f"    Warning: Unknown strategy '{strategy}', skipping")
+                        continue
+                else:
+                    converted_strategies.append(strategy)
+            
+            print(f"    Using requested strategies: {[s.value if hasattr(s, 'value') else str(s) for s in converted_strategies]}")
+            return converted_strategies
         
         # Use MeTTa reasoning to determine applicable strategies
         metta_strategies = self._reason_about_strategy_applicability(context)
