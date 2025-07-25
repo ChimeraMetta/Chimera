@@ -142,23 +142,29 @@ class MeTTaReasoningEngine:
     def _add_rule_safely(self, rule: str):
         """Safely add rule to MeTTa space."""
         try:
-            # Parse the string rule into a MeTTa atom first
-            if hasattr(self, 'metta') and hasattr(self.metta, 'parse_single'):
-                parsed_atom = self.metta.parse_single(rule)
-                self.metta_space.add_atom(parsed_atom)
-                return True
-            elif hasattr(self.metta_space, 'run'):
-                self.metta_space.run(f"!({rule})")
+            # Clean up the rule: remove extra whitespace and newlines
+            cleaned_rule = ' '.join(rule.split())
+            
+            # Try different approaches based on what's available
+            if hasattr(self.metta_space, 'run'):
+                # Use run method if available (preferred)
+                self.metta_space.run(f"!({cleaned_rule})")
                 return True
             elif hasattr(self.metta_space, 'add_atom'):
-                # Try to parse if metta is available through reasoning_engine
-                if hasattr(self, 'reasoning_engine') and hasattr(self.reasoning_engine, 'metta'):
-                    parsed_atom = self.reasoning_engine.metta.parse_single(rule)
-                    self.metta_space.add_atom(parsed_atom)
+                # For dynamic monitor spaces that expect atoms directly
+                if hasattr(self, 'metta'):
+                    try:
+                        parsed_atom = self.metta.parse_single(cleaned_rule)
+                        self.metta_space.add_atom(parsed_atom)
+                        return True
+                    except:
+                        # Fallback to string if parsing fails
+                        self.metta_space.add_atom(cleaned_rule)
+                        return True
                 else:
-                    # Fallback: try direct string (might fail)
-                    self.metta_space.add_atom(rule)
-                return True
+                    # Direct string addition
+                    self.metta_space.add_atom(cleaned_rule)
+                    return True
         except Exception as e:
             print(f"Failed to add rule: {e}")
             return False
