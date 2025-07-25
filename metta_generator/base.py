@@ -90,12 +90,13 @@ class GenerationStrategy(Enum):
 class MeTTaReasoningEngine:
     """Core MeTTa reasoning engine for donor generation."""
     
-    def __init__(self, metta_space):
+    def __init__(self, metta_space, metta_instance=None):
         self.metta_space = metta_space
+        self.metta_instance = metta_instance
         
         # Initialize MeTTa parser for atom creation
         from hyperon import MeTTa
-        self.metta = MeTTa()
+        self.metta = metta_instance or MeTTa()
         
         self._load_reasoning_rules()
     
