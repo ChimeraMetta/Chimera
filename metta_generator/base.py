@@ -92,6 +92,11 @@ class MeTTaReasoningEngine:
     
     def __init__(self, metta_space):
         self.metta_space = metta_space
+        
+        # Initialize MeTTa parser for atom creation
+        from hyperon import MeTTa
+        self.metta = MeTTa()
+        
         self._load_reasoning_rules()
     
     def _load_reasoning_rules(self):
@@ -137,12 +142,26 @@ class MeTTaReasoningEngine:
     def _add_rule_safely(self, rule: str):
         """Safely add rule to MeTTa space."""
         try:
-            if hasattr(self.metta_space, 'run'):
+            # Parse the string rule into a MeTTa atom first
+            if hasattr(self, 'metta') and hasattr(self.metta, 'parse_single'):
+                parsed_atom = self.metta.parse_single(rule)
+                self.metta_space.add_atom(parsed_atom)
+                return True
+            elif hasattr(self.metta_space, 'run'):
                 self.metta_space.run(f"!({rule})")
+                return True
             elif hasattr(self.metta_space, 'add_atom'):
-                self.metta_space.add_atom(rule)
+                # Try to parse if metta is available through reasoning_engine
+                if hasattr(self, 'reasoning_engine') and hasattr(self.reasoning_engine, 'metta'):
+                    parsed_atom = self.reasoning_engine.metta.parse_single(rule)
+                    self.metta_space.add_atom(parsed_atom)
+                else:
+                    # Fallback: try direct string (might fail)
+                    self.metta_space.add_atom(rule)
+                return True
         except Exception as e:
             print(f"Failed to add rule: {e}")
+            return False
     
     def reason_about_patterns(self, context: GenerationContext) -> List[FunctionPattern]:
         """Use MeTTa reasoning to detect patterns."""

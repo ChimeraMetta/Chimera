@@ -553,10 +553,10 @@ class SelfHealingManager:
                     enable_evolution=False  # Disable evolution to prevent loops
                 )
                 
-                # Generate donors for the problematic function
+                # Generate donors for the problematic function using actual supported strategies
                 donors = generator.generate_donors_from_function(
                     original_code,
-                    strategies=['memory_optimization', 'efficiency_improvement']
+                    strategies=['structure_preservation', 'algorithm_transformation', 'data_structure_adaptation']
                 )
                 
                 if donors and len(donors) > 0:
