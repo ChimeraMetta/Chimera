@@ -90,22 +90,12 @@ class GenerationStrategy(Enum):
 class MeTTaReasoningEngine:
     """Core MeTTa reasoning engine for donor generation."""
     
-    def __init__(self, metta_space, metta_instance=None):
+    def __init__(self, metta_space):
         self.metta_space = metta_space
         
-        # Use the provided MeTTa instance or create a new one
-        # IMPORTANT: The MeTTa instance must be the same one that created the space
-        if metta_instance:
-            self.metta = metta_instance
-        else:
-            # Try to get the MeTTa instance from the space if available
-            if hasattr(metta_space, '_metta'):
-                self.metta = metta_space._metta
-            else:
-                # Fallback: create new instance (may cause compatibility issues)
-                from hyperon import MeTTa
-                self.metta = MeTTa()
-                print("Warning: Created new MeTTa instance - may cause compatibility issues")
+        # Initialize MeTTa parser for atom creation
+        from hyperon import MeTTa
+        self.metta = MeTTa()
         
         self._load_reasoning_rules()
     
@@ -156,9 +146,9 @@ class MeTTaReasoningEngine:
             cleaned_rule = ' '.join(rule.split())
             
             # Try different approaches based on what's available
-            if hasattr(self.metta_space, 'run'):
-                # Use run method if available (preferred)
-                self.metta_space.run(f"!({cleaned_rule})")
+            if hasattr(self.metta, 'run'):
+                # Use MeTTa instance run method (preferred)
+                self.metta.run(f"!({cleaned_rule})")
                 return True
             elif hasattr(self.metta_space, 'add_atom'):
                 # For dynamic monitor spaces that expect atoms directly
@@ -332,13 +322,14 @@ class MeTTaReasoningEngine:
             for fact in facts:
                 self._add_rule_safely(fact)
             
-            # Execute query
+            # Execute query using MeTTa instance, not space
             print("          Executing query on MeTTa space...")
-            if hasattr(self.metta_space, 'run'):
+            if hasattr(self.metta, 'run'):
                 try:
                     # Clean the query like we do for rules
                     cleaned_query = ' '.join(query.split())
-                    query_result = self.metta_space.run(f"!({cleaned_query})")
+                    # Use MeTTa instance run method, not space run method
+                    query_result = self.metta.run(f"!({cleaned_query})")
                     if query_result:
                         results.extend(query_result)
                 except Exception as e:
@@ -346,7 +337,7 @@ class MeTTaReasoningEngine:
                     # Try fallback approach without the ! prefix
                     try:
                         cleaned_query = ' '.join(query.split())
-                        query_result = self.metta_space.run(f"({cleaned_query})")
+                        query_result = self.metta.run(f"({cleaned_query})")
                         if query_result:
                             results.extend(query_result)
                     except Exception as e2:
@@ -1135,14 +1126,13 @@ class MeTTaStrategyManager:
 class MeTTaPoweredModularDonorGenerator:
     """Main coordinator using MeTTa reasoning as the core engine."""
     
-    def __init__(self, metta_space=None, metta_instance=None, enable_evolution=True):
+    def __init__(self, metta_space=None, enable_evolution=True):
         from reflectors.dynamic_monitor import monitor
         
         self.metta_space = metta_space or monitor
-        self.metta_instance = metta_instance
         
-        # Initialize MeTTa reasoning engine with proper instance
-        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space, self.metta_instance)
+        # Initialize MeTTa reasoning engine
+        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space)
         
         # Initialize MeTTa-powered components
         self.pattern_detector = MeTTaPatternDetector(self.reasoning_engine)
