@@ -1371,25 +1371,22 @@ class MeTTaPoweredModularDonorGenerator:
                     (strategy-applicable $strategy $func)
                     (no-contraindications $func $strategy)))""",
             
-            # Simple quality assessment rules that actually work
-            """(= (quality-score $donor high)
-               (and (candidate-strategy $donor algorithm_transformation)
-                    (metta-derived $donor $count)
-                    (> $count 0)))""",
+            # Test rule to verify pattern matching works
+            """(= (quality-score $donor test-rule)
+               (candidate-name $donor))""",
             
-            """(= (quality-score $donor medium)
-               (and (candidate-strategy $donor data_structure_adaptation)
-                    (source-function $source)))""",
+            # Simple quality assessment rules with explicit matching
+            """(= (quality-score $donor high)
+               (candidate-strategy $donor algorithm_transformation))""",
+            
+            """(= (quality-score $donor high) 
+               (candidate-strategy $donor data_structure_adaptation))""",
             
             """(= (quality-score $donor medium)
                (candidate-strategy $donor operation_substitution))""",
             
             """(= (quality-score $donor low)
                (candidate-strategy $donor structure_preservation))""",
-            
-            # Default quality rule
-            """(= (quality-score $donor medium)
-               (candidate-name $donor))""",
             
             # Learning and adaptation rules
             """(= (learn-from-success $original $donor $feedback)
@@ -1817,6 +1814,16 @@ class MeTTaPoweredModularDonorGenerator:
         
         print(f"        MeTTa quality query: {quality_query.strip()}")
         print(f"        MeTTa quality facts: {quality_facts}")
+        
+        # Add a simple test query first to debug pattern matching
+        test_query = f"""
+        (match &self
+          (candidate-name {candidate.name})
+          found-candidate)
+        """
+        print(f"        Test query: {test_query.strip()}")
+        test_results = self.reasoning_engine._execute_metta_reasoning(test_query, quality_facts)
+        print(f"        Test results: {test_results}")
 
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
         print(f"        MeTTa quality results: {quality_results}")
