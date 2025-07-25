@@ -145,11 +145,18 @@ class MeTTaReasoningEngine:
             # Clean up the rule: remove extra whitespace and newlines
             cleaned_rule = ' '.join(rule.split())
             
+            # Debug: print the problematic rule
+            if len(cleaned_rule) > 200:
+                print(f"          DEBUG: Attempting to load rule: {cleaned_rule[:100]}...")
+            else:
+                print(f"          DEBUG: Attempting to load rule: {cleaned_rule}")
+            
             # Try different approaches based on what's available
             if hasattr(self.metta, 'run'):
                 # Use MeTTa instance run method (preferred)
                 # For rule loading, we don't need the !() wrapper
                 self.metta.run(cleaned_rule)
+                print(f"          DEBUG: Successfully loaded rule")
                 return True
             elif hasattr(self.metta_space, 'add_atom'):
                 # For dynamic monitor spaces that expect atoms directly
@@ -168,6 +175,7 @@ class MeTTaReasoningEngine:
                     return True
         except Exception as e:
             print(f"Failed to add rule: {e}")
+            print(f"          FAILING RULE: {cleaned_rule}")
             return False
     
     def reason_about_patterns(self, context: GenerationContext) -> List[FunctionPattern]:
