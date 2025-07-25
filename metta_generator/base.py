@@ -1172,17 +1172,58 @@ class MeTTaPoweredModularDonorGenerator:
                 with open(semantic_rules_file, 'r') as f:
                     rules_content = f.read()
                 
-                # Parse and load rules
-                for line in rules_content.split('\n'):
-                    line = line.strip()
-                    if line and not line.startswith(';') and line.startswith('(='):
-                        self.reasoning_engine._add_rule_safely(line)
+                # Parse and load rules - handle multi-line expressions
+                rules = self._parse_multiline_rules(rules_content)
+                for rule in rules:
+                    self.reasoning_engine._add_rule_safely(rule)
                 
                 print(f"    Loaded semantic evolution rules from {semantic_rules_file}")
             except Exception as e:
                 print(f"    Failed to load semantic evolution rules: {e}")
         else:
             print(f"    Semantic evolution rules file not found: {semantic_rules_file}")
+    
+    def _parse_multiline_rules(self, content: str) -> List[str]:
+        """Parse MeTTa rules that may span multiple lines."""
+        rules = []
+        current_rule = ""
+        paren_depth = 0
+        in_rule = False
+        
+        for line in content.split('\n'):
+            line = line.strip()
+            
+            # Skip comments and empty lines
+            if not line or line.startswith(';'):
+                continue
+                
+            # Start of a new rule
+            if line.startswith('(=') and not in_rule:
+                current_rule = line
+                paren_depth = line.count('(') - line.count(')')
+                in_rule = True
+                
+                # If rule is complete on one line
+                if paren_depth == 0:
+                    rules.append(current_rule)
+                    current_rule = ""
+                    in_rule = False
+            # Continuation of current rule
+            elif in_rule:
+                current_rule += " " + line
+                paren_depth += line.count('(') - line.count(')')
+                
+                # Rule is now complete
+                if paren_depth == 0:
+                    rules.append(current_rule)
+                    current_rule = ""
+                    in_rule = False
+        
+        # Handle any incomplete rule
+        if current_rule and in_rule:
+            print(f"Warning: Incomplete rule found: {current_rule[:100]}...")
+        
+        return rules
     
     def _setup_generators_with_reasoning(self):
         """Setup generators with access to MeTTa reasoning engine."""
