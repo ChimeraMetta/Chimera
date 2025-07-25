@@ -1135,13 +1135,14 @@ class MeTTaStrategyManager:
 class MeTTaPoweredModularDonorGenerator:
     """Main coordinator using MeTTa reasoning as the core engine."""
     
-    def __init__(self, metta_space=None, enable_evolution=True):
+    def __init__(self, metta_space=None, metta_instance=None, enable_evolution=True):
         from reflectors.dynamic_monitor import monitor
         
         self.metta_space = metta_space or monitor
+        self.metta_instance = metta_instance
         
-        # Initialize MeTTa reasoning engine
-        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space)
+        # Initialize MeTTa reasoning engine with proper instance
+        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space, self.metta_instance)
         
         # Initialize MeTTa-powered components
         self.pattern_detector = MeTTaPatternDetector(self.reasoning_engine)
