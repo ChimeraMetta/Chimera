@@ -101,8 +101,13 @@ class SelfHealingManager:
     """Manages self-healing responses using MeTTa reasoning"""
     
     def __init__(self):
-        self.monitor = DynamicMonitor()
-        self.evolution = AutonomousErrorFixer()
+        # Initialize MeTTa space first 
+        from hyperon import MeTTa
+        self.metta = MeTTa()
+        self.metta_space = self.metta.space()
+        
+        self.monitor = DynamicMonitor(self.metta_space)
+        self.evolution = AutonomousErrorFixer(self.metta_space)  # Pass explicit MeTTa space
         self.classifier = ErrorClassifier()
         self.metrics_history = deque(maxlen=1000)
         self.healing_actions = deque(maxlen=100)
@@ -543,7 +548,10 @@ class SelfHealingManager:
             # Fallback: Use MeTTa-powered donor generator if available
             try:
                 from metta_generator.base import MeTTaPoweredModularDonorGenerator
-                generator = MeTTaPoweredModularDonorGenerator()
+                generator = MeTTaPoweredModularDonorGenerator(
+                    metta_space=self.metta_space,  # Pass our controlled MeTTa space
+                    enable_evolution=False  # Disable evolution to prevent loops
+                )
                 
                 # Generate donors for the problematic function
                 donors = generator.generate_donors_from_function(
