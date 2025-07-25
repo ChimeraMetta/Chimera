@@ -148,7 +148,8 @@ class MeTTaReasoningEngine:
             # Try different approaches based on what's available
             if hasattr(self.metta, 'run'):
                 # Use MeTTa instance run method (preferred)
-                self.metta.run(f"!({cleaned_rule})")
+                # For rule loading, we don't need the !() wrapper
+                self.metta.run(cleaned_rule)
                 return True
             elif hasattr(self.metta_space, 'add_atom'):
                 # For dynamic monitor spaces that expect atoms directly
@@ -328,7 +329,7 @@ class MeTTaReasoningEngine:
                 try:
                     # Clean the query like we do for rules
                     cleaned_query = ' '.join(query.split())
-                    # Use MeTTa instance run method, not space run method
+                    # Use MeTTa instance run method with ! prefix for queries
                     query_result = self.metta.run(f"!({cleaned_query})")
                     if query_result:
                         results.extend(query_result)
@@ -337,7 +338,7 @@ class MeTTaReasoningEngine:
                     # Try fallback approach without the ! prefix
                     try:
                         cleaned_query = ' '.join(query.split())
-                        query_result = self.metta.run(f"({cleaned_query})")
+                        query_result = self.metta.run(cleaned_query)
                         if query_result:
                             results.extend(query_result)
                     except Exception as e2:
