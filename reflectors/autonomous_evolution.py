@@ -871,8 +871,41 @@ def test_enhanced_error_fixer_standalone():
     return success or success_div
 
 
-if __name__ == "__main__":
-    # Run demonstrations
+# This section should only run when the file is executed directly, not when imported
+# Commented out to prevent automatic execution during imports
+# 
+# if __name__ == "__main__":
+#     # Run demonstrations
+#     print("Running Autonomous Error Fixing Demonstrations")
+#     print("=" * 60)
+#     
+#     # Test standalone error fixer
+#     standalone_success = test_enhanced_error_fixer_standalone()
+#     
+#     # Run full demo
+#     try:
+#         demo_monitor = demo_autonomous_fixing()
+#         demo_success = True
+#     except Exception as e:
+#         print(f"[ERROR] Demo failed: {e}")
+#         demo_success = False
+#     
+#     # Summary
+#     print(f"\n[INFO] Test Summary:")
+#     print(f"   Standalone Error Fixer: {'[OK] PASS' if standalone_success else '[ERROR] FAIL'}")
+#     print(f"   Full Demo: {'[OK] PASS' if demo_success else '[ERROR] FAIL'}")
+#     
+#     if standalone_success and demo_success:
+#         print("[OK] All tests passed! Enhanced Autonomous Error Fixer is working correctly.")
+#     else:
+#         print("[WARNING] Some tests failed. Check the output above for details.")
+
+
+def run_autonomous_evolution_demo():
+    """
+    Explicitly callable function to run the autonomous evolution demo.
+    Call this only when you want to run the demonstration.
+    """
     print("Running Autonomous Error Fixing Demonstrations")
     print("=" * 60)
     
@@ -894,5 +927,7 @@ if __name__ == "__main__":
     
     if standalone_success and demo_success:
         print("[OK] All tests passed! Enhanced Autonomous Error Fixer is working correctly.")
+        return True
     else:
         print("[WARNING] Some tests failed. Check the output above for details.")
+        return False

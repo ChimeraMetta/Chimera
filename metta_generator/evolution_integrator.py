@@ -375,5 +375,10 @@ def create_enhanced_evolution_demo():
         import traceback
         traceback.print_exc()
 
-if __name__ == "__main__":
+# Disabled automatic execution during imports
+# if __name__ == "__main__":
+#     create_enhanced_evolution_demo()
+
+def run_evolution_integrator_demo():
+    """Explicitly callable function to run the evolution integrator demo"""
     create_enhanced_evolution_demo()

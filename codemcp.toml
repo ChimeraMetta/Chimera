@@ -1,0 +1,24 @@
+# codemcp.toml
+[commands]
+test = ["python base.py"]  # or whatever your test command is
+format = ["python base.py"]  # your formatting command
+lint = ["python base.py"]  # your linting command
+
+# Add project context
+project_prompt = """
+This is a Python project that uses MeTTa to generate donors for provided functions using a modular approach, MeTTa's built in logic reasoning, and a range of rules and definitions 
+that have been defined in the project.
+
+Key things to remember:
+- The project is a Python project, but all solutions for code generation and error correction should be in MeTTa and/or use MeTTa's rules and reasoning.
+- Resolution code for code generation and error correction may NOT use Python only, it must use MeTTa and/or MeTTa's rules and reasoning, although these can be in combination with Python through hyperon
+- Hyperon is a Python library that allows for the use of MeTTa's rules and reasoning in Python code, but it has specific OS requirements and is not a standard Python library.
+- Because of Hyperon's OS requirements, the project cannot be tested by you locally
+- MeTTa reasoning approaches include:
+    - Symbolic reasoning
+    - Rule-based reasoning
+    - Probabilistic reasoning
+    - Evolutionary reasoning
+    - Genetic programming
+- Always use your latest knowledge base of MeTTa to reason about the code and the project, as well as provide solutions
+"""

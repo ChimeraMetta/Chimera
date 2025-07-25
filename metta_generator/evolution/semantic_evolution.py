@@ -1025,5 +1025,10 @@ def demonstrate_semantic_evolution():
     
     return results
 
-if __name__ == "__main__":
+# Disabled automatic execution during imports
+# if __name__ == "__main__":
+#     demonstrate_semantic_evolution()
+
+def run_semantic_evolution_demo():
+    """Explicitly callable function to run the semantic evolution demo"""
     demonstrate_semantic_evolution()
