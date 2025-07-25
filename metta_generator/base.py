@@ -90,12 +90,22 @@ class GenerationStrategy(Enum):
 class MeTTaReasoningEngine:
     """Core MeTTa reasoning engine for donor generation."""
     
-    def __init__(self, metta_space):
+    def __init__(self, metta_space, metta_instance=None):
         self.metta_space = metta_space
         
-        # Initialize MeTTa parser for atom creation
-        from hyperon import MeTTa
-        self.metta = MeTTa()
+        # Use the provided MeTTa instance or create a new one
+        # IMPORTANT: The MeTTa instance must be the same one that created the space
+        if metta_instance:
+            self.metta = metta_instance
+        else:
+            # Try to get the MeTTa instance from the space if available
+            if hasattr(metta_space, '_metta'):
+                self.metta = metta_space._metta
+            else:
+                # Fallback: create new instance (may cause compatibility issues)
+                from hyperon import MeTTa
+                self.metta = MeTTa()
+                print("Warning: Created new MeTTa instance - may cause compatibility issues")
         
         self._load_reasoning_rules()
     
@@ -1125,13 +1135,14 @@ class MeTTaStrategyManager:
 class MeTTaPoweredModularDonorGenerator:
     """Main coordinator using MeTTa reasoning as the core engine."""
     
-    def __init__(self, metta_space=None, enable_evolution=True):
+    def __init__(self, metta_space=None, metta_instance=None, enable_evolution=True):
         from reflectors.dynamic_monitor import monitor
         
         self.metta_space = metta_space or monitor
+        self.metta_instance = metta_instance
         
-        # Initialize MeTTa reasoning engine
-        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space)
+        # Initialize MeTTa reasoning engine with proper instance
+        self.reasoning_engine = MeTTaReasoningEngine(self.metta_space, self.metta_instance)
         
         # Initialize MeTTa-powered components
         self.pattern_detector = MeTTaPatternDetector(self.reasoning_engine)
