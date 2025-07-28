@@ -1384,48 +1384,23 @@ class MeTTaPoweredModularDonorGenerator:
         """Load MeTTa ontology for reasoning-powered generation."""
         print(" Loading MeTTa reasoning-powered donor generation ontology...")
         
-        # Load enhanced ontology rules
+        # Load enhanced ontology rules as direct facts for matching
         enhanced_rules = [
-            # Core reasoning rules
-            """(= (donor-generation-applicable $func $strategy)
-               (and (function-analyzable $func)
-                    (strategy-applicable $strategy $func)
-                    (no-contraindications $func $strategy)))""",
+            # Test facts for debugging - these should be directly matchable
+            """(test-simple success)""",
             
-            # Very simple test rule that should always work
-            """(= (test-simple success) True)""",
+            # Quality assessment template patterns that can be matched
+            # These define the relationship between strategies and quality scores
+            """(quality-strategy-mapping algorithm_transformation high)""",
+            """(quality-strategy-mapping data_structure_adaptation high)""",
+            """(quality-strategy-mapping operation_substitution medium)""",
+            """(quality-strategy-mapping structure_preservation low)""",
             
-            # Test rule to verify pattern matching works
-            """(= (quality-score $donor test-rule)
-               (candidate-name $donor))""",
-            
-            # Test rule to verify strategy matching works  
-            """(= (quality-score $donor strategy-test)
-               (candidate-strategy $donor $strategy))""",
-            
-            # Direct test rule for data_structure_adaptation
-            """(= (quality-score $donor direct-test-high)
-               (candidate-strategy $donor data_structure_adaptation))""",
-            
-            # Simple quality assessment rules with explicit matching
-            """(= (quality-score $donor high)
-               (candidate-strategy $donor algorithm_transformation))""",
-            
-            """(= (quality-score $donor high) 
-               (candidate-strategy $donor data_structure_adaptation))""",
-            
-            """(= (quality-score $donor medium)
-               (candidate-strategy $donor operation_substitution))""",
-            
-            """(= (quality-score $donor low)
-               (candidate-strategy $donor structure_preservation))""",
-            
-            # Learning and adaptation rules
-            """(= (learn-from-success $original $donor $feedback)
-               (strengthen-patterns (patterns-used $original $donor)))""",
-            
-            """(= (learn-from-failure $original $donor $feedback)
-               (weaken-patterns (patterns-used $original $donor)))"""
+            # Core reasoning facts
+            """(donor-generation-strategy algorithm_transformation)""",
+            """(donor-generation-strategy data_structure_adaptation)""",
+            """(donor-generation-strategy operation_substitution)""",
+            """(donor-generation-strategy structure_preservation)"""
         ]
         
         print(f"    Loading {len(enhanced_rules)} ontology rules...")
@@ -1828,10 +1803,10 @@ class MeTTaPoweredModularDonorGenerator:
     def _calculate_metta_candidate_score(self, candidate, context: GenerationContext) -> float:
         """Calculate candidate score using MeTTa reasoning."""
         print(f"      Calculating MeTTa score for candidate: {candidate.name}")
-        # Query MeTTa for candidate quality assessment
+        # Query MeTTa using the correct pattern for strategy-based quality assessment
         quality_query = f"""
         (match &self
-          (quality-score {candidate.name} $quality)
+          (quality-strategy-mapping {candidate.strategy} $quality)
           $quality)
         """
         
@@ -1870,35 +1845,25 @@ class MeTTaPoweredModularDonorGenerator:
         strategy_test_results = self.reasoning_engine._execute_metta_reasoning(strategy_test_query, quality_facts)
         print(f"        Strategy test results: {strategy_test_results}")
         
-        # Test direct quality rule matching
-        direct_test_query = f"""
-        (match &self
-          (quality-score {candidate.name} direct-test-high)
-          found-direct-rule)
-        """
-        print(f"        Direct test query: {direct_test_query.strip()}")
-        direct_test_results = self.reasoning_engine._execute_metta_reasoning(direct_test_query, quality_facts)
-        print(f"        Direct test results: {direct_test_results}")
-        
-        # Debug: Test if basic rule evaluation works at all
-        basic_rule_query = f"""
+        # Test basic fact matching
+        basic_fact_query = f"""
         (match &self
           (test-simple success)
-          found-basic-rule)
+          found-basic-fact)
         """
-        print(f"        Basic rule query: {basic_rule_query.strip()}")
-        basic_rule_results = self.reasoning_engine._execute_metta_reasoning(basic_rule_query, [])
-        print(f"        Basic rule results: {basic_rule_results}")
+        print(f"        Basic fact query: {basic_fact_query.strip()}")
+        basic_fact_results = self.reasoning_engine._execute_metta_reasoning(basic_fact_query, [])
+        print(f"        Basic fact results: {basic_fact_results}")
         
-        # Debug: Test if our rule definition is actually loaded and working
-        rule_check_query = f"""
+        # Test strategy mapping lookup
+        strategy_mapping_query = f"""
         (match &self
-          (= (quality-score $donor direct-test-high) (candidate-strategy $donor data_structure_adaptation))
-          found-rule-definition)
+          (quality-strategy-mapping {candidate.strategy} $quality)
+          (found-mapping $quality))
         """
-        print(f"        Rule check query: {rule_check_query.strip()}")
-        rule_check_results = self.reasoning_engine._execute_metta_reasoning(rule_check_query, [])
-        print(f"        Rule check results: {rule_check_results}")
+        print(f"        Strategy mapping query: {strategy_mapping_query.strip()}")
+        strategy_mapping_results = self.reasoning_engine._execute_metta_reasoning(strategy_mapping_query, [])
+        print(f"        Strategy mapping results: {strategy_mapping_results}")
 
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
         print(f"        MeTTa quality results: {quality_results}")
