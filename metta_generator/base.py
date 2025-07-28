@@ -1379,6 +1379,10 @@ class MeTTaPoweredModularDonorGenerator:
             """(= (quality-score $donor strategy-test)
                (candidate-strategy $donor $strategy))""",
             
+            # Direct test rule for data_structure_adaptation
+            """(= (quality-score $donor direct-test-high)
+               (candidate-strategy $donor data_structure_adaptation))""",
+            
             # Simple quality assessment rules with explicit matching
             """(= (quality-score $donor high)
                (candidate-strategy $donor algorithm_transformation))""",
@@ -1838,6 +1842,16 @@ class MeTTaPoweredModularDonorGenerator:
         print(f"        Strategy test query: {strategy_test_query.strip()}")
         strategy_test_results = self.reasoning_engine._execute_metta_reasoning(strategy_test_query, quality_facts)
         print(f"        Strategy test results: {strategy_test_results}")
+        
+        # Test direct quality rule matching
+        direct_test_query = f"""
+        (match &self
+          (quality-score {candidate.name} direct-test-high)
+          found-direct-rule)
+        """
+        print(f"        Direct test query: {direct_test_query.strip()}")
+        direct_test_results = self.reasoning_engine._execute_metta_reasoning(direct_test_query, quality_facts)
+        print(f"        Direct test results: {direct_test_results}")
 
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
         print(f"        MeTTa quality results: {quality_results}")
