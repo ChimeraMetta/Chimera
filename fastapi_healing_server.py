@@ -372,6 +372,31 @@ class SelfHealingManager:
         healed_memory_usage = self._simulate_function_memory_usage(healed_function_code)
         print(f"[ANALYSIS] Healed function estimated memory usage: {healed_memory_usage:.1f}MB per 1000 operations")
         
+        # Step 2.5: Side-by-side comparison
+        print(f"\n[HEALING] SIDE-BY-SIDE COMPARISON:")
+        print(f"{'='*80}")
+        print(f"{'ORIGINAL (Memory-Leaking)':^39} │ {'HEALED (MeTTa-Optimized)':^39}")
+        print(f"{'='*39}┼{'='*40}")
+        
+        orig_lines = original_function_code.split('\n')
+        healed_lines = healed_function_code.split('\n')
+        max_lines = max(len(orig_lines), len(healed_lines))
+        
+        for i in range(min(15, max_lines)):  # Show first 15 lines
+            orig_line = orig_lines[i] if i < len(orig_lines) else ''
+            healed_line = healed_lines[i] if i < len(healed_lines) else ''
+            
+            # Truncate long lines for display
+            orig_display = (orig_line[:35] + '...') if len(orig_line) > 38 else orig_line
+            healed_display = (healed_line[:35] + '...') if len(healed_line) > 38 else healed_line
+            
+            print(f"{orig_display:<39} │ {healed_display}")
+        
+        if max_lines > 15:
+            print(f"{'... (truncated)':^39} │ {'... (truncated)':^39}")
+        
+        print(f"{'='*80}")
+        
         # Step 3: Calculate improvement
         memory_improvement = original_memory_usage - healed_memory_usage
         improvement_percentage = (memory_improvement / original_memory_usage) * 100
@@ -534,46 +559,57 @@ class SelfHealingManager:
 
     def _generate_healed_function_with_metta(self, original_code):
         """Generate healed function using actual MeTTa reasoning system"""
+        print("[HEALING] Starting MeTTa-powered function generation...")
+        
         try:
-            # Use the existing MeTTa evolution system for real generation
-            if hasattr(self.evolution, 'generate_optimized_function'):
-                # Try to use the autonomous evolution system
-                optimized_result = self.evolution.generate_optimized_function(
-                    original_code, 
-                    optimization_target='memory_efficiency'
-                )
-                if optimized_result and 'optimized_code' in optimized_result:
-                    return optimized_result['optimized_code']
+            # Use MeTTa-powered donor generator with full debugging
+            from metta_generator.base import MeTTaPoweredModularDonorGenerator
+            print("[HEALING] Initializing MeTTa generator...")
             
-            # Fallback: Use MeTTa-powered donor generator if available
-            try:
-                from metta_generator.base import MeTTaPoweredModularDonorGenerator
-                generator = MeTTaPoweredModularDonorGenerator(
-                    metta_space=self.metta_space,  # Pass our controlled MeTTa space
-                    metta_instance=self.metta,     # Pass the MeTTa instance too
-                    enable_evolution=False         # Disable evolution to prevent loops
-                )
-                
-                # Generate donors for the problematic function using actual supported strategies
-                donors = generator.generate_donors_from_function(
-                    original_code,
-                    strategies=['structure_preservation', 'algorithm_transformation', 'data_structure_adaptation']
-                )
-                
-                if donors and len(donors) > 0:
-                    # Return the best donor candidate
-                    best_donor = max(donors, key=lambda d: d.get('quality_score', 0))
-                    return best_donor.get('generated_code', self._get_fallback_optimized_function())
-                
-            except Exception as metta_error:
-                print(f"[HEALING] MeTTa generation failed: {metta_error}")
+            generator = MeTTaPoweredModularDonorGenerator(
+                metta_space=self.metta_space,
+                metta_instance=self.metta,
+                enable_evolution=False
+            )
             
-            # Final fallback: Use reasoning-based optimization
-            return self._apply_memory_optimization_patterns(original_code)
+            print("[HEALING] Generating MeTTa candidates...")
+            # Generate donors for the problematic function using MeTTa reasoning
+            donors = generator.generate_donors_from_function(
+                original_code,
+                strategies=['data_structure_adaptation', 'algorithm_transformation', 'structure_preservation']
+            )
             
-        except Exception as e:
-            print(f"[HEALING] Error in MeTTa generation: {e}")
-            return self._get_fallback_optimized_function()
+            if donors and len(donors) > 0:
+                print(f"[HEALING] MeTTa generated {len(donors)} candidates")
+                
+                # Find the best candidate based on quality score
+                best_donor = max(donors, key=lambda d: d.get('final_score', d.get('quality_score', 0)))
+                
+                print(f"[HEALING] Best candidate: {best_donor['name']} (Score: {best_donor.get('final_score', 'N/A')})")
+                print(f"[HEALING] Strategy: {best_donor.get('strategy', 'N/A')}")
+                print(f"[HEALING] MeTTa Score: {best_donor.get('metta_score', 'N/A')}")
+                
+                # Show the MeTTa reasoning if available
+                if best_donor.get('metta_reasoning_trace'):
+                    print(f"[HEALING] MeTTa Reasoning: {', '.join(best_donor['metta_reasoning_trace'])}")
+                
+                generated_code = best_donor.get('code', best_donor.get('generated_code', ''))
+                if generated_code:
+                    print("[HEALING] ✅ Successfully generated MeTTa-powered optimized function")
+                    return generated_code
+                else:
+                    print("[HEALING] ⚠️ Candidate found but no code generated")
+            else:
+                print("[HEALING] ⚠️ No MeTTa candidates generated")
+                
+        except Exception as metta_error:
+            print(f"[HEALING] ❌ MeTTa generation error: {metta_error}")
+            import traceback
+            traceback.print_exc()
+        
+        # Fallback: Use reasoning-based optimization patterns
+        print("[HEALING] Using pattern-based optimization as fallback...")
+        return self._apply_memory_optimization_patterns(original_code)
     
     def _apply_memory_optimization_patterns(self, original_code):
         """Apply memory optimization patterns based on MeTTa reasoning"""
