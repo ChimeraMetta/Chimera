@@ -1371,6 +1371,9 @@ class MeTTaPoweredModularDonorGenerator:
                     (strategy-applicable $strategy $func)
                     (no-contraindications $func $strategy)))""",
             
+            # Very simple test rule that should always work
+            """(= (test-simple success) True)""",
+            
             # Test rule to verify pattern matching works
             """(= (quality-score $donor test-rule)
                (candidate-name $donor))""",
@@ -1852,6 +1855,26 @@ class MeTTaPoweredModularDonorGenerator:
         print(f"        Direct test query: {direct_test_query.strip()}")
         direct_test_results = self.reasoning_engine._execute_metta_reasoning(direct_test_query, quality_facts)
         print(f"        Direct test results: {direct_test_results}")
+        
+        # Debug: Test if basic rule evaluation works at all
+        basic_rule_query = f"""
+        (match &self
+          (test-simple success)
+          found-basic-rule)
+        """
+        print(f"        Basic rule query: {basic_rule_query.strip()}")
+        basic_rule_results = self.reasoning_engine._execute_metta_reasoning(basic_rule_query, [])
+        print(f"        Basic rule results: {basic_rule_results}")
+        
+        # Debug: Test if our rule definition is actually loaded and working
+        rule_check_query = f"""
+        (match &self
+          (= (quality-score $donor direct-test-high) (candidate-strategy $donor data_structure_adaptation))
+          found-rule-definition)
+        """
+        print(f"        Rule check query: {rule_check_query.strip()}")
+        rule_check_results = self.reasoning_engine._execute_metta_reasoning(rule_check_query, [])
+        print(f"        Rule check results: {rule_check_results}")
 
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
         print(f"        MeTTa quality results: {quality_results}")
