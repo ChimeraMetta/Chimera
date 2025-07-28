@@ -1171,6 +1171,10 @@ class MeTTaPoweredModularDonorGenerator:
         self._setup_generators_with_reasoning()
         
         print("  Initialized MeTTa-Powered Modular Donor Generator...")
+        
+        # Load core ontology rules for quality assessment
+        print("  Loading MeTTa ontology rules...")
+        self.load_ontology()
 
        # Add semantic evolution capability
         self.enable_semantic_evolution = enable_evolution and SEMANTIC_EVOLUTION_AVAILABLE
@@ -1424,9 +1428,12 @@ class MeTTaPoweredModularDonorGenerator:
                (weaken-patterns (patterns-used $original $donor)))"""
         ]
         
-        for rule in enhanced_rules:
+        print(f"    Loading {len(enhanced_rules)} ontology rules...")
+        for i, rule in enumerate(enhanced_rules, 1):
+            print(f"      Loading rule {i}: {rule[:50]}...")
             self.reasoning_engine._add_rule_safely(rule)
         
+        print(f"    Completed loading {len(enhanced_rules)} ontology rules")
         return True
     
     def generate_donors_from_function(self, func: Union[Callable, str],
