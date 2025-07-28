@@ -441,41 +441,71 @@ class SelfHealingManager:
         print(f"{'='*80}\n")
     
     def _simulate_function_memory_usage(self, function_code: str) -> float:
-        """Simulate memory usage analysis of a function"""
-        # Simple heuristic-based memory usage estimation
+        """Simulate memory usage analysis of a function with realistic estimates"""
         lines = function_code.split('\n')
         
-        memory_score = 0
+        # Base memory overhead
+        base_memory = 0.1  # 100KB base overhead
+        
+        # Analyze data structure usage
+        list_count = 0
+        dict_count = 0
+        nested_loop_depth = 0
+        current_indent = 0
+        max_indent = 0
+        has_generator = False
+        has_limit = False
+        
         for line in lines:
-            line = line.strip().lower()
-            if not line or line.startswith('#') or line.startswith('"""'):
+            stripped = line.strip().lower()
+            if not stripped or stripped.startswith('#') or stripped.startswith('"""'):
                 continue
-                
-            # Memory-heavy patterns (higher scores = more memory usage)
-            if 'append(' in line:
-                memory_score += 2.0  # List appending
-            if 'all_results' in line or 'intermediate_storage' in line:
-                memory_score += 3.0  # Large data structures
-            if 'for i in range(' in line and 'for' in line:
-                memory_score += 1.5  # Nested loops
-            if '.strip()' in line or '.lower()' in line:
-                memory_score += 0.5  # String operations
-            if 'char_analysis' in line or 'metadata' in line:
-                memory_score += 2.5  # Complex object creation
-            if 'timestamp' in line or 'time.time()' in line:
-                memory_score += 0.3  # Time tracking
-            if 'yield' in line:
-                memory_score -= 1.0  # Generators reduce memory
-            if 'max_results' in line or 'limit' in line:
-                memory_score -= 0.8  # Bounded processing
-            if 'break' in line:
-                memory_score -= 0.5  # Early termination
+            
+            # Track indentation for nested loop detection
+            indent = len(line) - len(line.lstrip())
+            if 'for' in stripped and 'in' in stripped:
+                current_indent = indent
+                if current_indent > max_indent:
+                    max_indent = current_indent
+                    nested_loop_depth += 1
+            
+            # Count data structures
+            if '= []' in line or 'append(' in stripped:
+                list_count += 1
+            if '= {}' in line or 'dict(' in stripped:
+                dict_count += 1
+            
+            # Memory patterns
+            if 'yield' in stripped:
+                has_generator = True
+            if 'max_results' in stripped or 'limit' in stripped or '[:' in stripped:
+                has_limit = True
         
-        # Convert score to simulated MB usage
-        base_memory = 2.0  # Base function overhead
-        estimated_memory = base_memory + (memory_score * 0.8)
+        # Calculate realistic memory usage
+        memory_usage = base_memory
         
-        return max(0.5, estimated_memory)  # Minimum 0.5MB
+        # Lists: assume average 1000 items, 50 bytes each
+        if 'all_results' in function_code and 'append' in function_code:
+            # Unbounded list growth
+            items_estimate = 10000 if not has_limit else 1000
+            memory_usage += (items_estimate * 0.05) / 1000  # 50 bytes per item in MB
+        
+        # Dicts in nested loops are especially bad
+        if dict_count > 0 and nested_loop_depth > 2:
+            # Each dict entry ~200 bytes, potentially n^2 or n^3 entries
+            dict_entries = 1000 ** min(nested_loop_depth, 3) / 1000  # Scale down for simulation
+            memory_usage += (dict_entries * 0.2) / 1000  # 200 bytes per entry in MB
+        
+        # Generators significantly reduce memory
+        if has_generator:
+            memory_usage *= 0.1  # 90% reduction for streaming
+        
+        # Tuple vs list difference
+        if 'tuple' in function_code and '+' in function_code:
+            # Tuple concatenation creates new objects
+            memory_usage *= 1.5  # 50% more memory than lists
+        
+        return round(memory_usage, 1)
     
     def _get_original_cpu_intensive_function(self):
         """Return example of original CPU-intensive function"""
@@ -522,55 +552,89 @@ class SelfHealingManager:
     return results  # O(n^4) complexity'''
 
     def _simulate_function_cpu_usage(self, function_code: str) -> float:
-        """Simulate CPU usage analysis of a function"""
-        # Simple heuristic-based CPU usage estimation
+        """Simulate CPU usage analysis with realistic complexity estimates"""
         lines = function_code.split('\n')
         
-        cpu_score = 0
+        # Analyze loop structure and complexity
+        loop_depth = 0
+        max_loop_depth = 0
+        current_indent = 0
+        indent_stack = []
+        has_cache = False
+        has_early_termination = False
+        has_set_operations = False
+        expensive_ops_in_loop = 0
+        
         for line in lines:
-            line = line.strip().lower()
-            if not line or line.startswith('#') or line.startswith('"""'):
+            stripped = line.strip().lower()
+            if not stripped or stripped.startswith('#') or stripped.startswith('"""'):
                 continue
+            
+            # Track indentation and loop nesting
+            indent = len(line) - len(line.lstrip())
+            
+            # Pop from stack if dedented
+            while indent_stack and indent <= indent_stack[-1]:
+                indent_stack.pop()
+                loop_depth = max(0, loop_depth - 1)
+            
+            # Check for loops
+            if 'for' in stripped and 'in' in stripped:
+                indent_stack.append(indent)
+                loop_depth += 1
+                max_loop_depth = max(max_loop_depth, loop_depth)
                 
-            # CPU-intensive patterns (higher scores = more CPU usage)
-            if 'for' in line and 'in' in line:
-                cpu_score += 2.0  # Each loop adds CPU load
-                if 'range(' in line:
-                    cpu_score += 1.0  # Range loops are more intensive
+                # Check if it's iterating over the full data
+                if 'range(len(' in stripped or 'enumerate(' in stripped:
+                    if loop_depth > 2:
+                        expensive_ops_in_loop += 10  # Nested full iterations
             
-            if 'for' in line and cpu_score > 4.0:  # Nested loops detection
-                cpu_score += 3.0  # Nested loops are exponentially worse
+            # Count expensive operations inside loops
+            if loop_depth > 0:
+                if '**' in stripped or 'pow(' in stripped:
+                    expensive_ops_in_loop += 5 * loop_depth
+                if '.time()' in stripped:
+                    expensive_ops_in_loop += 3 * loop_depth
+                if 'append(' in stripped:
+                    expensive_ops_in_loop += 1 * loop_depth
+                if any(op in stripped for op in ['==', '>', '<', '!=']):
+                    expensive_ops_in_loop += 0.5 * loop_depth
             
-            if '**' in line or 'pow(' in line:
-                cpu_score += 2.5  # Mathematical operations
-            
-            if '.time()' in line or 'timestamp' in line:
-                cpu_score += 1.5  # System calls in loops
-            
-            if 'similarity' in line or 'comparison' in line:
-                cpu_score += 2.0  # Complex comparisons
-            
-            if 'sort' in line or 'sorted(' in line:
-                cpu_score += 1.5  # Sorting operations
-            
-            if 'append(' in line and cpu_score > 5.0:  # List operations in loops
-                cpu_score += 1.0
-            
-            # Optimization patterns (reduce CPU score)
-            if 'break' in line:
-                cpu_score -= 0.8  # Early termination
-            if 'cache' in line or 'memo' in line:
-                cpu_score -= 1.5  # Caching reduces repeated work
-            if 'yield' in line:
-                cpu_score -= 1.0  # Generators reduce immediate CPU load
-            if 'enumerate(' in line:
-                cpu_score -= 0.3  # More efficient than manual indexing
+            # Optimization patterns
+            if 'cache' in stripped or 'memo' in stripped or '_cache' in stripped:
+                has_cache = True
+            if 'break' in stripped or 'return' in stripped and loop_depth > 0:
+                has_early_termination = True
+            if 'set(' in stripped or '&' in stripped and 'set' in function_code:
+                has_set_operations = True
         
-        # Convert score to simulated CPU percentage
-        base_cpu = 5.0  # Base function overhead
-        estimated_cpu = base_cpu + (cpu_score * 1.2)
+        # Calculate complexity-based CPU usage
+        # O(n) = 10%, O(n²) = 40%, O(n³) = 70%, O(n⁴) = 90%
+        base_cpu = 5.0
         
-        return max(2.0, estimated_cpu)  # Minimum 2% CPU
+        if max_loop_depth >= 4:
+            complexity_cpu = 90.0  # O(n⁴) or worse
+        elif max_loop_depth == 3:
+            complexity_cpu = 70.0  # O(n³)
+        elif max_loop_depth == 2:
+            complexity_cpu = 40.0  # O(n²)
+        elif max_loop_depth == 1:
+            complexity_cpu = 10.0  # O(n)
+        else:
+            complexity_cpu = 5.0   # O(1) or O(log n)
+        
+        # Adjust for optimizations
+        if has_cache:
+            complexity_cpu *= 0.3  # 70% reduction with caching
+        if has_early_termination:
+            complexity_cpu *= 0.7  # 30% reduction with early exit
+        if has_set_operations and max_loop_depth >= 2:
+            complexity_cpu *= 0.5  # Set operations are O(1) average
+        
+        # Add penalty for expensive operations in loops
+        complexity_cpu += expensive_ops_in_loop * 0.1
+        
+        return round(min(95.0, base_cpu + complexity_cpu), 1)
 
     def _generate_cpu_optimized_function_with_metta(self, original_code):
         """Generate CPU-optimized function using actual MeTTa reasoning system"""
