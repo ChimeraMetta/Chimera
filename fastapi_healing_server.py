@@ -375,8 +375,8 @@ class SelfHealingManager:
         # Step 2.5: Side-by-side comparison
         print(f"\n[HEALING] SIDE-BY-SIDE COMPARISON:")
         print(f"{'='*80}")
-        print(f"{'ORIGINAL (Memory-Leaking)':^39} │ {'HEALED (MeTTa-Optimized)':^39}")
-        print(f"{'='*39}┼{'='*40}")
+        print(f"{'ORIGINAL (Memory-Leaking)':^39} | {'HEALED (MeTTa-Optimized)':^39}")
+        print(f"{'='*39}+{'='*40}")
         
         orig_lines = original_function_code.split('\n')
         healed_lines = healed_function_code.split('\n')
@@ -390,10 +390,10 @@ class SelfHealingManager:
             orig_display = (orig_line[:35] + '...') if len(orig_line) > 38 else orig_line
             healed_display = (healed_line[:35] + '...') if len(healed_line) > 38 else healed_line
             
-            print(f"{orig_display:<39} │ {healed_display}")
+            print(f"{orig_display:<39} | {healed_display}")
         
         if max_lines > 15:
-            print(f"{'... (truncated)':^39} │ {'... (truncated)':^39}")
+            print(f"{'... (truncated)':^39} | {'... (truncated)':^39}")
         
         print(f"{'='*80}")
         
