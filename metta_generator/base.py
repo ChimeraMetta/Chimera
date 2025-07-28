@@ -1375,6 +1375,10 @@ class MeTTaPoweredModularDonorGenerator:
             """(= (quality-score $donor test-rule)
                (candidate-name $donor))""",
             
+            # Test rule to verify strategy matching works  
+            """(= (quality-score $donor strategy-test)
+               (candidate-strategy $donor $strategy))""",
+            
             # Simple quality assessment rules with explicit matching
             """(= (quality-score $donor high)
                (candidate-strategy $donor algorithm_transformation))""",
@@ -1815,7 +1819,7 @@ class MeTTaPoweredModularDonorGenerator:
         print(f"        MeTTa quality query: {quality_query.strip()}")
         print(f"        MeTTa quality facts: {quality_facts}")
         
-        # Add a simple test query first to debug pattern matching
+        # Add test queries to debug pattern matching
         test_query = f"""
         (match &self
           (candidate-name {candidate.name})
@@ -1824,6 +1828,16 @@ class MeTTaPoweredModularDonorGenerator:
         print(f"        Test query: {test_query.strip()}")
         test_results = self.reasoning_engine._execute_metta_reasoning(test_query, quality_facts)
         print(f"        Test results: {test_results}")
+        
+        # Test strategy matching specifically
+        strategy_test_query = f"""
+        (match &self
+          (candidate-strategy {candidate.name} $strategy)
+          (found-strategy $strategy))
+        """
+        print(f"        Strategy test query: {strategy_test_query.strip()}")
+        strategy_test_results = self.reasoning_engine._execute_metta_reasoning(strategy_test_query, quality_facts)
+        print(f"        Strategy test results: {strategy_test_results}")
 
         quality_results = self.reasoning_engine._execute_metta_reasoning(quality_query, quality_facts)
         print(f"        MeTTa quality results: {quality_results}")
