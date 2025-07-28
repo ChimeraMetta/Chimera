@@ -121,22 +121,45 @@ async def trigger_cpu_overload(duration: int = 10, num_threads: int = 4):
         duration: Duration in seconds for each CPU task
         num_threads: Number of concurrent CPU-intensive threads
     """
+    # Get initial CPU reading with proper interval
+    psutil.Process().cpu_percent()  # First call to initialize
+    await asyncio.sleep(0.1)  # Wait for measurement interval
     before_cpu = psutil.Process().cpu_percent()
     
+    print(f"[DEMO] Starting CPU overload simulation with {num_threads} threads for {duration} seconds")
+    
     def cpu_task(task_id: int):
+        print(f"[DEMO] CPU task {task_id} started")
         try:
-            result = cpu_intensive_operation(duration)
+            # More aggressive CPU usage
+            start_time = time.time()
+            result = 0
+            iterations = 0
+            
+            while time.time() - start_time < duration:
+                # Heavy mathematical operations without sleep
+                for i in range(1000000):  # Increased from 100000
+                    result += i ** 2
+                    result = result % 1000000
+                    # Add more operations to ensure CPU usage
+                    for j in range(10):
+                        result = (result * 13 + 7) % 1000000
+                iterations += 1
+            
             cpu_intensive_tasks.append({
                 'task_id': task_id,
                 'result': result,
+                'iterations': iterations,
                 'completed_at': time.time()
             })
+            print(f"[DEMO] CPU task {task_id} completed after {iterations} iterations")
         except Exception as e:
             cpu_intensive_tasks.append({
                 'task_id': task_id,
                 'error': str(e),
                 'completed_at': time.time()
             })
+            print(f"[DEMO] CPU task {task_id} failed: {e}")
     
     # Start CPU-intensive threads
     threads = []
@@ -145,13 +168,29 @@ async def trigger_cpu_overload(duration: int = 10, num_threads: int = 4):
         thread.daemon = True
         thread.start()
         threads.append(thread)
+        # Stagger thread starts slightly
+        await asyncio.sleep(0.01)
+    
+    # Wait a moment for threads to start consuming CPU
+    await asyncio.sleep(0.5)
+    after_cpu = psutil.Process().cpu_percent()
+    
+    # Monitor CPU for a few seconds
+    max_cpu = after_cpu
+    for _ in range(5):
+        await asyncio.sleep(0.5)
+        current_cpu = psutil.Process().cpu_percent()
+        max_cpu = max(max_cpu, current_cpu)
+        print(f"[DEMO] Current CPU usage: {current_cpu:.1f}%")
     
     return {
         "message": f"Started {num_threads} CPU-intensive tasks for {duration} seconds each",
         "cpu_before_percent": before_cpu,
+        "cpu_after_percent": after_cpu,
+        "max_cpu_observed": max_cpu,
         "estimated_completion": f"{duration} seconds",
         "active_cpu_tasks": len([t for t in threads if t.is_alive()]),
-        "note": "Self-healing should trigger when CPU usage exceeds threshold"
+        "note": "Self-healing should trigger when CPU usage exceeds threshold (75%)"
     }
 
 @router.post("/connection-issues")

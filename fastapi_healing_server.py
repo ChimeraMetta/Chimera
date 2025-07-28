@@ -168,10 +168,15 @@ class SelfHealingManager:
         """Collect current system metrics"""
         process = psutil.Process()
         memory_mb = process.memory_info().rss / 1024 / 1024
-        cpu_percent = process.cpu_percent()
+        
+        # CPU measurement needs interval parameter for accuracy
+        cpu_percent = process.cpu_percent(interval=0.1)  # 100ms interval for accurate reading
         
         # Simple connection count (approximation)
-        connection_count = len([conn for conn in process.connections() if conn.status == 'ESTABLISHED'])
+        try:
+            connection_count = len([conn for conn in process.connections() if conn.status == 'ESTABLISHED'])
+        except:
+            connection_count = 0  # Handle permission errors
         
         # Calculate recent request latency
         recent_metrics = list(self.metrics_history)[-10:]
