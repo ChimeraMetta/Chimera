@@ -154,11 +154,28 @@ class MeTTaReasoningEngine:
             
             # Try different approaches based on what's available
             if hasattr(self.metta, 'run'):
-                # Use MeTTa instance run method (preferred)
-                # For rule loading, we don't need the !() wrapper
-                self.metta.run(cleaned_rule)
-                print(f"          DEBUG: Successfully loaded rule")
-                return True
+                # For rule definitions (starting with '='), we need to add them to the space
+                # For facts/queries, we can run them directly
+                if cleaned_rule.strip().startswith('(='):
+                    # This is a rule definition - add it to the space for persistence
+                    if hasattr(self.metta_space, 'add_atom'):
+                        try:
+                            parsed_atom = self.metta.parse_single(cleaned_rule)
+                            self.metta_space.add_atom(parsed_atom)
+                            print(f"          DEBUG: Successfully added rule to space")
+                            return True
+                        except Exception as e:
+                            print(f"          DEBUG: Failed to parse rule: {e}, trying direct run")
+                    
+                    # Fallback: try adding to space via run
+                    self.metta.run(f"(add-atom &self {cleaned_rule})")
+                    print(f"          DEBUG: Successfully added rule via run")
+                    return True
+                else:
+                    # This is a fact or query - run it directly
+                    self.metta.run(cleaned_rule)
+                    print(f"          DEBUG: Successfully executed fact/query")
+                    return True
             elif hasattr(self.metta_space, 'add_atom'):
                 # For dynamic monitor spaces that expect atoms directly
                 if hasattr(self, 'metta'):
