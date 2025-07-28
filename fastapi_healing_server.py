@@ -406,10 +406,10 @@ class SelfHealingManager:
         print(f"Memory Reduction: {memory_improvement:.1f}MB per 1000 operations ({improvement_percentage:.1f}% improvement)")
         
         if memory_improvement > 0:
-            print(f"✅ HEALING SUCCESSFUL - Memory-efficient alternative generated")
+            print(f"SUCCESS: HEALING SUCCESSFUL - Memory-efficient alternative generated")
             healing_strategies.append(f"Generated memory-efficient MeTTa solution with {improvement_percentage:.1f}% improvement")
         else:
-            print(f"⚠️  HEALING PARTIAL - Alternative generated but minimal memory improvement")
+            print(f"PARTIAL: HEALING PARTIAL - Alternative generated but minimal memory improvement")
             healing_strategies.append(f"Generated MeTTa solution with functional improvements")
         
         # Step 4: Simulate system memory improvement
@@ -595,15 +595,15 @@ class SelfHealingManager:
                 
                 generated_code = best_donor.get('code', best_donor.get('generated_code', ''))
                 if generated_code:
-                    print("[HEALING] ✅ Successfully generated MeTTa-powered optimized function")
+                    print("[HEALING] SUCCESS: Successfully generated MeTTa-powered optimized function")
                     return generated_code
                 else:
-                    print("[HEALING] ⚠️ Candidate found but no code generated")
+                    print("[HEALING] WARNING: Candidate found but no code generated")
             else:
-                print("[HEALING] ⚠️ No MeTTa candidates generated")
+                print("[HEALING] WARNING: No MeTTa candidates generated")
                 
         except Exception as metta_error:
-            print(f"[HEALING] ❌ MeTTa generation error: {metta_error}")
+            print(f"[HEALING] ERROR: MeTTa generation error: {metta_error}")
             import traceback
             traceback.print_exc()
         
