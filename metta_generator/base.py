@@ -1825,37 +1825,7 @@ class MeTTaPoweredModularDonorGenerator:
         print(f"        MeTTa quality query: {quality_query.strip()}")
         print(f"        MeTTa quality facts: {quality_facts}")
         
-        # Add test queries to debug pattern matching
-        test_query = f"""
-        (match &self
-          (candidate-name {candidate.name})
-          found-candidate)
-        """
-        print(f"        Test query: {test_query.strip()}")
-        test_results = self.reasoning_engine._execute_metta_reasoning(test_query, quality_facts)
-        print(f"        Test results: {test_results}")
-        
-        # Test strategy matching specifically
-        strategy_test_query = f"""
-        (match &self
-          (candidate-strategy {candidate.name} $strategy)
-          (found-strategy $strategy))
-        """
-        print(f"        Strategy test query: {strategy_test_query.strip()}")
-        strategy_test_results = self.reasoning_engine._execute_metta_reasoning(strategy_test_query, quality_facts)
-        print(f"        Strategy test results: {strategy_test_results}")
-        
-        # Test basic fact matching
-        basic_fact_query = f"""
-        (match &self
-          (test-simple success)
-          found-basic-fact)
-        """
-        print(f"        Basic fact query: {basic_fact_query.strip()}")
-        basic_fact_results = self.reasoning_engine._execute_metta_reasoning(basic_fact_query, [])
-        print(f"        Basic fact results: {basic_fact_results}")
-        
-        # Test strategy mapping lookup
+        # Debug: Test strategy mapping lookup (can be removed once confirmed working)
         strategy_mapping_query = f"""
         (match &self
           (quality-strategy-mapping {candidate.strategy} $quality)
