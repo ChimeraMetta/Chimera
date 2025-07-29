@@ -185,11 +185,20 @@ class SelfHealingManager:
         # CPU measurement needs interval parameter for accuracy
         cpu_percent = process.cpu_percent(interval=0.1)  # 100ms interval for accurate reading
         
-        # Simple connection count (approximation)
+        # Connection count (real + fake demo connections)
         try:
-            connection_count = len([conn for conn in process.connections() if conn.status == 'ESTABLISHED'])
+            real_connections = len([conn for conn in process.connections() if conn.status == 'ESTABLISHED'])
         except:
-            connection_count = 0  # Handle permission errors
+            real_connections = 0  # Handle permission errors
+        
+        # Include fake connections from demo endpoints for testing
+        try:
+            from demo_endpoints import fake_connections
+            fake_connection_count = len(fake_connections)
+        except:
+            fake_connection_count = 0
+        
+        connection_count = real_connections + fake_connection_count
         
         # Calculate recent request latency
         recent_metrics = list(self.metrics_history)[-10:]
