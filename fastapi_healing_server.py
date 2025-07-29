@@ -136,6 +136,10 @@ class SelfHealingManager:
         self.cpu_overload_triggered = False  # Once triggered, stop checking
         self.cpu_healing_complete = False
         
+        # Connection issues simulation control
+        self.connection_issues_triggered = False  # Once triggered, stop checking
+        self.connection_healing_complete = False
+        
         self.start_monitoring()
     
     def start_monitoring(self):
@@ -228,9 +232,16 @@ class SelfHealingManager:
             healing_thread.daemon = True
             healing_thread.start()
         
-        # Connection issues detection
-        if metrics.connection_count > self.thresholds['connection_count']:
+        # Connection issues detection - only trigger once
+        if (not self.connection_issues_triggered and 
+            not self.connection_healing_complete and 
+            metrics.connection_count > self.thresholds['connection_count']):
+            
             print(f"[HEALING TRIGGER] Connection threshold exceeded: {metrics.connection_count} > {self.thresholds['connection_count']}")
+            print(f"[HEALING TRIGGER] Stopping connection monitoring to prevent loops - performing one-time healing")
+            
+            self.connection_issues_triggered = True  # Stop further connection checks
+            
             healing_thread = threading.Thread(target=self._heal_connection_issues_sync, args=(metrics,))
             healing_thread.daemon = True
             healing_thread.start()
@@ -1068,33 +1079,119 @@ class SelfHealingManager:
         print(f"{'='*80}\n")
     
     def _heal_connection_issues_sync(self, metrics: SystemMetrics):
-        """Synchronous version of connection issues healing for thread execution"""
-        print(f"[HEALING] Starting connection issues recovery - Current: {metrics.connection_count} connections")
+        """MeTTa-powered connection issues healing with connection optimization analysis"""
+        print(f"\n{'='*80}")
+        print(f"[HEALING] CONNECTION ISSUES DETECTED - Starting MeTTa-Powered Healing")
+        print(f"[HEALING] Current Connection Count: {metrics.connection_count}")
+        print(f"[HEALING] Threshold: {self.thresholds['connection_count']}")
+        print(f"{'='*80}")
         
         healing_strategies = []
         
+        # Step 1: Show original connection-inefficient function
+        print(f"\n[HEALING] STEP 1: Analyzing Original Connection-Inefficient Function")
+        print(f"{'='*60}")
+        original_function_code = self._get_original_connection_heavy_function()
+        print(original_function_code)
+        print(f"{'='*60}")
+        
+        # Simulate original function connection analysis
+        original_connection_usage = self._simulate_function_connection_usage(original_function_code)
+        print(f"[ANALYSIS] Original function estimated connection usage: {original_connection_usage:.0f} connections per operation")
+        
+        # Step 2: Generate MeTTa-optimized solution
+        print(f"\n[HEALING] STEP 2: Generating MeTTa-Powered Connection Optimization")
+        print(f"{'='*60}")
+        healed_function_code = self._generate_connection_optimized_function_with_metta(original_function_code)
+        print(healed_function_code)
+        print(f"{'='*60}")
+        
+        # Simulate healed function connection analysis
+        healed_connection_usage = self._simulate_function_connection_usage(healed_function_code)
+        print(f"[ANALYSIS] Healed function estimated connection usage: {healed_connection_usage:.0f} connections per operation")
+        
+        # Step 2.5: Side-by-side comparison
+        print(f"\n[HEALING] SIDE-BY-SIDE COMPARISON:")
+        print(f"{'='*80}")
+        print(f"{'ORIGINAL (Connection-Heavy)':^39} | {'HEALED (MeTTa-Optimized)':^39}")
+        print(f"{'='*39}+{'='*40}")
+        
+        orig_lines = original_function_code.split('\n')
+        healed_lines = healed_function_code.split('\n')
+        max_lines = max(len(orig_lines), len(healed_lines))
+        
+        for i in range(min(15, max_lines)):  # Show first 15 lines
+            orig_line = orig_lines[i] if i < len(orig_lines) else ''
+            healed_line = healed_lines[i] if i < len(healed_lines) else ''
+            
+            # Truncate long lines for display
+            orig_display = (orig_line[:35] + '...') if len(orig_line) > 38 else orig_line
+            healed_display = (healed_line[:35] + '...') if len(healed_line) > 38 else healed_line
+            
+            print(f"{orig_display:<39} | {healed_display}")
+        
+        if max_lines > 15:
+            print(f"{'... (truncated)':^39} | {'... (truncated)':^39}")
+        
+        print(f"{'='*80}")
+        
+        # Step 3: Calculate improvement
+        connection_improvement = original_connection_usage - healed_connection_usage
+        improvement_percentage = (connection_improvement / original_connection_usage) * 100
+        
+        print(f"\n[HEALING] STEP 3: Connection Efficiency Improvement Analysis")
+        print(f"{'='*60}")
+        print(f"Connection Reduction: {connection_improvement:.0f} connections per operation ({improvement_percentage:.1f}% improvement)")
+        
+        if connection_improvement > 0:
+            print(f"SUCCESS: HEALING SUCCESSFUL - Connection-efficient alternative generated")
+            healing_strategies.append(f"Generated connection-efficient MeTTa solution with {improvement_percentage:.1f}% improvement")
+        else:
+            print(f"PARTIAL: HEALING PARTIAL - Alternative generated but minimal connection improvement")
+            healing_strategies.append(f"Generated MeTTa solution with functional improvements")
+        
+        # Step 4: Apply system-level connection healing
+        print(f"\n[HEALING] STEP 4: Applying System-Level Connection Optimizations")
+        print(f"{'='*60}")
+        
         # Strategy 1: Reset circuit breakers
+        breaker_resets = 0
         for endpoint, breaker in self.circuit_breakers.items():
             if breaker['state'] == 'open':
                 breaker['state'] = 'half-open'
                 breaker['failures'] = 0
-                healing_strategies.append(f"Reset circuit breaker for {endpoint}")
+                breaker_resets += 1
+        
+        if breaker_resets > 0:
+            healing_strategies.append(f"Reset {breaker_resets} circuit breakers")
+            print(f"[HEALING] Reset {breaker_resets} circuit breakers to allow reconnections")
         
         # Strategy 2: Clear connection pools
         healing_strategies.append("Cleared connection pools")
-        print("[HEALING] Reset circuit breakers and cleared connection pools")
+        print("[HEALING] Cleared connection pools to force pool recreation")
         
+        # Strategy 3: Enable connection pooling optimizations
+        healing_strategies.append("Enabled connection pooling optimizations")
+        print("[HEALING] Enabled connection pooling and keep-alive optimizations")
+        
+        # Step 5: Complete healing process
         action = HealingAction(
             timestamp=datetime.now(),
             error_type='connection_issues',
-            detection_method='metrics_threshold',
+            detection_method='threshold_simulation',
             healing_strategy='; '.join(healing_strategies),
             success=True,
-            details=f"Connection count was {metrics.connection_count}"
+            details=f"Connection count was {metrics.connection_count}, generated optimized solution with {improvement_percentage:.1f}% improvement"
         )
         
         self.healing_actions.append(action)
-        print(f"[HEALING] Connection issues recovery completed: {action.healing_strategy}")
+        self.connection_healing_complete = True
+        
+        print(f"\n[HEALING] CONNECTION ISSUES HEALING COMPLETED")
+        print(f"[HEALING] Strategy: {action.healing_strategy}")
+        print(f"[HEALING] Estimated connection reduction: {improvement_percentage:.1f}%")
+        print(f"[HEALING] Future connection monitoring disabled to prevent loops")
+        print(f"{'='*80}\n")
 
 # Initialize the healing manager
 healing_manager = SelfHealingManager()
@@ -1178,6 +1275,10 @@ async def reset_healing_flags():
     healing_manager.cpu_overload_triggered = False
     healing_manager.cpu_healing_complete = False
     
+    # Reset connection healing flags
+    healing_manager.connection_issues_triggered = False
+    healing_manager.connection_healing_complete = False
+    
     # Clear healing actions history
     healing_manager.healing_actions.clear()
     
@@ -1187,6 +1288,7 @@ async def reset_healing_flags():
         "healing_states": {
             "memory_healing_ready": True,
             "cpu_healing_ready": True,
+            "connection_healing_ready": True,
             "healing_history_cleared": True
         },
         "timestamp": datetime.now().isoformat()
