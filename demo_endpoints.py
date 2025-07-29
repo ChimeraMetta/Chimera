@@ -79,7 +79,7 @@ async def demo_overview():
 
 @router.post("/memory-leak")
 @router.get("/memory-leak")
-async def trigger_memory_leak(size_mb: int = 30, count: int = 4):
+async def trigger_memory_leak(size_mb: int = 75, count: int = 5):
     """
     Trigger memory leak by creating memory-consuming objects
     

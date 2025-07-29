@@ -132,6 +132,10 @@ class SelfHealingManager:
         self.memory_healing_complete = False
         self.simulated_memory_improvement = 0  # Track simulated memory savings
         
+        # CPU overload simulation control
+        self.cpu_overload_triggered = False  # Once triggered, stop checking
+        self.cpu_healing_complete = False
+        
         self.start_monitoring()
     
     def start_monitoring(self):
@@ -210,9 +214,16 @@ class SelfHealingManager:
             healing_thread.daemon = True
             healing_thread.start()
         
-        # CPU overload detection
-        if metrics.cpu_percent > self.thresholds['cpu_percent']:
+        # CPU overload detection - only trigger once
+        if (not self.cpu_overload_triggered and 
+            not self.cpu_healing_complete and 
+            metrics.cpu_percent > self.thresholds['cpu_percent']):
+            
             print(f"[HEALING TRIGGER] CPU threshold exceeded: {metrics.cpu_percent:.1f}% > {self.thresholds['cpu_percent']}%")
+            print(f"[HEALING TRIGGER] Stopping CPU monitoring to prevent loops - performing one-time healing")
+            
+            self.cpu_overload_triggered = True  # Stop further CPU checks
+            
             healing_thread = threading.Thread(target=self._heal_cpu_overload_sync, args=(metrics,))
             healing_thread.daemon = True
             healing_thread.start()
@@ -1048,10 +1059,12 @@ class SelfHealingManager:
         )
         
         self.healing_actions.append(action)
+        self.cpu_healing_complete = True
         
         print(f"\n[HEALING] CPU OVERLOAD HEALING COMPLETED")
         print(f"[HEALING] Strategy: {action.healing_strategy}")
         print(f"[HEALING] Estimated CPU improvement: {improvement_percentage:.1f}%")
+        print(f"[HEALING] Future CPU monitoring disabled to prevent loops")
         print(f"{'='*80}\n")
     
     def _heal_connection_issues_sync(self, metrics: SystemMetrics):
@@ -1150,6 +1163,33 @@ async def health_check():
             "circuit_breakers": dict(healing_manager.circuit_breakers),
             "thresholds": healing_manager.thresholds
         }
+    }
+
+@app.post("/reset-healing")
+@app.get("/reset-healing")
+async def reset_healing_flags():
+    """Reset healing flags to allow re-triggering healing demonstrations"""
+    # Reset memory healing flags
+    healing_manager.memory_leak_triggered = False
+    healing_manager.memory_healing_complete = False
+    healing_manager.simulated_memory_improvement = 0
+    
+    # Reset CPU healing flags
+    healing_manager.cpu_overload_triggered = False
+    healing_manager.cpu_healing_complete = False
+    
+    # Clear healing actions history
+    healing_manager.healing_actions.clear()
+    
+    return {
+        "status": "success",
+        "message": "Healing flags reset successfully",
+        "healing_states": {
+            "memory_healing_ready": True,
+            "cpu_healing_ready": True,
+            "healing_history_cleared": True
+        },
+        "timestamp": datetime.now().isoformat()
     }
 
 async def generate_dashboard_html():
