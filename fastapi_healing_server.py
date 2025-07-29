@@ -206,7 +206,6 @@ class SelfHealingManager:
             self.memory_leak_triggered = True  # Stop further memory checks
             
             # Use threading instead of asyncio to avoid event loop issues
-            import threading
             healing_thread = threading.Thread(target=self._heal_memory_leak_simulation, args=(metrics,))
             healing_thread.daemon = True
             healing_thread.start()
