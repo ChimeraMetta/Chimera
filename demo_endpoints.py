@@ -195,7 +195,7 @@ async def trigger_cpu_overload(duration: int = 10, num_threads: int = 4):
 
 @router.post("/connection-issues")
 @router.get("/connection-issues")
-async def trigger_connection_issues(connection_count: int = 50):
+async def trigger_connection_issues(connection_count: int = 90):
     """
     Simulate connection pool issues by creating many fake connections
     
