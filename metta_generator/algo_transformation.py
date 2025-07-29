@@ -99,9 +99,31 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             print(f"        MeTTa reasoning found no transformations, using symbolic fallback")
             transformations = self._symbolic_transformation_detection(context)
         
-        print(f"        Found {len(transformations)} potential transformations: {[t.get('from', 'unknown') + '->' + t.get('to', 'unknown') for t in transformations]}")
+        # Handle both raw MeTTa results (lists) and structured results (dicts)
+        safe_transformations = []
+        for t in transformations:
+            if isinstance(t, dict):
+                safe_transformations.append(t)
+            elif isinstance(t, list) and len(t) >= 2:
+                # Convert list format to dict format
+                safe_transformations.append({
+                    'from': str(t[0]) if len(t) > 0 else 'unknown',
+                    'to': str(t[1]) if len(t) > 1 else 'unknown',
+                    'pattern': str(t[0]) if len(t) > 0 else 'generic',
+                    'target_pattern': str(t[1]) if len(t) > 1 else 'variant'
+                })
+            else:
+                # Fallback for unexpected formats
+                safe_transformations.append({
+                    'from': 'unknown',
+                    'to': 'variant', 
+                    'pattern': 'generic',
+                    'target_pattern': 'variant'
+                })
         
-        for transformation in transformations:
+        print(f"        Found {len(safe_transformations)} potential transformations: {[t.get('from', 'unknown') + '->' + t.get('to', 'unknown') for t in safe_transformations]}")
+        
+        for transformation in safe_transformations:
             candidate = self._create_metta_reasoned_candidate(context, transformation)
             if candidate:
                 candidates.append(candidate)
