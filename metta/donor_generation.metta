@@ -1214,4 +1214,48 @@
         (performance-acceptable $donor $context)
         (maintainability-adequate $donor)))
 
-;; The complete ontology is now ready for production use
+;; ========================================
+;; Demo Solution References for Healing System
+;; ========================================
+
+;; Link demo solutions to healing contexts
+(= (healing-demo-solution memory_leak) demo-memory-efficient-processor)
+(= (healing-demo-solution memory_leak) demo-memory-bounded-cache)
+(= (healing-demo-solution cpu_overload) demo-cpu-efficient-algorithm) 
+(= (healing-demo-solution cpu_overload) demo-cpu-efficient-batch)
+(= (healing-demo-solution connection_issues) demo-connection-efficient-db)
+(= (healing-demo-solution connection_issues) demo-connection-efficient-api)
+(= (healing-demo-solution request_failures) demo-error-resilient-handler)
+
+;; Pattern matching for solution selection
+(= (select-healing-solution $problem_type $context)
+   (match &self (healing-demo-solution $problem_type) $solution
+          (and (pattern-compatible $solution $context)
+               (quality-score $solution high))))
+
+;; Solution adaptation rules for healing system
+(= (adapt-demo-for-healing $demo_solution $target_function $problem_context)
+   (let $demo_patterns (extract-patterns $demo_solution)
+        (let $target_analysis (analyze-function $target_function)
+             (let $adaptation_plan (create-adaptation-plan $demo_patterns $target_analysis $problem_context)
+                  (apply-adaptations $target_function $adaptation_plan)))))
+
+;; Quality metrics from demo solutions
+(= (demo-quality-benchmark memory-efficiency 0.90)    ;; 90% memory reduction
+(= (demo-quality-benchmark cpu-efficiency 0.75)       ;; 75% CPU reduction  
+(= (demo-quality-benchmark connection-efficiency 0.80) ;; 80% connection reduction
+(= (demo-quality-benchmark error-resilience 0.68)     ;; 68% error reduction
+
+;; Learning from demo solutions
+(= (learn-from-demo $demo_solution $pattern_type)
+   (match &self (function $demo_solution $body)
+          (extract-pattern $body $pattern_type)))
+
+;; Demo-guided generation strategy
+(= (demo-guided-generation $func $problem_type)
+   (let $demo_solutions (healing-demo-solution $problem_type)
+        (let $applicable_patterns (map learn-from-demo $demo_solutions)
+             (let $adapted_candidates (adapt-patterns-to-function $applicable_patterns $func)
+                  (rank-by-demo-similarity $adapted_candidates $demo_solutions)))))
+
+;; The complete ontology with demo solutions is now ready for production use

@@ -1400,7 +1400,32 @@ class MeTTaPoweredModularDonorGenerator:
             """(donor-generation-strategy algorithm_transformation)""",
             """(donor-generation-strategy data_structure_adaptation)""",
             """(donor-generation-strategy operation_substitution)""",
-            """(donor-generation-strategy structure_preservation)"""
+            """(donor-generation-strategy structure_preservation)""",
+            
+            # Demo solution patterns for healing system guidance
+            """(demo-solution-pattern memory_leak memory-efficient-processor)""",
+            """(demo-solution-pattern memory_leak memory-bounded-cache)""", 
+            """(demo-solution-pattern cpu_overload cpu-efficient-algorithm)""",
+            """(demo-solution-pattern cpu_overload cpu-efficient-batch)""",
+            """(demo-solution-pattern connection_issues connection-efficient-db)""",
+            """(demo-solution-pattern connection_issues connection-efficient-api)""",
+            """(demo-solution-pattern request_failures error-resilient-handler)""",
+            
+            # Demo quality benchmarks
+            """(demo-quality-benchmark memory-efficiency 0.90)""",
+            """(demo-quality-benchmark cpu-efficiency 0.75)""",
+            """(demo-quality-benchmark connection-efficiency 0.80)""",
+            """(demo-quality-benchmark error-resilience 0.68)""",
+            
+            # Pattern recognition for demo solutions
+            """(has-pattern memory-efficient-processor generator-based)""",
+            """(has-pattern memory-efficient-processor chunking)""",
+            """(has-pattern cpu-efficient-algorithm binary-search)""",
+            """(has-pattern cpu-efficient-algorithm parallel-processing)""",
+            """(has-pattern connection-efficient-db connection-pooling)""",
+            """(has-pattern connection-efficient-db prepared-statements)""",
+            """(has-pattern error-resilient-handler retry-mechanism)""",
+            """(has-pattern error-resilient-handler timeout-protection)"""
         ]
         
         print(f"    Loading {len(enhanced_rules)} ontology rules...")
