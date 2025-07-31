@@ -229,6 +229,8 @@ async def trigger_connection_issues(connection_count: int = 90):
 
 @router.post("/request-failures")
 @router.get("/request-failures")
+@router.post("/request_failures")  # Alias with underscore
+@router.get("/request_failures")   # Alias with underscore
 async def trigger_request_failures(failure_rate: float = 0.7):
     """
     Simulate request handling failures
@@ -236,6 +238,13 @@ async def trigger_request_failures(failure_rate: float = 0.7):
     Args:
         failure_rate: Probability of failure (0.0 to 1.0)
     """
+    
+    # Import healing manager to track request outcomes
+    try:
+        from fastapi_healing_server import healing_manager
+        track_outcome = healing_manager.track_request_outcome
+    except:
+        track_outcome = lambda success: None  # Fallback if import fails
     
     # Simulate different types of request failures
     if random.random() < failure_rate:
@@ -258,6 +267,9 @@ async def trigger_request_failures(failure_rate: float = 0.7):
         # Add some delay to simulate a slow failing request
         await asyncio.sleep(random.uniform(0.5, 2.0))
         
+        # Track the failed request
+        track_outcome(False)
+        
         raise HTTPException(
             status_code=500, 
             detail=f"{failure_type}: {error_messages[failure_type]}"
@@ -265,6 +277,9 @@ async def trigger_request_failures(failure_rate: float = 0.7):
     
     # If no failure, simulate a slow successful request
     await asyncio.sleep(random.uniform(0.1, 1.0))
+    
+    # Track the successful request
+    track_outcome(True)
     
     return {
         "message": "Request completed successfully (avoided failure)",

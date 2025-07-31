@@ -145,7 +145,30 @@ class SelfHealingManager:
         self.request_failures_triggered = False  # Once triggered, stop checking  
         self.request_healing_complete = False
         
+        # Error rate tracking for request failure detection
+        self.recent_requests = []  # Track recent request outcomes
+        self.error_rate_window = 50  # Track last 50 requests
+        
         self.start_monitoring()
+    
+    def track_request_outcome(self, success: bool):
+        """Track request success/failure for error rate monitoring"""
+        self.recent_requests.append({
+            'success': success,
+            'timestamp': time.time()
+        })
+        
+        # Keep only recent requests within the window
+        if len(self.recent_requests) > self.error_rate_window:
+            self.recent_requests.pop(0)
+    
+    def get_current_error_rate(self) -> float:
+        """Calculate current error rate from recent requests"""
+        if not self.recent_requests:
+            return 0.0
+        
+        failed_requests = sum(1 for req in self.recent_requests if not req['success'])
+        return failed_requests / len(self.recent_requests)
     
     def start_monitoring(self):
         """Start background monitoring thread"""
@@ -166,7 +189,9 @@ class SelfHealingManager:
                         healing_status = " (Healing in progress...)"
                     
                     # Print real-time memory consumption to stdout
-                    print(f"[MONITOR] Memory: {display_memory:.1f}MB{healing_status} | CPU: {metrics.cpu_percent:.1f}% | Connections: {metrics.connection_count} | Active Requests: {metrics.active_requests}")
+                    current_error_rate = self.get_current_error_rate()
+                    error_display = f" | Error Rate: {current_error_rate:.1%} ({len(self.recent_requests)} reqs)" if self.recent_requests else " | Error Rate: 0.0%"
+                    print(f"[MONITOR] Memory: {display_memory:.1f}MB{healing_status} | CPU: {metrics.cpu_percent:.1f}% | Connections: {metrics.connection_count} | Active Requests: {metrics.active_requests}{error_display}")
                     
                     self.check_for_healing_triggers(metrics)
                     time.sleep(2)  # Check every 2 seconds for more responsive demo
@@ -257,6 +282,22 @@ class SelfHealingManager:
             self.connection_issues_triggered = True  # Stop further connection checks
             
             healing_thread = threading.Thread(target=self._heal_connection_issues_sync, args=(metrics,))
+            healing_thread.daemon = True
+            healing_thread.start()
+        
+        # Request failure detection - only trigger once
+        current_error_rate = self.get_current_error_rate()
+        if (not self.request_failures_triggered and 
+            not self.request_healing_complete and 
+            current_error_rate > self.thresholds['error_rate'] and
+            len(self.recent_requests) >= 10):  # Need at least 10 requests to calculate meaningful rate
+            
+            print(f"[HEALING TRIGGER] Error rate threshold exceeded: {current_error_rate:.1%} > {self.thresholds['error_rate']:.1%}")
+            print(f"[HEALING TRIGGER] Stopping request failure monitoring to prevent loops - performing one-time healing")
+            
+            self.request_failures_triggered = True  # Stop further request failure checks
+            
+            healing_thread = threading.Thread(target=self._heal_request_failures_sync, args=(f"Error rate: {current_error_rate:.1%}",))
             healing_thread.daemon = True
             healing_thread.start()
     
