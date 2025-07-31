@@ -20,8 +20,7 @@ from metta_generator.evolution.basic import BasicEvolutionEngine
 from metta_generator.genetics.genome import SimpleCodeGenome, MeTTaGene
 from metta_generator.evolution_integrator import (
         integrate_semantic_evolution_with_base_generator,
-        EnhancedEvolutionIntegrator,
-        SEMANTIC_EVOLUTION_AVAILABLE
+        EnhancedEvolutionIntegrator
     )
 
 EVOLUTION_AVAILABLE = True
@@ -1177,7 +1176,7 @@ class MeTTaPoweredModularDonorGenerator:
         self.load_ontology()
 
        # Add semantic evolution capability
-        self.enable_semantic_evolution = enable_evolution and SEMANTIC_EVOLUTION_AVAILABLE
+        self.enable_semantic_evolution = enable_evolution
         
         if self.enable_semantic_evolution:
             print("  Enabling semantic evolution integration...")
