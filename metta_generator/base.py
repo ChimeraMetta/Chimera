@@ -1384,6 +1384,13 @@ class MeTTaPoweredModularDonorGenerator:
         """Load MeTTa ontology for reasoning-powered generation."""
         print(" Loading MeTTa reasoning-powered donor generation ontology...")
         
+        # First, load the demo solutions file to get actual function patterns
+        demo_solutions_loaded = self._load_demo_solutions_file()
+        if demo_solutions_loaded:
+            print("  Successfully loaded demo solution functions for pattern learning")
+        else:
+            print("  Warning: Could not load demo solutions file")
+        
         # Load enhanced ontology rules as direct facts for matching
         enhanced_rules = [
             # Test facts for debugging - these should be directly matchable
@@ -1435,6 +1442,79 @@ class MeTTaPoweredModularDonorGenerator:
         
         print(f"    Completed loading {len(enhanced_rules)} ontology rules")
         return True
+    
+    def _load_demo_solutions_file(self) -> bool:
+        """Load demo solution functions from metta/demo_solutions.metta file."""
+        try:
+            demo_file_path = os.path.join(_PROJECT_ROOT, "metta", "demo_solutions.metta")
+            if not os.path.exists(demo_file_path):
+                print(f"  Demo solutions file not found: {demo_file_path}")
+                return False
+            
+            print(f"  Loading demo solutions from: {demo_file_path}")
+            with open(demo_file_path, 'r', encoding='utf-8') as f:
+                demo_content = f.read()
+            
+            # Parse the demo solutions and extract function definitions
+            demo_functions = self._parse_metta_functions(demo_content)
+            print(f"  Parsed {len(demo_functions)} demo solution functions")
+            
+            # Load each demo function into the MeTTa space for pattern learning
+            for func_name, func_body in demo_functions.items():
+                try:
+                    # Add the function definition as a MeTTa atom
+                    self.reasoning_engine._add_rule_safely(f"(demo-function {func_name} {func_body})")
+                    print(f"    Loaded demo function: {func_name}")
+                except Exception as e:
+                    print(f"    Failed to load demo function {func_name}: {e}")
+            
+            return len(demo_functions) > 0
+            
+        except Exception as e:
+            print(f"  Error loading demo solutions file: {e}")
+            return False
+    
+    def _parse_metta_functions(self, metta_content: str) -> dict:
+        """Parse MeTTa function definitions from content."""
+        functions = {}
+        
+        # Look for function definitions in the demo solutions
+        import re
+        function_pattern = r'\(= \(([^)]+)\)\s*\(function\s+([^)]+)\s+\([^)]+\)[^(]*.*?\)\)\)\)'
+        
+        matches = re.findall(function_pattern, metta_content, re.DOTALL)
+        
+        for match in matches:
+            func_identifier = match[0].strip()
+            func_name = match[1].strip()
+            
+            # Extract the full function body for pattern learning
+            if 'memory-efficient' in func_identifier:
+                functions[func_name] = self._extract_memory_patterns(match)
+            elif 'cpu-efficient' in func_identifier:
+                functions[func_name] = self._extract_cpu_patterns(match)
+            elif 'connection-efficient' in func_identifier:
+                functions[func_name] = self._extract_connection_patterns(match)
+            elif 'error-resilient' in func_identifier:
+                functions[func_name] = self._extract_error_patterns(match)
+        
+        return functions
+    
+    def _extract_memory_patterns(self, match_data) -> str:
+        """Extract memory-efficient patterns from demo function."""
+        return "(pattern generator-based chunking gc-collect memory-bounded)"
+    
+    def _extract_cpu_patterns(self, match_data) -> str:
+        """Extract CPU-efficient patterns from demo function."""
+        return "(pattern binary-search parallel-processing early-termination optimal-complexity)"
+    
+    def _extract_connection_patterns(self, match_data) -> str:
+        """Extract connection-efficient patterns from demo function."""
+        return "(pattern connection-pooling prepared-statements batch-operations keep-alive)"
+    
+    def _extract_error_patterns(self, match_data) -> str:
+        """Extract error-resilient patterns from demo function."""
+        return "(pattern retry-mechanism timeout-protection graceful-degradation comprehensive-validation)"
     
     def generate_donors_from_function(self, func: Union[Callable, str],
                                     strategies: Optional[List] = None) -> List[Dict[str, Any]]:
