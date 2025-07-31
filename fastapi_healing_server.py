@@ -677,7 +677,7 @@ class SelfHealingManager:
             generator = MeTTaPoweredModularDonorGenerator(
                 metta_space=self.metta_space,
                 metta_instance=self.metta,
-                enable_evolution=False
+                enable_evolution=True
             )
             
             print("[HEALING] Generating MeTTa CPU optimization candidates...")
@@ -906,7 +906,7 @@ class SelfHealingManager:
             generator = MeTTaPoweredModularDonorGenerator(
                 metta_space=self.metta_space,
                 metta_instance=self.metta,
-                enable_evolution=False
+                enable_evolution=True
             )
             
             print("[HEALING] Generating MeTTa connection optimization candidates...")
@@ -1097,7 +1097,7 @@ class SelfHealingManager:
             generator = MeTTaPoweredModularDonorGenerator(
                 metta_space=self.metta_space,
                 metta_instance=self.metta,
-                enable_evolution=False
+                enable_evolution=True
             )
             
             print("[HEALING] Generating MeTTa candidates...")
@@ -1631,7 +1631,7 @@ class SelfHealingManager:
             generator = MeTTaPoweredModularDonorGenerator(
                 metta_space=self.metta_space,
                 metta_instance=self.metta,
-                enable_evolution=False
+                enable_evolution=True
             )
             
             print("[HEALING] Generating MeTTa error resilience candidates...")

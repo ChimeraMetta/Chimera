@@ -8,12 +8,7 @@ from typing import List, Dict, Any, Optional, Callable, Union
 import inspect
 import textwrap
 
-try:
-    from metta_generator.evolution.semantic_evolution import SemanticEvolutionEngine
-    SEMANTIC_EVOLUTION_AVAILABLE = True
-except ImportError as e:
-    print(f"Semantic evolution not available: {e}")
-    SEMANTIC_EVOLUTION_AVAILABLE = False
+from metta_generator.evolution.semantic_evolution import SemanticEvolutionEngine
 
 class EnhancedEvolutionIntegrator:
     """Integrates semantic evolution with existing donor generation"""
@@ -21,22 +16,17 @@ class EnhancedEvolutionIntegrator:
     def __init__(self, metta_space=None, reasoning_engine=None):
         self.metta_space = metta_space
         self.reasoning_engine = reasoning_engine
-        self.semantic_engine = None
-        
-        if SEMANTIC_EVOLUTION_AVAILABLE:
-            self.semantic_engine = SemanticEvolutionEngine(
-                metta_space=metta_space,
-                reasoning_engine=reasoning_engine,
-                population_size=12,  # Smaller for integration
-                max_generations=6    # Faster for integration
-            )
-            print("  Enhanced evolution integrator: Semantic evolution enabled")
-        else:
-            print("  Enhanced evolution integrator: Semantic evolution not available")
+        self.semantic_engine = SemanticEvolutionEngine(
+            metta_space=metta_space,
+            reasoning_engine=reasoning_engine,
+            population_size=12,  # Smaller for integration
+            max_generations=6    # Faster for integration
+        )
+        print("  Enhanced evolution integrator: Semantic evolution enabled")
     
     def is_semantic_evolution_available(self) -> bool:
         """Check if semantic evolution is available"""
-        return SEMANTIC_EVOLUTION_AVAILABLE and self.semantic_engine is not None
+        return self.semantic_engine is not None
     
     def generate_semantic_donors(self, func: Union[Callable, str], 
                                 function_type: str = "search") -> List[Dict[str, Any]]:
@@ -250,7 +240,7 @@ class EnhancedEvolutionIntegrator:
     def get_integration_stats(self) -> Dict[str, Any]:
         """Get integration statistics"""
         stats = {
-            "semantic_evolution_available": self.is_semantic_evolution_available(),
+            "semantic_evolution_available": True,
             "engine_initialized": self.semantic_engine is not None
         }
         
@@ -265,12 +255,7 @@ class EnhancedEvolutionIntegrator:
 
 def integrate_semantic_evolution_with_base_generator(base_generator, enable_semantic=True):
     """Integration function to add semantic evolution to base generator"""
-    if not enable_semantic or not SEMANTIC_EVOLUTION_AVAILABLE:
-        return base_generator
-    
-def integrate_semantic_evolution_with_base_generator(base_generator, enable_semantic=True):
-    """Integration function to add semantic evolution to base generator"""
-    if not enable_semantic or not SEMANTIC_EVOLUTION_AVAILABLE:
+    if not enable_semantic:
         return base_generator
     
     # Add semantic evolution capability
