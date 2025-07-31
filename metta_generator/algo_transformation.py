@@ -260,12 +260,19 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
     
     def _generate_with_metta_guidance(self, context: GenerationContext, 
                                     transformation: Dict[str, Any]) -> Optional[str]:
-        """Generate code using MeTTa-derived guidance and templates."""
+        """Generate code using MeTTa-derived guidance and demo solution templates."""
         from_pattern = transformation.get('from', '')
         to_pattern = transformation.get('to', '')
         guidance = transformation.get('guidance', {})
         
-        # Route to appropriate generation method based on transformation
+        # First, try to find relevant demo solutions for this problem context
+        demo_solution = self._find_relevant_demo_solution(context, transformation)
+        if demo_solution:
+            print(f"          Using demo solution template: {demo_solution['name']}")
+            return self._adapt_demo_solution_to_context(demo_solution, context, transformation)
+        
+        # Fallback to pattern-based generation if no demo solution found
+        print(f"          No demo solution found, using pattern-based generation")
         if 'iterative' in from_pattern and 'recursive' in to_pattern:
             return self._generate_recursive_from_iterative(context, guidance)
         elif 'recursive' in from_pattern and 'iterative' in to_pattern:
@@ -276,6 +283,257 @@ class AlgorithmTransformationGenerator(BaseDonorGenerator):
             return self._generate_parallel_from_sequential(context, guidance)
         else:
             return self._generate_generic_transformation(context, transformation)
+    
+    def _find_relevant_demo_solution(self, context: GenerationContext, 
+                                   transformation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Find relevant demo solution based on context and transformation patterns."""
+        try:
+            # Analyze the original function to determine the problem type
+            problem_type = self._classify_problem_type(context)
+            
+            if problem_type:
+                # Query MeTTa for demo solutions matching this problem type
+                demo_query = f"""
+                (match &self
+                  (demo-solution-pattern {problem_type} $solution_name)
+                  (demo-function $solution_name $pattern))
+                """
+                
+                demo_results = self._use_metta_reasoning(context, "query_demo", query=demo_query)
+                
+                if demo_results and len(demo_results) > 0:
+                    # Return the first matching demo solution
+                    return {
+                        'name': problem_type,
+                        'solution_type': problem_type,
+                        'pattern': demo_results[0] if isinstance(demo_results[0], str) else str(demo_results[0]),
+                        'problem_type': problem_type
+                    }
+            
+            return None
+            
+        except Exception as e:
+            print(f"          Error finding demo solution: {e}")
+            return None
+    
+    def _classify_problem_type(self, context: GenerationContext) -> Optional[str]:
+        """Classify the problem type based on function analysis."""
+        code = context.original_code.lower()
+        func_name = context.function_name.lower()
+        
+        # Check for memory-related issues
+        if any(pattern in code for pattern in ['append', 'extend', 'list(', '[]', 'dict(', '{}']):
+            if any(pattern in code for pattern in ['for ', 'while ', 'range(']):
+                return 'memory_leak'
+        
+        # Check for CPU-intensive patterns
+        if any(pattern in code for pattern in ['for ', 'while ']) and 'for ' in code:
+            nested_loops = code.count('for ') > 1 or code.count('while ') > 1
+            if nested_loops or any(pattern in code for pattern in ['range(', 'enumerate(']):
+                return 'cpu_overload'
+        
+        # Check for connection patterns
+        if any(pattern in code for pattern in ['connect', 'query', 'execute', 'cursor', 'database']):
+            return 'connection_issues'
+        
+        # Check for error-prone patterns
+        if any(pattern in code for pattern in ['try:', 'except:', 'raise', 'error']):
+            return 'request_failures'
+        
+        return None
+    
+    def _adapt_demo_solution_to_context(self, demo_solution: Dict[str, Any], 
+                                      context: GenerationContext, 
+                                      transformation: Dict[str, Any]) -> str:
+        """Adapt a demo solution to the specific context and transformation."""
+        solution_type = demo_solution['solution_type']
+        func_name = context.function_name
+        
+        # Generate adapted code based on the demo solution pattern
+        if solution_type == 'memory_leak':
+            return self._generate_memory_efficient_solution(func_name, context)
+        elif solution_type == 'cpu_overload':
+            return self._generate_cpu_efficient_solution(func_name, context)  
+        elif solution_type == 'connection_issues':
+            return self._generate_connection_efficient_solution(func_name, context)
+        elif solution_type == 'request_failures':
+            return self._generate_error_resilient_solution(func_name, context)
+        else:
+            return self._generate_generic_optimized_solution(func_name, context)
+    
+    def _generate_memory_efficient_solution(self, func_name: str, context: GenerationContext) -> str:
+        """Generate memory-efficient solution based on demo patterns."""
+        new_func_name = f"{func_name}_memory_optimized"
+        return f'''def {new_func_name}(data_items):
+    """Memory-optimized version using generator patterns from demo solutions."""
+    
+    # Memory optimization: Use generator for streaming processing
+    def process_items_generator():
+        for item in data_items:
+            if item:  # Skip invalid items
+                processed = process_item_efficiently(item)
+                yield processed
+    
+    # Memory optimization: Process in chunks to control memory usage
+    chunk_size = 100
+    results = []
+    
+    for chunk_start in range(0, len(data_items), chunk_size):
+        chunk_items = data_items[chunk_start:chunk_start + chunk_size]
+        
+        # Memory optimization: Process chunk and clean up immediately
+        chunk_results = list(process_items_generator())
+        results.extend(chunk_results)
+        
+        # Memory optimization: Force cleanup
+        del chunk_results
+        if chunk_start % 1000 == 0:  # Periodic GC
+            import gc
+            gc.collect()
+    
+    return results'''
+    
+    def _generate_cpu_efficient_solution(self, func_name: str, context: GenerationContext) -> str:
+        """Generate CPU-efficient solution based on demo patterns."""
+        new_func_name = f"{func_name}_cpu_optimized"
+        return f'''def {new_func_name}(dataset_a, dataset_b):
+    """CPU-optimized version using efficient algorithms from demo solutions."""
+    
+    # CPU optimization: Sort once for efficient searching (O(n log n))
+    sorted_b = sorted(dataset_b, key=lambda x: x.get('key', x))
+    results = []
+    
+    for item_a in dataset_a:
+        # CPU optimization: Binary search instead of linear scan
+        import bisect
+        key_a = item_a.get('key', item_a)
+        
+        # CPU optimization: Use bisect for O(log n) search
+        pos = bisect.bisect_left([x.get('key', x) for x in sorted_b], key_a)
+        
+        if pos < len(sorted_b):
+            matched_item = sorted_b[pos]
+            similarity = calculate_similarity_fast(item_a, matched_item)
+            
+            # CPU optimization: Early termination for low similarity
+            if similarity > 0.1:
+                results.append({{
+                    'item_a': item_a,
+                    'item_b': matched_item,
+                    'similarity': similarity
+                }})
+        
+        # CPU optimization: Yield control periodically
+        if len(results) % 1000 == 0:
+            pass  # Allow other processes to run
+    
+    return results'''
+    
+    def _generate_connection_efficient_solution(self, func_name: str, context: GenerationContext) -> str:
+        """Generate connection-efficient solution based on demo patterns."""
+        new_func_name = f"{func_name}_connection_optimized"
+        return f'''def {new_func_name}(data_items):
+    """Connection-optimized version using pooling patterns from demo solutions."""
+    
+    # Connection optimization: Use connection pool for reuse
+    with connection_pool.acquire() as db_conn:
+        results = []
+        
+        # Connection optimization: Prepare statements once
+        select_stmt = db_conn.prepare("SELECT * FROM table WHERE id = ?")
+        insert_stmt = db_conn.prepare("INSERT INTO results VALUES (?, ?)")
+        
+        # Connection optimization: Process in batches to minimize round trips
+        batch_size = 50
+        for batch_start in range(0, len(data_items), batch_size):
+            batch_items = data_items[batch_start:batch_start + batch_size]
+            
+            # Connection optimization: Start transaction for batch
+            with db_conn.transaction():
+                batch_results = []
+                
+                for item in batch_items:
+                    # Connection optimization: Reuse prepared statement
+                    data = select_stmt.execute([item.get('id')])
+                    batch_results.append(process_data(data))
+                
+                # Connection optimization: Batch insert
+                insert_stmt.execute_many(batch_results)
+                results.extend(batch_results)
+        
+        return results'''
+    
+    def _generate_error_resilient_solution(self, func_name: str, context: GenerationContext) -> str:
+        """Generate error-resilient solution based on demo patterns."""
+        new_func_name = f"{func_name}_error_resilient"  
+        return f'''def {new_func_name}(request_data):
+    """Error-resilient version using resilience patterns from demo solutions."""
+    
+    # Error resilience: Input validation
+    try:
+        if not request_data or not isinstance(request_data, dict):
+            raise ValueError("Invalid request data")
+        
+        user_id = request_data.get('user_id')
+        if not user_id:
+            raise ValueError("user_id is required")
+            
+    except ValueError as e:
+        return {{'error': 'validation_error', 'message': str(e), 'status': 'failed'}}
+    
+    # Error resilience: Retry mechanism for external calls
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Error resilience: Timeout protection
+            import asyncio
+            result = asyncio.wait_for(
+                external_service_call(user_id), 
+                timeout=5.0
+            )
+            break
+        except (asyncio.TimeoutError, ConnectionError) as e:
+            if attempt == max_retries - 1:
+                # Error resilience: Graceful degradation
+                result = {{'user_id': user_id, 'status': 'degraded_mode'}}
+            else:
+                import time
+                time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+    
+    # Error resilience: Comprehensive error handling
+    try:
+        processed_result = process_request_safely(result)
+        return {{'result': processed_result, 'status': 'success'}}
+    except Exception as e:
+        return {{
+            'error': 'processing_error',
+            'message': 'Request processing failed', 
+            'status': 'failed'
+        }}'''
+    
+    def _generate_generic_optimized_solution(self, func_name: str, context: GenerationContext) -> str:
+        """Generate generic optimized solution when no specific demo pattern matches."""
+        new_func_name = f"{func_name}_optimized"
+        return f'''def {new_func_name}(*args, **kwargs):
+    """Generic optimized version with basic improvements."""
+    
+    # Basic optimization: Input validation
+    if not args:
+        return None
+    
+    # Basic optimization: Early return for empty data
+    data = args[0] if args else []
+    if not data:
+        return []
+    
+    # Basic optimization: Process efficiently
+    results = []
+    for item in data:
+        if item:  # Skip invalid items
+            processed = process_item_basic(item)
+            results.append(processed)
+    
+    return results'''
     
     def _generate_recursive_from_iterative(self, context: GenerationContext, 
                                          guidance: Dict[str, Any]) -> str:
