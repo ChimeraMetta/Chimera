@@ -682,10 +682,27 @@ class SelfHealingManager:
             
             print("[HEALING] Generating MeTTa CPU optimization candidates...")
             # Generate donors focusing on algorithm transformation and structure optimization
-            donors = generator.generate_donors_from_function(
-                original_code,
-                strategies=['algorithm_transformation', 'structure_preservation', 'data_structure_adaptation']
-            )
+            # IMPORTANT: Set a timeout and limit for generation to prevent infinite loops
+            import signal
+            import time
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("MeTTa generation timed out")
+            
+            # Set timeout to prevent infinite generation
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30 second timeout
+            
+            try:
+                donors = generator.generate_donors_from_function(
+                    original_code,
+                    strategies=['algorithm_transformation', 'structure_preservation', 'data_structure_adaptation']
+                )
+            except TimeoutError:
+                print("[HEALING] WARNING: MeTTa generation timed out after 30 seconds")
+                donors = []
+            finally:
+                signal.alarm(0)  # Disable timeout
             
             if donors and len(donors) > 0:
                 print(f"[HEALING] MeTTa generated {len(donors)} CPU optimization candidates")
@@ -911,10 +928,27 @@ class SelfHealingManager:
             
             print("[HEALING] Generating MeTTa connection optimization candidates...")
             # Generate donors focusing on structure preservation and data structure adaptation
-            donors = generator.generate_donors_from_function(
-                original_code,
-                strategies=['structure_preservation', 'data_structure_adaptation', 'algorithm_transformation']
-            )
+            # IMPORTANT: Set a timeout and limit for generation to prevent infinite loops
+            import signal
+            import time
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("MeTTa generation timed out")
+            
+            # Set timeout to prevent infinite generation
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30 second timeout
+            
+            try:
+                donors = generator.generate_donors_from_function(
+                    original_code,
+                    strategies=['structure_preservation', 'data_structure_adaptation', 'algorithm_transformation']
+                )
+            except TimeoutError:
+                print("[HEALING] WARNING: MeTTa generation timed out after 30 seconds")
+                donors = []
+            finally:
+                signal.alarm(0)  # Disable timeout
             
             if donors and len(donors) > 0:
                 print(f"[HEALING] MeTTa generated {len(donors)} connection optimization candidates")
@@ -1102,10 +1136,27 @@ class SelfHealingManager:
             
             print("[HEALING] Generating MeTTa candidates...")
             # Generate donors for the problematic function using MeTTa reasoning
-            donors = generator.generate_donors_from_function(
-                original_code,
-                strategies=['data_structure_adaptation', 'algorithm_transformation', 'structure_preservation']
-            )
+            # IMPORTANT: Set a timeout and limit for generation to prevent infinite loops
+            import signal
+            import time
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("MeTTa generation timed out")
+            
+            # Set timeout to prevent infinite generation
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30 second timeout
+            
+            try:
+                donors = generator.generate_donors_from_function(
+                    original_code,
+                    strategies=['data_structure_adaptation', 'algorithm_transformation', 'structure_preservation']
+                )
+            except TimeoutError:
+                print("[HEALING] WARNING: MeTTa generation timed out after 30 seconds")
+                donors = []
+            finally:
+                signal.alarm(0)  # Disable timeout
             
             if donors and len(donors) > 0:
                 print(f"[HEALING] MeTTa generated {len(donors)} candidates")
@@ -1636,10 +1687,27 @@ class SelfHealingManager:
             
             print("[HEALING] Generating MeTTa error resilience candidates...")
             # Generate donors focusing on error handling and fault tolerance
-            donors = generator.generate_donors_from_function(
-                original_code,
-                strategies=['error_handling_adaptation', 'structure_preservation', 'algorithm_transformation']
-            )
+            # IMPORTANT: Set a timeout and limit for generation to prevent infinite loops
+            import signal
+            import time
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("MeTTa generation timed out")
+            
+            # Set timeout to prevent infinite generation
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30 second timeout
+            
+            try:
+                donors = generator.generate_donors_from_function(
+                    original_code,
+                    strategies=['error_handling_adaptation', 'structure_preservation', 'algorithm_transformation']
+                )
+            except TimeoutError:
+                print("[HEALING] WARNING: MeTTa generation timed out after 30 seconds")
+                donors = []
+            finally:
+                signal.alarm(0)  # Disable timeout
             
             if donors and len(donors) > 0:
                 print(f"[HEALING] MeTTa generated {len(donors)} error resilience candidates")
