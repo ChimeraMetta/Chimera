@@ -45,7 +45,8 @@ Open your browser to `http://localhost:8000` to see the real-time monitoring das
 - `POST /demo/memory-leak` - Trigger memory leak for healing demo
 - `POST /demo/cpu-overload` - Trigger CPU overload for healing demo  
 - `POST /demo/connection-issues` - Trigger connection pool issues
-- `POST /demo/request-failures` - Trigger request handling failures
+- `POST /demo/request-failures` - Trigger request handling failures (probabilistic)
+- `GET /demo/request-failures-immediate` - Immediately trigger request failure healing
 - `GET /demo/status` - View current demo system status
 - `POST /demo/reset` - Reset all demo conditions
 - `POST /demo/stress-test` - Comprehensive stress test
@@ -108,6 +109,7 @@ curl -X POST "http://localhost:8000/demo/connection-issues?connection_count=100"
 - Monitors request failures via middleware
 - Exception handling for various failure types
 - Request latency and timeout tracking
+- Error rate calculation over sliding window
 
 **Healing Actions:**
 - Enable graceful degradation mode
@@ -115,9 +117,15 @@ curl -X POST "http://localhost:8000/demo/connection-issues?connection_count=100"
 - Implement circuit breaker patterns
 - Log failure recovery strategies
 
-**Demo:**
+**Demo (Probabilistic failures):**
 ```bash
 curl -X POST "http://localhost:8000/demo/request-failures?failure_rate=0.8"
+```
+
+**Demo (Immediate healing trigger):**
+```bash
+# Instantly triggers healing without waiting for error threshold
+curl -X GET "http://localhost:8000/demo/request-failures-immediate"
 ```
 
 ## Architecture
@@ -182,8 +190,11 @@ curl -X POST "http://localhost:8000/demo/cpu-overload?duration=20&num_threads=8"
 # Connection issues healing
 curl -X POST "http://localhost:8000/demo/connection-issues?connection_count=120"
 
-# Request failure healing
+# Request failure healing (probabilistic)
 curl -X POST "http://localhost:8000/demo/request-failures?failure_rate=0.9"
+
+# Request failure healing (immediate trigger)
+curl -X GET "http://localhost:8000/demo/request-failures-immediate"
 ```
 
 ### Reset Demo Environment
