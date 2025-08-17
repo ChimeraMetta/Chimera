@@ -33,6 +33,14 @@ The server will start on `http://localhost:8000`
 ### 3. View Dashboard
 Open your browser to `http://localhost:8000` to see the real-time monitoring dashboard.
 
+![Chimera Self-Healing Dashboard](dashboard_screenshot.png)
+
+The dashboard provides:
+- **Real-time system metrics** (Memory, CPU, Connections, Request Latency)
+- **Performance charts** showing memory and CPU usage over time
+- **Recent healing actions** with detailed strategies and success status
+- **Auto-refresh** every 10 seconds for live monitoring
+
 ## API Endpoints
 
 ### Core Endpoints
