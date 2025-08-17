@@ -1931,7 +1931,71 @@ async def healing_middleware(request: Request, call_next):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
     """Performance monitoring dashboard"""
-    return await generate_dashboard_html()
+    try:
+        print("[DASHBOARD] Request received for dashboard")
+        html = await generate_dashboard_html()
+        print("[DASHBOARD] HTML generated successfully")
+        return html
+    except Exception as e:
+        print(f"[DASHBOARD ERROR] Failed to generate dashboard: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return a simple fallback HTML
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Chimera Dashboard Error</title></head>
+        <body>
+            <h1>Dashboard temporarily unavailable</h1>
+            <p>Error: """ + str(e) + """</p>
+            <p>Try <a href="/test">/test</a> or <a href="/health">/health</a> endpoints</p>
+        </body>
+        </html>
+        """
+
+@app.get("/simple-dashboard", response_class=HTMLResponse)
+async def simple_dashboard():
+    """Simple dashboard that doesn't require complex metrics"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Chimera Simple Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .status { padding: 20px; background: #e8f5e9; border-radius: 8px; margin: 20px 0; }
+            h1 { color: #1a73e8; }
+            a { color: #1a73e8; text-decoration: none; margin: 0 10px; }
+            a:hover { text-decoration: underline; }
+        </style>
+    </head>
+    <body>
+        <h1>🧬 Chimera Self-Healing Server</h1>
+        <div class="status">
+            <h2>✅ Server is Running</h2>
+            <p>The self-healing server is active and monitoring for issues.</p>
+        </div>
+        
+        <h3>Quick Links:</h3>
+        <a href="/docs">📚 API Documentation</a>
+        <a href="/health">🏥 Health Check</a>
+        <a href="/demo/">🎮 Demo Endpoints</a>
+        <a href="/healing/status">🔧 Healing Status</a>
+        
+        <h3>Trigger Healing Demos:</h3>
+        <ul>
+            <li><a href="/demo/memory-leak">Memory Leak Healing</a></li>
+            <li><a href="/demo/cpu-overload">CPU Overload Healing</a></li>
+            <li><a href="/demo/connection-issues">Connection Issues Healing</a></li>
+            <li><a href="/demo/request-failures-immediate">Request Failures Healing (Immediate)</a></li>
+        </ul>
+        
+        <p style="margin-top: 40px; color: #666;">
+            Full dashboard with metrics available at <a href="/">root path</a> (may require debugging if not loading)
+        </p>
+    </body>
+    </html>
+    """
 
 @app.get("/test")
 async def test_endpoint():
