@@ -2171,76 +2171,78 @@ async def generate_dashboard_html():
         <script>
             // Memory usage chart
             const memoryCtx = document.getElementById('memoryChart').getContext('2d');
-            new Chart(memoryCtx, {{
+            const memoryChart = new Chart(memoryCtx, {
                 type: 'line',
-                data: {{
-                    labels: {json.dumps(timestamps[-10:])},
-                    datasets: [{{
+                data: {
+                    labels: """ + json.dumps(timestamps[-10:]) + """,
+                    datasets: [{
                         label: 'Memory Usage (MB)',
-                        data: {json.dumps(memory_data[-10:])},
+                        data: """ + json.dumps(memory_data[-10:]) + """,
                         borderColor: 'rgb(75, 192, 192)',
                         backgroundColor: 'rgba(75, 192, 192, 0.2)',
                         tension: 0.1
-                    }}]
-                }},
-                options: {{
+                    }]
+                },
+                options: {
                     responsive: true,
-                    plugins: {{
-                        title: {{
+                    plugins: {
+                        title: {
                             display: true,
                             text: 'Memory Usage Over Time'
-                        }}
-                    }},
-                    scales: {{
-                        y: {{
+                        }
+                    },
+                    scales: {
+                        y: {
                             beginAtZero: true
-                        }}
-                    }}
-                }}
-            }});
+                        }
+                    }
+                }
+            });
 
             // CPU usage chart
             const cpuCtx = document.getElementById('cpuChart').getContext('2d');
-            new Chart(cpuCtx, {{
+            const cpuChart = new Chart(cpuCtx, {
                 type: 'line',
-                data: {{
-                    labels: {json.dumps(timestamps[-10:])},
-                    datasets: [{{
+                data: {
+                    labels: """ + json.dumps(timestamps[-10:]) + """,
+                    datasets: [{
                         label: 'CPU Usage (%)',
-                        data: {json.dumps(cpu_data[-10:])},
+                        data: """ + json.dumps(cpu_data[-10:]) + """,
                         borderColor: 'rgb(255, 99, 132)',
                         backgroundColor: 'rgba(255, 99, 132, 0.2)',
                         tension: 0.1
-                    }}]
-                }},
-                options: {{
+                    }]
+                },
+                options: {
                     responsive: true,
-                    plugins: {{
-                        title: {{
+                    plugins: {
+                        title: {
                             display: true,
                             text: 'CPU Usage Over Time'
-                        }}
-                    }},
-                    scales: {{
-                        y: {{
+                        }
+                    },
+                    scales: {
+                        y: {
                             beginAtZero: true,
                             max: 100
-                        }}
-                    }}
-                }}
-            }});
+                        }
+                    }
+                }
+            });
 
             // Debug: Log data to console
-            console.log('Memory data:', {json.dumps(memory_data[-10:])});
-            console.log('CPU data:', {json.dumps(cpu_data[-10:])});
-            console.log('Timestamps:', {json.dumps(timestamps[-10:])});
+            console.log('Memory data:', """ + json.dumps(memory_data[-10:]) + """);
+            console.log('CPU data:', """ + json.dumps(cpu_data[-10:]) + """);
+            console.log('Timestamps:', """ + json.dumps(timestamps[-10:]) + """);
             
             // Check if Chart.js loaded
-            if (typeof Chart === 'undefined') {{
+            if (typeof Chart === 'undefined') {
                 console.error('Chart.js failed to load from CDN');
                 document.getElementById('memoryChart').innerHTML = '<p style="text-align:center;color:red;">Charts unavailable - Chart.js failed to load</p>';
                 document.getElementById('cpuChart').innerHTML = '<p style="text-align:center;color:red;">Charts unavailable - Chart.js failed to load</p>';
-            }}
+            } else {
+                console.log('Chart.js loaded successfully, charts created');
+            }
 
             // Auto-refresh every 10 seconds
             setTimeout(() => location.reload(), 10000);
