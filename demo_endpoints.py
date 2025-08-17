@@ -287,6 +287,43 @@ async def trigger_request_failures(failure_rate: float = 0.7):
         "note": "Self-healing should activate on request failures"
     }
 
+@router.post("/request-failures-immediate")
+@router.get("/request-failures-immediate")
+async def trigger_immediate_request_failure():
+    """
+    Immediately trigger request failure healing by simulating a catastrophic failure
+    Always triggers healing on first call
+    """
+    
+    # Import healing manager
+    try:
+        from fastapi_healing_server import healing_manager
+    except:
+        raise HTTPException(status_code=500, detail="Healing manager not available")
+    
+    # Always fill the recent_requests buffer with failures to trigger immediate healing
+    print("[DEMO] Simulating catastrophic request failures to trigger immediate healing...")
+    
+    # Clear existing requests and fill with failures to exceed threshold
+    healing_manager.recent_requests = []
+    for _ in range(15):  # Add 15 failed requests to history
+        healing_manager.track_request_outcome(False)
+    
+    # Directly trigger the healing if not already triggered
+    if not healing_manager.request_failures_triggered:
+        print("[DEMO] Directly triggering request failure healing...")
+        # Call the healing method directly
+        import asyncio
+        asyncio.create_task(healing_manager.heal_request_failures(
+            "Catastrophic failure: Multiple unhandled request types detected"
+        ))
+    
+    # Now throw an actual error to represent the unhandled request
+    raise HTTPException(
+        status_code=500,
+        detail="CRITICAL: Unhandled request type - server cannot process this request pattern"
+    )
+
 @router.get("/status")
 async def demo_status():
     """Get current status of all demo systems"""
