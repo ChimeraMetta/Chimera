@@ -2067,6 +2067,18 @@ async def generate_dashboard_html():
     cpu_data = [m.cpu_percent for m in recent_metrics]
     timestamps = [m.timestamp.strftime("%H:%M:%S") for m in recent_metrics]
     
+    # If not enough data, create some dummy data for charts
+    if len(recent_metrics) < 5:
+        import time
+        now = datetime.now()
+        for i in range(10):
+            timestamps.append((now - timedelta(minutes=i)).strftime("%H:%M:%S"))
+            memory_data.append(current_metrics.memory_usage_mb + (i * 2))
+            cpu_data.append(max(0, current_metrics.cpu_percent + (i * 0.5)))
+        timestamps.reverse()
+        memory_data.reverse()
+        cpu_data.reverse()
+    
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -2217,6 +2229,18 @@ async def generate_dashboard_html():
                     }}
                 }}
             }});
+
+            // Debug: Log data to console
+            console.log('Memory data:', {json.dumps(memory_data[-10:])});
+            console.log('CPU data:', {json.dumps(cpu_data[-10:])});
+            console.log('Timestamps:', {json.dumps(timestamps[-10:])});
+            
+            // Check if Chart.js loaded
+            if (typeof Chart === 'undefined') {{
+                console.error('Chart.js failed to load from CDN');
+                document.getElementById('memoryChart').innerHTML = '<p style="text-align:center;color:red;">Charts unavailable - Chart.js failed to load</p>';
+                document.getElementById('cpuChart').innerHTML = '<p style="text-align:center;color:red;">Charts unavailable - Chart.js failed to load</p>';
+            }}
 
             // Auto-refresh every 10 seconds
             setTimeout(() => location.reload(), 10000);
