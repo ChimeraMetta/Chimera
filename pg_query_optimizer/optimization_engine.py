@@ -15,6 +15,7 @@ from datetime import datetime
 from .demo_queries import DemoQuery, DEMO_QUERIES, get_demo_query
 from .query_analyzer import QueryAnalyzer, QueryStructure, analyze_query_with_metadata
 from .pattern_detector import MeTTaQueryPatternDetector, QueryPattern
+from .query_rewriter import MeTTaQueryRewriter, OptimizedQuery
 
 
 @dataclass
@@ -114,10 +115,17 @@ class OptimizationEngine:
     3. Generates optimization suggestions based on detected patterns
     """
 
-    def __init__(self):
-        """Initialize the optimization engine."""
+    def __init__(self, use_dynamic_rewriting: bool = True):
+        """Initialize the optimization engine.
+
+        Args:
+            use_dynamic_rewriting: If True, use MeTTa to dynamically generate
+                                   optimized SQL. If False, use pre-defined demos.
+        """
         self.query_analyzer = QueryAnalyzer()
         self.pattern_detector = MeTTaQueryPatternDetector()
+        self.query_rewriter = MeTTaQueryRewriter()
+        self.use_dynamic_rewriting = use_dynamic_rewriting
         self.optimization_history: List[OptimizationResult] = []
 
     def analyze_demo_query(self, query_id: str) -> Optional[OptimizationResult]:
@@ -184,9 +192,42 @@ class OptimizationEngine:
         result.detected_patterns = patterns
         result.reasoning_trace.extend(pattern_trace)
 
-        # Step 3: Generate optimization suggestions
+        # Step 3: Generate optimized SQL using MeTTa rewriter
         result.reasoning_trace.append("")
-        result.reasoning_trace.append("=== Step 3: Optimization Suggestions ===")
+        result.reasoning_trace.append("=== Step 3: MeTTa Query Rewriting ===")
+
+        if self.use_dynamic_rewriting and patterns:
+            # Use MeTTa to dynamically generate optimized SQL
+            optimized = self.query_rewriter.rewrite_query(
+                demo_query.original_sql,
+                patterns,
+                structure,
+                demo_query.table_metadata
+            )
+
+            # Update result with dynamically generated SQL
+            result.optimized_sql = optimized.optimized_sql
+            result.reasoning_trace.extend(optimized.metta_reasoning_trace)
+
+            # Add rewrite details to reasoning trace
+            result.reasoning_trace.append("")
+            result.reasoning_trace.append("=== Rewrites Applied ===")
+            for rewrite in optimized.rewrites_applied:
+                result.reasoning_trace.append(f"Pattern: {rewrite.pattern_type}")
+                result.reasoning_trace.append(f"  Original: {rewrite.original_fragment}")
+                result.reasoning_trace.append(f"  Rewritten: {rewrite.rewritten_fragment}")
+                result.reasoning_trace.append(f"  Explanation: {rewrite.explanation}")
+
+            # Add index suggestions
+            if optimized.index_suggestions:
+                result.reasoning_trace.append("")
+                result.reasoning_trace.append("=== Index Suggestions ===")
+                for idx in optimized.index_suggestions:
+                    result.reasoning_trace.append(f"  {idx}")
+
+        # Step 4: Generate optimization suggestions (for display)
+        result.reasoning_trace.append("")
+        result.reasoning_trace.append("=== Step 4: Optimization Summary ===")
 
         suggestions = self._generate_suggestions(demo_query, patterns)
         result.suggestions = suggestions
@@ -195,6 +236,105 @@ class OptimizationEngine:
             result.reasoning_trace.append(f"Suggestion: {suggestion.optimization_type}")
             result.reasoning_trace.append(f"  Action: {suggestion.suggested_action[:100]}...")
             result.reasoning_trace.append(f"  Expected improvement: {suggestion.expected_improvement_pct:.1f}%")
+
+        # Store in history
+        self.optimization_history.append(result)
+
+        return result
+
+    def optimize_raw_query(
+        self,
+        sql: str,
+        table_metadata: Dict[str, Any] = None
+    ) -> OptimizationResult:
+        """
+        Optimize a raw SQL query (not from demo set) using MeTTa reasoning.
+
+        This is the main entry point for optimizing arbitrary queries.
+
+        Args:
+            sql: The SQL query to optimize
+            table_metadata: Optional table schema information
+
+        Returns:
+            OptimizationResult with dynamically generated optimizations
+        """
+        import uuid
+
+        query_id = f"raw_{uuid.uuid4().hex[:8]}"
+
+        # Create result object
+        result = OptimizationResult(
+            query_id=query_id,
+            original_sql=sql,
+            original_duration_ms=0.0,  # Unknown for raw queries
+            original_cost=0.0,
+        )
+
+        # Step 1: Analyze query structure
+        result.reasoning_trace.append("=== Step 1: Query Structure Analysis ===")
+        structure, atoms = analyze_query_with_metadata(sql, table_metadata or {})
+        result.query_structure = structure
+        result.metta_atoms = atoms
+
+        result.reasoning_trace.append(f"Query type: {structure.query_type}")
+        result.reasoning_trace.append(f"Tables: {structure.tables}")
+        result.reasoning_trace.append(f"Uses SELECT *: {structure.uses_select_star}")
+        result.reasoning_trace.append(f"Uses implicit JOIN: {structure.uses_implicit_join}")
+        result.reasoning_trace.append(f"Has subquery: {structure.has_subquery}")
+
+        # Step 2: Detect patterns using MeTTa
+        result.reasoning_trace.append("")
+        result.reasoning_trace.append("=== Step 2: MeTTa Pattern Detection ===")
+
+        patterns, pattern_trace = self.pattern_detector.detect_patterns(
+            query_id, atoms, anti_patterns=[]
+        )
+        result.detected_patterns = patterns
+        result.reasoning_trace.extend(pattern_trace)
+
+        # Step 3: Rewrite query using MeTTa
+        result.reasoning_trace.append("")
+        result.reasoning_trace.append("=== Step 3: MeTTa Query Rewriting ===")
+
+        if patterns:
+            optimized = self.query_rewriter.rewrite_query(
+                sql, patterns, structure, table_metadata or {}
+            )
+
+            result.optimized_sql = optimized.optimized_sql
+            result.reasoning_trace.extend(optimized.metta_reasoning_trace)
+
+            # Create suggestions from rewrites
+            for rewrite in optimized.rewrites_applied:
+                suggestion = OptimizationSuggestion(
+                    query_id=query_id,
+                    optimization_type=rewrite.pattern_type,
+                    description=rewrite.explanation,
+                    suggested_action=rewrite.rewritten_fragment,
+                    expected_improvement_pct=optimized.total_improvement_pct,
+                    confidence=rewrite.confidence,
+                    patterns_addressed=[rewrite.pattern_type],
+                    metta_reasoning_trace=rewrite.metta_trace
+                )
+                result.suggestions.append(suggestion)
+
+            # Add index suggestions
+            for idx_sql in optimized.index_suggestions:
+                suggestion = OptimizationSuggestion(
+                    query_id=query_id,
+                    optimization_type="create-index",
+                    description="Index recommendation",
+                    suggested_action=idx_sql,
+                    expected_improvement_pct=50.0,
+                    confidence=0.85,
+                    patterns_addressed=["missing-index"],
+                    metta_reasoning_trace=[]
+                )
+                result.suggestions.append(suggestion)
+        else:
+            result.optimized_sql = sql
+            result.reasoning_trace.append("No anti-patterns detected - query appears optimized")
 
         # Store in history
         self.optimization_history.append(result)

@@ -19,3 +19,5 @@ CLAUDE.md
 GEMINI.md
 .gemini/
 .serena/
+
+.venv*

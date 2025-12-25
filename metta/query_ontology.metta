@@ -207,3 +207,113 @@
 (= (expected-improvement filesort-required) 70)
 (= (expected-improvement missing-index) 90)
 (= (expected-improvement select-star) 30)
+
+;; ============================================
+;; SQL Rewrite Rules - Dynamic Query Optimization
+;; ============================================
+;; These rules define transformations from anti-patterns to optimized SQL
+
+;; --- Rewrite Rule: SELECT * to Explicit Columns ---
+;; Input: (rewrite-select-star table-name columns)
+;; Output: Optimized SELECT clause
+(= (rewrite-select-star $table $columns)
+   (rewrite-result select-star
+     (build-select-clause $columns)
+     "Replaced SELECT * with explicit columns to reduce I/O"))
+
+;; Build SELECT clause from column list
+(= (build-select-clause ()) "")
+(= (build-select-clause ($col)) $col)
+(= (build-select-clause ($col . $rest))
+   (concat $col ", " (build-select-clause $rest)))
+
+;; --- Rewrite Rule: Implicit JOIN to Explicit JOIN ---
+;; Transform: FROM a, b WHERE a.id = b.a_id
+;; To: FROM a INNER JOIN b ON a.id = b.a_id
+(= (rewrite-implicit-join $left-table $left-alias $right-table $right-alias $join-condition)
+   (rewrite-result implicit-join
+     (build-explicit-join $left-table $left-alias $right-table $right-alias $join-condition)
+     "Converted implicit join to explicit INNER JOIN for query optimizer"))
+
+(= (build-explicit-join $left $left-alias $right $right-alias $condition)
+   (concat "FROM " $left " " $left-alias
+           " INNER JOIN " $right " " $right-alias
+           " ON " $condition))
+
+;; --- Rewrite Rule: Correlated Subquery to JOIN ---
+;; Transform: WHERE (SELECT ... FROM inner WHERE inner.id = outer.id)
+;; To: JOIN (SELECT ... GROUP BY ...) subq ON ...
+(= (rewrite-correlated-subquery $outer-table $inner-table $correlation-col $agg-func $agg-col $condition)
+   (rewrite-result correlated-subquery
+     (build-subquery-join $outer-table $inner-table $correlation-col $agg-func $agg-col $condition)
+     "Transformed correlated subquery to derived table JOIN"))
+
+(= (build-subquery-join $outer $inner $corr-col $agg $agg-col $cond)
+   (concat "FROM " $outer " "
+           "INNER JOIN (SELECT " $corr-col ", " $agg "(" $agg-col ") as agg_result "
+           "FROM " $inner " GROUP BY " $corr-col " HAVING " $agg "(" $agg-col ") " $cond
+           ") subq ON " $outer "." $corr-col " = subq." $corr-col))
+
+;; --- Rewrite Rule: Add Index Suggestion ---
+(= (suggest-index $table $column $is-covering $extra-cols)
+   (if $is-covering
+       (index-suggestion
+         (concat "CREATE INDEX idx_" $table "_" $column "_covering ON " $table "(" $column ", " $extra-cols ");")
+         high
+         "Covering index includes all columns needed by query")
+       (index-suggestion
+         (concat "CREATE INDEX idx_" $table "_" $column " ON " $table "(" $column ");")
+         medium
+         "Index on filter/join column")))
+
+;; --- Rewrite Rule: ORDER BY Optimization ---
+;; When ORDER BY uses an expression, use alias instead
+(= (rewrite-order-by-expression $agg-func $column $alias)
+   (rewrite-result order-by
+     (concat "ORDER BY " $alias)
+     "Using column alias instead of expression for ORDER BY"))
+
+;; ============================================
+;; Query Transformation Pipeline
+;; ============================================
+;; Orchestrates multiple rewrites based on detected patterns
+
+;; Apply all applicable rewrites to a query
+(= (optimize-query $query-id $patterns $query-info)
+   (apply-rewrites $patterns $query-info ()))
+
+;; Base case: no more patterns
+(= (apply-rewrites () $query-info $rewrites)
+   (optimization-complete $query-info $rewrites))
+
+;; Recursive case: apply rewrite for each pattern
+(= (apply-rewrites ($pattern . $rest) $query-info $rewrites)
+   (let $new-rewrite (get-rewrite-for-pattern $pattern $query-info)
+        (apply-rewrites $rest $query-info ($new-rewrite . $rewrites))))
+
+;; Get appropriate rewrite based on pattern type
+(= (get-rewrite-for-pattern (pattern-detected $qid select-star $sev $desc) $info)
+   (match $info (query-columns $cols)
+     (rewrite-select-star (get-primary-table $info) $cols)))
+
+(= (get-rewrite-for-pattern (pattern-detected $qid implicit-join $sev $desc) $info)
+   (match $info (, (left-table $lt $la) (right-table $rt $ra) (join-condition $cond))
+     (rewrite-implicit-join $lt $la $rt $ra $cond)))
+
+(= (get-rewrite-for-pattern (pattern-detected $qid correlated-subquery $sev $desc) $info)
+   (match $info (, (outer-table $ot) (inner-table $it) (correlation $col) (aggregation $agg $acol) (condition $cond))
+     (rewrite-correlated-subquery $ot $it $col $agg $acol $cond)))
+
+;; ============================================
+;; Optimization Priority Ordering
+;; ============================================
+;; Higher priority rewrites are applied first
+
+(= (rewrite-priority correlated-subquery) 100)
+(= (rewrite-priority n-plus-one) 95)
+(= (rewrite-priority cartesian-product-risk) 90)
+(= (rewrite-priority implicit-join) 80)
+(= (rewrite-priority full-table-scan) 70)
+(= (rewrite-priority aggregation-full-scan) 60)
+(= (rewrite-priority select-star) 30)
+(= (rewrite-priority filesort-required) 20)
