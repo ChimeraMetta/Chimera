@@ -24,23 +24,20 @@ def run_query(query_text, workspace_root, interactive=False, show_metrics=False)
     """
     # Initialize MeTTa space and load ontology
     logger.info("Initializing MeTTa space for cybersecurity query...")
-    metta_instance = None
-    metta_space = None
 
-    try:
-        local_monitor = DynamicMonitor()
-        ontology_path = os.path.join(workspace_root, CYBERSECURITY_ONTOLOGY_PATH)
+    local_monitor = DynamicMonitor()
+    ontology_path = os.path.join(workspace_root, CYBERSECURITY_ONTOLOGY_PATH)
 
-        if os.path.exists(ontology_path):
-            local_monitor.load_metta_rules(ontology_path)
-            logger.info(f"Loaded cybersecurity ontology from {ontology_path}")
-        else:
-            logger.warning(f"Cybersecurity ontology not found at {ontology_path}. Using fallback mode.")
+    if not os.path.exists(ontology_path):
+        raise FileNotFoundError(
+            f"Cybersecurity ontology not found at {ontology_path}"
+        )
 
-        metta_instance = local_monitor.metta
-        metta_space = local_monitor.metta_space
-    except Exception as e:
-        logger.warning(f"MeTTa initialization failed: {e}. Using Python fallback.")
+    local_monitor.load_metta_rules(ontology_path)
+    logger.info(f"Loaded cybersecurity ontology from {ontology_path}")
+
+    metta_instance = local_monitor.metta
+    metta_space = local_monitor.metta_space
 
     # Create query engine
     from cybersecurity_query.engine import CyberSecurityQueryEngine

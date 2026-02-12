@@ -172,7 +172,7 @@ class TestMeTTaQueryGeneration(unittest.TestCase):
 
 
 class TestReasoningEngine(unittest.TestCase):
-    """Test reasoning engine with fallback mode."""
+    """Test reasoning engine (requires hyperon)."""
 
     def setUp(self):
         self.engine_obj = CyberSecurityQueryEngine()

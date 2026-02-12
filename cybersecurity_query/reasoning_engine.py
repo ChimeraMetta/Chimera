@@ -2,16 +2,11 @@
 
 The reasoning engine runs MeTTa queries against the loaded ontology. All
 knowledge lives in the .metta ontology file -- there are no hardcoded Python
-knowledge bases. When hyperon is available, queries execute through MeTTa's
-full reasoning engine. When unavailable, an OntologyReader parses the same
-.metta file and provides basic pattern matching + rule composition.
-
-Either way, the .metta file is the single source of truth. Adding new facts
-to the ontology automatically makes them queryable without Python changes.
+knowledge bases. Queries execute through MeTTa's full reasoning engine via
+hyperon; hyperon is a hard requirement.
 """
 
 import os
-import re
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from cybersecurity_query.models import (
@@ -27,45 +22,34 @@ logger = logging.getLogger("reasoning_engine")
 class ReasoningEngine:
     """Executes MeTTa queries -- all knowledge lives in the .metta ontology.
 
-    Uses hyperon MeTTa when available, falls back to OntologyReader (which
-    parses the same .metta file) when hyperon is not installed. Either way,
-    the ontology file is the single source of truth.
+    Requires hyperon for MeTTa reasoning. Will raise an error if hyperon is
+    not installed.
     """
 
     def __init__(self, metta_instance=None, metta_space=None, ontology_reader=None):
         self.metta = metta_instance
         self.metta_space = metta_space
-        self._metta_available = metta_instance is not None
         self._ontology: Optional[OntologyReader] = ontology_reader
 
-        if not self._metta_available:
+        if self.metta is None:
             self._init_metta()
 
-        # If MeTTa still unavailable and no shared reader, create one
-        if not self._metta_available and self._ontology is None and os.path.exists(_ONTOLOGY_PATH):
-            self._ontology = OntologyReader(_ONTOLOGY_PATH)
-
     def _init_metta(self):
-        """Initialize MeTTa and load the cybersecurity ontology."""
-        try:
-            from hyperon import MeTTa
-            self.metta = MeTTa()
-            self._metta_available = True
+        """Initialize MeTTa and load the cybersecurity ontology.
 
-            if os.path.exists(_ONTOLOGY_PATH):
-                with open(_ONTOLOGY_PATH) as f:
-                    self.metta.run(f.read())
-                logger.info(f"Loaded ontology from {_ONTOLOGY_PATH}")
-            else:
-                logger.warning(f"Ontology not found at {_ONTOLOGY_PATH}")
-        except ImportError:
-            logger.warning("hyperon not installed -- using ontology file reader as fallback")
-            self.metta = None
-            self._metta_available = False
-        except Exception as e:
-            logger.warning(f"MeTTa initialization failed: {e}")
-            self.metta = None
-            self._metta_available = False
+        Raises ImportError if hyperon is not installed.
+        """
+        from hyperon import MeTTa
+        self.metta = MeTTa()
+
+        if os.path.exists(_ONTOLOGY_PATH):
+            with open(_ONTOLOGY_PATH) as f:
+                self.metta.run(f.read())
+            logger.info(f"Loaded ontology from {_ONTOLOGY_PATH}")
+        else:
+            raise FileNotFoundError(
+                f"Cybersecurity ontology not found at {_ONTOLOGY_PATH}"
+            )
 
     def execute_plan(self, plan: QueryPlan, parsed: ParsedQuery) -> QueryResult:
         """Execute a query plan and return results with reasoning trace."""
@@ -120,19 +104,13 @@ class ReasoningEngine:
         return query
 
     def _execute_query(self, query_str: str) -> List[str]:
-        """Execute a query. Uses MeTTa if available, else OntologyReader."""
-        if self._metta_available:
-            try:
-                raw = self.metta.run(query_str)
-                return self._parse_metta_results(raw)
-            except Exception as e:
-                logger.warning(f"MeTTa query failed: {query_str!r} -- {e}")
-
-        # Fallback: evaluate against parsed ontology file
-        if self._ontology:
-            return self._ontology.evaluate(query_str)
-
-        return []
+        """Execute a MeTTa query. Raises on failure."""
+        try:
+            raw = self.metta.run(query_str)
+            return self._parse_metta_results(raw)
+        except Exception as e:
+            logger.warning(f"MeTTa query failed: {query_str!r} -- {e}")
+            return []
 
     def _parse_metta_results(self, raw_results) -> List[str]:
         """Parse MeTTa execution results into clean strings."""
@@ -157,8 +135,6 @@ class ReasoningEngine:
     def _classify_reasoning(self, query_str: str) -> str:
         """Classify the reasoning type based on the query."""
         q = query_str.strip()
-        if not self._metta_available and not self._ontology:
-            return "unavailable"
         if q.startswith('!(match '):
             return "direct"
         multi_hop_rules = (
