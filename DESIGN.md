@@ -35,3 +35,13 @@ The problem with utilising LLMs for generating new candidates for functions or p
 3. Loop invariants
 
 For these we use a custom JSON intermediate representation of a function, which is then parsed through MeTTa and used to figure out if a particular candidate function matches the desired outcomes.
+
+--
+
+## Cybersecurity Domain Application
+
+Chimera's hybrid reasoning architecture extends beyond code analysis to domain-specific knowledge systems. The cybersecurity query module demonstrates this by combining:
+
+1. **MeTTa ontology as single source of truth** — threats, vulnerabilities, mitigations, attack vectors, and their relationships are all defined in `metta/cybersecurity_ontology.metta`. Adding a new entity to the `.metta` file makes it automatically discoverable.
+2. **Sentence-transformer embeddings for NL understanding** — intent classification uses cosine similarity against pre-embedded exemplar phrases, handling arbitrary paraphrased queries without regex patterns.
+3. **Deductive reasoning via MeTTa rules** — the ontology contains rules like `(= (mitigations-for $threat) ...)` that Chimera evaluates to answer multi-hop queries about threat relationships and mitigation chains.

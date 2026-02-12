@@ -64,6 +64,7 @@ chimera summary file.py                           # analyzes and then provides a
 chimera analyze file.py --api_key=OPENAI_API_KEY  # will perform complexity analysis and guide you through generating improved alternatives to your functions
 chimera export file.metta                         # exports your current atomspace to a .metta file at the specified path
 chimera import file.metta --overwrite             # imports an external .metta file into your atomspace
+chimera query "What mitigations exist for ransomware?"  # natural language cybersecurity query
 ```
 
 The `analyze` command takes an `--api_key` argument with an OpenAI API key, which is optional. If you supply it Chimera will 
@@ -156,7 +157,58 @@ This command runs the donor generation process on a predefined example function 
 
 [![Visualize](./assets/visualize.png)](./assets/visualize.png)
 
--- 
+### Cybersecurity Query
+
+Chimera includes a natural language cybersecurity threat intelligence query system. It uses sentence-transformer embeddings for intent classification and resolves entities directly from a MeTTa knowledge base — adding a new threat, vulnerability, or mitigation to the `.metta` ontology makes it automatically discoverable with no Python changes.
+
+```sh
+chimera query "What mitigations exist for ransomware?"
+chimera query "How severe is SQL injection?"
+chimera query "Tell me about CVE-2021-44228"
+```
+
+The system handles arbitrary paraphrased queries. All of the following resolve correctly:
+
+```
+"What defenses exist for phishing?"          → MITIGATION_ADVICE
+"Can you explain what a rootkit does?"       → THREAT_LOOKUP
+"Which threats pose the greatest danger?"    → SEVERITY_ASSESSMENT
+"What attacks follow after SQL injection?"   → RELATIONSHIP_QUERY
+"Details on Log4Shell"                       → VULNERABILITY_CHECK
+```
+
+#### SDK Usage
+
+The query engine is also importable as a Python SDK:
+
+```python
+from cybersecurity_query import CyberSecurityQueryEngine
+
+engine = CyberSecurityQueryEngine()
+result = engine.query("What mitigations exist for ransomware?")
+print(result.formatted_response)
+```
+
+The SDK provides a fluent builder API as well:
+
+```python
+from cybersecurity_query import QueryBuilder
+
+result = (QueryBuilder()
+    .threat("ransomware")
+    .intent("mitigation")
+    .execute())
+```
+
+#### Architecture
+
+The NL parser uses a hybrid approach:
+
+- **Intent Classification**: Sentence-transformer embeddings (`all-MiniLM-L6-v2`) classify query intent by cosine similarity to pre-embedded exemplar phrases — no regex patterns
+- **Entity Resolution**: Entity vocabulary (threats, attack vectors, software, severity levels) is read from the MeTTa ontology at init time via `OntologyReader`
+- **Reasoning Engine**: Generates MeTTa query plans and evaluates them against the cybersecurity ontology, with Python fallback for rule evaluation
+
+--
 
 ## Next Phase
 
