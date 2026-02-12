@@ -24,8 +24,9 @@ from executors.export_importer import (
 )
 from metta_generator.base import MeTTaPoweredModularDonorGenerator
 from metta_generator.operation_substitution import OperationSubstitutionGenerator
-from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator  
+from metta_generator.data_struct_adaptation import DataStructureAdaptationGenerator
 from metta_generator.algo_transformation import AlgorithmTransformationGenerator
+from executors.query_executor import run_query as _run_query_executor
 
 _WORKSPACE_ROOT = os.path.abspath(os.path.dirname(__file__))
 _INTERMEDIATE_EXPORT_DIR = os.path.join(_WORKSPACE_ROOT, ".chimera_exports")
@@ -1412,6 +1413,21 @@ def run_metta_generate_command(target_path: str = None):
     logger.info(f"  - Use 'export' command to save MeTTa reasoning atomspace")
     logger.info(f"  - Compare results with 'analyze' command for API-based optimization")
 
+def run_query_command(query_text: str, interactive: bool = False, show_metrics: bool = False):
+    """Run a cybersecurity threat NL query using MeTTa symbolic reasoning."""
+    logger.info(f"Running 'query' command: \"{query_text}\"")
+    try:
+        _run_query_executor(
+            query_text=query_text,
+            workspace_root=_WORKSPACE_ROOT,
+            interactive=interactive,
+            show_metrics=show_metrics,
+        )
+    except Exception as e:
+        logger.error(f"Error during query execution: {e}")
+        logger.exception("Full traceback for query execution error:")
+    logger.info("'query' command complete.")
+
 # --- Main CLI Logic ---
 
 if __name__ == "__main__":
@@ -1424,12 +1440,14 @@ if __name__ == "__main__":
                f"  python cli.py import /path/to/existing/atomspace.metta\n"
                f"  python cli.py import /path/to/atomspace.metta --overwrite\n"
                f"  python cli.py export /path/to/output/atomspace.metta\n"
-               f"  python cli.py visualize /path/to/your/file.py",
+               f"  python cli.py visualize /path/to/your/file.py\n"
+               f"  python cli.py query \"What is ransomware?\"\n"
+               f"  python cli.py query \"How to protect against SQL injection?\" --interactive",
         formatter_class=ColoredHelpFormatter # Use the custom formatter
     )
     parser.add_argument(
         "command", 
-        choices=["summary", "analyze", "import", "export", "visualize", "generate", "evolve"],
+        choices=["summary", "analyze", "import", "export", "visualize", "generate", "evolve", "query"],
         help=(
             "The command to execute. Each command has specific behaviors:\n"
             "  summary: Codebase structure, patterns, and concepts analysis.\n"
@@ -1437,16 +1455,18 @@ if __name__ == "__main__":
             "  generate: MeTTa-based donor generation for all functions in a file.\n"
             "  visualize: DEMONSTRATION - Show donor evolution process with example function.\n"
             "  import:  Import atoms from an external .metta file.\n"
-            "  export:  Export a consolidated MeTTa atomspace."
+            "  export:  Export a consolidated MeTTa atomspace.\n"
+            "  query:   Cybersecurity threat NL query with MeTTa reasoning."
         )
     )
     parser.add_argument(
-        "path", 
+        "path",
         help="The path argument, meaning depends on the command:\n"
             "  For 'summary', 'analyze', 'generate': Path to the target Python file or directory to analyze.\n"
             "  For 'analyze': Path to the target Python file or directory to analyze.\n"
             "  For 'import': Path to the .metta file to import atoms from.\n"
-            "  For 'export': Path to the output .metta file where the atomspace will be saved."
+            "  For 'export': Path to the output .metta file where the atomspace will be saved.\n"
+            "  For 'query': The natural language query text (e.g. 'What is ransomware?')."
     )
     parser.add_argument(
         "--api_key", 
@@ -1464,11 +1484,25 @@ if __name__ == "__main__":
              "Default behavior is to skip atoms that already exist in the atomspace.",
         default=False
     )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="[Optional] For 'query' command: enable interactive rating mode after each query.",
+        default=False
+    )
+    parser.add_argument(
+        "--query-metrics",
+        action="store_true",
+        help="[Optional] For 'query' command: display accuracy metrics after query execution.",
+        default=False
+    )
 
     args = parser.parse_args()
 
-    # Path validation based on command
-    if args.command in ["summary", "analyze"]:
+    # Path validation based on command (query uses path as query text, no validation needed)
+    if args.command == "query":
+        pass  # path is query text, not a file path
+    elif args.command in ["summary", "analyze"]:
         if not os.path.exists(args.path):
             logger.error(f"Error: The input path '{args.path}' for command '{args.command}' does not exist. Please provide a valid file or directory path.")
             sys.exit(1)
@@ -1528,6 +1562,8 @@ if __name__ == "__main__":
         run_metta_generate_command(args.path)
     elif args.command == "evolve":
         run_evolve_command()
+    elif args.command == "query":
+        run_query_command(args.path, interactive=args.interactive, show_metrics=args.query_metrics)
     else:
         logger.error(f"Unknown command: {args.command}") 
         parser.print_help()
