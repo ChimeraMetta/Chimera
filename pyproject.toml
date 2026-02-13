@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chimera"
+version = "0.1.0"
+description = "Autonomous code evolution through symbolic reasoning and LLM inference"
+requires-python = ">=3.8"
+dependencies = [
+    "blessed>=1.21.0",
+    "certifi",
+    "colorama>=0.4.6",
+    "gitdb",
+    "GitPython>=3.1.44",
+    "psutil>=5.9.6",
+    "tqdm>=4.67.1",
+    "requests>=2.32.3",
+    "sentence-transformers>=2.2.0",
+]
+
+[project.optional-dependencies]
+interactive = ["inquirer>=3.4.0"]
+metta = ["hyperon>=0.2.4"]
+api = ["fastapi>=0.104.1", "uvicorn>=0.24.0", "python-multipart>=0.0.6", "jinja2>=3.1.2"]
+all = ["chimera[interactive,metta,api]"]
+
+[project.scripts]
+chimera = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli"]
+packages = [
+    "common",
+    "cybersecurity_query",
+    "executors",
+    "metta_generator",
+    "metta_generator.evolution",
+    "proofs",
+    "reflectors",
+]

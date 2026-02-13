@@ -88,8 +88,15 @@ class EmbeddingIntentClassifier:
     CONFIDENCE_MIN = 0.6
     CONFIDENCE_MAX = 0.95
 
+    _MODEL_NAME = "all-MiniLM-L6-v2"
+
     def __init__(self):
-        self._model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Try loading from local cache first; fall back to download on first run.
+        try:
+            self._model = SentenceTransformer(self._MODEL_NAME, local_files_only=True)
+        except Exception:
+            logger.info("Downloading model %s (first run only)...", self._MODEL_NAME)
+            self._model = SentenceTransformer(self._MODEL_NAME)
         self._intent_embeddings: Dict[QueryIntent, object] = {}
 
         # Pre-embed all exemplars per intent

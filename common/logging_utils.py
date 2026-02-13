@@ -1,10 +1,14 @@
 import logging
 from colorama import init, Fore, Style
 import argparse
-from inquirer import themes
 
 # Initialize colorama globally
 init(autoreset=True)
+
+# Suppress noisy third-party debug loggers
+for _quiet in ("httpx", "httpcore", "urllib3", "huggingface_hub",
+               "sentence_transformers", "filelock", "git", "git.cmd"):
+    logging.getLogger(_quiet).setLevel(logging.WARNING)
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter that adds colors to different log levels"""
@@ -66,26 +70,24 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     
     return logger
 
-# Custom theme for inquirer that matches our color scheme
-class ChimeraTheme(themes.GreenPassion):
-    def __init__(self):
-        """
-        This is a custom theme for inquirer that matches our color scheme.
-        It's used to style the inquirer prompts.
-        It's based on the GreenPassion theme from inquirer.
-        It's used to style the inquirer prompts.
-        """
-        super().__init__()
-        # Assuming Fore and Style are available (e.g., imported from logging_utils or globally)
-        self.Checkbox.selected_icon = f"{Fore.GREEN}{Style.RESET_ALL}"
-        self.Checkbox.unselected_icon = " "
-        self.Checkbox.selected_color = Fore.GREEN # Inquirer might handle RESET_ALL
-        self.Checkbox.unselected_color = Style.RESET_ALL # Or rely on autoreset
-        # For List prompt, cursor color can be set if supported by theme
-        if hasattr(self.List, 'selection_cursor'):
-            self.List.selection_cursor = f"{Fore.GREEN}❯{Style.RESET_ALL}"
-        if hasattr(self.List, 'selection_color'):
-            self.List.selection_color = Fore.GREEN
+# Custom theme factory for inquirer that matches our color scheme
+def ChimeraTheme():
+    """Create a Chimera-styled inquirer theme (requires inquirer to be installed)."""
+    from inquirer import themes
+
+    class _ChimeraTheme(themes.GreenPassion):
+        def __init__(self):
+            super().__init__()
+            self.Checkbox.selected_icon = f"{Fore.GREEN}{Style.RESET_ALL}"
+            self.Checkbox.unselected_icon = " "
+            self.Checkbox.selected_color = Fore.GREEN
+            self.Checkbox.unselected_color = Style.RESET_ALL
+            if hasattr(self.List, 'selection_cursor'):
+                self.List.selection_cursor = f"{Fore.GREEN}❯{Style.RESET_ALL}"
+            if hasattr(self.List, 'selection_color'):
+                self.List.selection_color = Fore.GREEN
+
+    return _ChimeraTheme()
 
 # Custom HelpFormatter for colored output (moved from cli.py)
 class ColoredHelpFormatter(argparse.HelpFormatter):
@@ -200,17 +202,17 @@ class ColoredHelpFormatter(argparse.HelpFormatter):
         # The user has the art in cli.py, so we will copy it exactly, escaping as necessary.
         
         ascii_art = (
-            "      ___           ___                       ___           ___           ___           ___     \n"
-            "     /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    \n"
-            "    /::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   \n"
-            "   /:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  \n"
-            "  /:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ \n"
-            " /:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ \n"
-            " \:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /\n"
-            "  \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / \n"
-            "   \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  \n"
-            "    \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   \n"
-            "     \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    \n"
+            r"      ___           ___                       ___           ___           ___           ___     " "\n"
+            r"     /\  \         /\__\          ___        /\__\         /\  \         /\  \         /\  \    " "\n"
+            r"    /::\  \       /:/  /         /\  \      /::|  |       /::\  \       /::\  \       /::\  \   " "\n"
+            r"   /:/\:\  \     /:/__/          \:\  \    /:|:|  |      /:/\:\  \     /:/\:\  \     /:/\:\  \  " "\n"
+            r"  /:/  \:\  \   /::\  \ ___      /::\__\  /:/|:|__|__   /::\~\:\  \   /::\~\:\  \   /::\~\:\  \ " "\n"
+            r" /:/__/ \:\__\ /:/\:\  /\__\  __/:/\/__/ /:/ |::::\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ " "\n"
+            r" \:\  \  \/__/ \/__\:\/:/  / /\/:/  /    \/__/~~/:/  / \:\~\:\ \/__/ \/_|::\/:/  / \/__\:\/:/  /" "\n"
+            r"  \:\  \            \::/  /  \::/__/           /:/  /   \:\ \:\__\      |:|::/  /       \::/  / " "\n"
+            r"   \:\  \           /:/  /    \:\__\          /:/  /     \:\ \/__/      |:|\/__/        /:/  /  " "\n"
+            r"    \:\__\         /:/  /      \/__/         /:/  /       \:\__\        |:|  |         /:/  /   " "\n"
+            r"     \/__/         \/__/                     \/__/         \/__/         \|__|         \/__/    " "\n"
             "\n"
         )
         help_message = super().format_help()

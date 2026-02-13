@@ -2,7 +2,6 @@ import argparse
 import os
 import sys
 from typing import Union
-import inquirer
 from io import StringIO
 import ast
 import time
@@ -252,6 +251,7 @@ def run_analyze_command(target_path: str, api_key: Union[str, None] = None):
             if not functions_in_file:
                 logger.info("No functions found in the decomposed file info to offer for optimization.")
             else:
+                import inquirer
                 questions = [
                     inquirer.List('selected_func',
                                   message="Select a function to attempt optimization (or 'skip')",
@@ -1430,7 +1430,7 @@ def run_query_command(query_text: str, interactive: bool = False, show_metrics: 
 
 # --- Main CLI Logic ---
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Chimera Indexer: A CLI tool for analyzing Python codebases and managing MeTTa atomspaces.",
         epilog=f"Example usage:\n"
@@ -1571,3 +1571,7 @@ if __name__ == "__main__":
 
     logger.info("CLI command execution finished.")
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
